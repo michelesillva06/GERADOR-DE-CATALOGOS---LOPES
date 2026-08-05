@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Building2, User as UserIcon, LogOut, ExternalLink, ShieldAlert, Sparkles, ChevronDown } from 'lucide-react';
 
+import { LopesLogo } from './LopesLogo';
+
 interface HeaderProps {
   onOpenPublicCatalog?: () => void;
   activeView: string;
@@ -20,19 +22,8 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Brand Logo */}
-        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveView('dashboard')}>
-          <div className="w-10 h-10 rounded-lg bg-[#F10F4D] flex items-center justify-center font-bold text-xl shadow-lg shadow-rose-900/40">
-            L
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-extrabold text-lg tracking-tight text-white">LOPES</span>
-              <span className="text-[#F10F4D] font-bold text-xs uppercase px-1.5 py-0.5 bg-rose-950/60 rounded border border-rose-800/50">
-                CAPTAÇÃO
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 font-medium hidden sm:block">Lopes Captação</p>
-          </div>
+        <div className="flex items-center cursor-pointer" onClick={() => setActiveView('dashboard')}>
+          <LopesLogo size="md" variant="white" showBadge badgeText="CAPTAÇÃO" />
         </div>
 
         {/* Header Right Actions */}

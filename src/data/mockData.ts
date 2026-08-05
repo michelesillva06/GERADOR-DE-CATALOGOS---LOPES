@@ -1,9 +1,9 @@
 import { User, Property, CompanySettings, AuditLog } from '../types';
 
 export const initialCompanySettings: CompanySettings = {
-  company_name: 'Lopes Manaus',
+  company_name: 'Lopes Captação',
   unit_name: 'Lopes Imobiliária - Shopping Ponta Negra',
-  logo_url: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=400&q=80',
+  logo_url: '/lopes-logo.svg',
   primary_color: '#F10F4D',
   phone: '(92) 3659-1000',
   whatsapp: '5592981234567',

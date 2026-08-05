@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { KeyRound, User as UserIcon, Lock, Building2, Sparkles, AlertCircle } from 'lucide-react';
 
+import { LopesLogo } from '../components/LopesLogo';
+
 export const Login: React.FC = () => {
   const { login } = useAuth();
   const [loginInput, setLoginInput] = useState('');
@@ -67,16 +69,8 @@ export const Login: React.FC = () => {
       <div className="max-w-md w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl relative z-10 backdrop-blur-xl">
         
         {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 bg-[#F10F4D] rounded-2xl flex items-center justify-center font-extrabold text-white text-3xl mx-auto shadow-xl shadow-rose-900/50 mb-3">
-            L
-          </div>
-          <div className="flex items-center justify-center space-x-2">
-            <h1 className="text-2xl font-black text-white tracking-tight">LOPES</h1>
-            <span className="text-[#F10F4D] font-extrabold text-xs uppercase px-2 py-0.5 bg-rose-950 rounded border border-rose-800">
-              CAPTAÇÃO
-            </span>
-          </div>
+        <div className="text-center mb-8 flex flex-col items-center">
+          <LopesLogo size="lg" variant="white" showBadge badgeText="CAPTAÇÃO" className="mb-2" />
           <p className="text-xs text-slate-400 mt-1 font-medium">
             Sistema de Captação & Gestão Imobiliária
           </p>

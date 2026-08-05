@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { getStoredProperties, getStoredUsers, getStoredSettings } from '../lib/storage';
+import { LopesLogo } from '../components/LopesLogo';
 import { 
   Building2, MapPin, Bed, Bath, Car, Maximize2, Calendar, Phone, 
   MessageCircle, Share2, ArrowLeft, CheckCircle2, Play, Video, 
@@ -180,17 +181,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <a href="/" className="flex items-center space-x-2 group">
-              <div className="w-8 h-8 rounded-lg bg-[#F10F4D] flex items-center justify-center font-black text-white text-base shadow">
-                L
-              </div>
-              <div>
-                <span className="font-extrabold text-sm tracking-wide text-white group-hover:text-rose-400 transition">
-                  LOPES MANAUS
-                </span>
-                <span className="block text-[9px] font-semibold text-slate-400">
-                  CRECI-J: {companySettings.creci_j || '540-J/AM'}
-                </span>
-              </div>
+              <LopesLogo size="sm" variant="white" showBadge badgeText="CAPTAÇÃO" />
             </a>
           </div>
 

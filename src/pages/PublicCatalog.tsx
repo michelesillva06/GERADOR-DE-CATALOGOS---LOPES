@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 import { generateQRCodeDataUrl } from '../lib/qrCode';
+import { LopesLogo } from '../components/LopesLogo';
 import { getStoredUsers, getStoredProperties } from '../lib/storage';
 
 interface PublicCatalogProps {
@@ -183,20 +184,10 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-12">
       
-      {/* Top Lopes Manaus Bar */}
+      {/* Top Lopes Bar */}
       <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-lg bg-[#F10F4D] flex items-center justify-center font-black text-xl text-white shadow-md">
-              L
-            </div>
-            <div>
-              <span className="font-black text-lg text-white tracking-tight">LOPES</span>
-              <span className="text-[#F10F4D] font-bold text-xs ml-1.5 uppercase px-1.5 py-0.5 bg-rose-950 rounded border border-rose-800">
-                MANAUS
-              </span>
-            </div>
-          </div>
+          <LopesLogo size="md" variant="white" showBadge badgeText="CAPTAÇÃO" />
 
           <div className="flex items-center space-x-2">
             <button
