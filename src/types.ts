@@ -49,6 +49,7 @@ export interface Property {
   features: string[];
   images: string[];
   main_image: string;
+  views?: number;
   created_at: string;
   updated_at: string;
 }

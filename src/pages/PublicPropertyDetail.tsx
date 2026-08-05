@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { getStoredProperties, getStoredUsers, getStoredSettings } from '../lib/storage';
 import { LopesLogo } from '../components/LopesLogo';
+import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { 
   Building2, MapPin, Bed, Bath, Car, Maximize2, Calendar, Phone, 
   MessageCircle, Share2, ArrowLeft, CheckCircle2, Play, Video, 
@@ -126,13 +127,12 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
     ? `R$ ${property.rent_price.toLocaleString('pt-BR')} /mês`
     : `R$ ${property.price.toLocaleString('pt-BR')}`;
 
-  const agentPhone = captador?.whatsapp || captador?.phone || companySettings.whatsapp || companySettings.phone;
-  const cleanPhone = agentPhone.replace(/\D/g, '');
-  const waPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+  const agentPhone = getEffectiveWhatsApp(captador, companySettings);
 
-  const waInterestUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(
+  const waInterestUrl = buildWhatsAppUrl(
+    agentPhone,
     `Olá ${captador?.name || 'Lopes Captação'}! Tenho interesse no imóvel "${property.title}". Poderia me passar mais informações?`
-  )}`;
+  );
 
   const handleScheduleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,7 +150,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
       (visitNotes ? `*Observações:* ${visitNotes}\n` : '') +
       `\nSolicitação enviada via Portal Lopes Captação.`;
 
-    const waScheduleUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
+    const waScheduleUrl = buildWhatsAppUrl(agentPhone, msg);
     
     setScheduleSuccess(true);
     setTimeout(() => {
@@ -527,7 +527,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
               <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 space-y-1.5 font-semibold">
                 <div className="flex items-center space-x-2">
                   <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{captador?.whatsapp || captador?.phone || companySettings.phone}</span>
+                  <span>{formatPhoneDisplay(agentPhone)}</span>
                 </div>
                 {captador?.email && (
                   <div className="flex items-center space-x-2 truncate">

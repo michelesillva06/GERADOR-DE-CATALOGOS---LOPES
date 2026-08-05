@@ -19,6 +19,7 @@ import {
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 import { generateQRCodeDataUrl } from '../lib/qrCode';
 import { LopesLogo } from '../components/LopesLogo';
+import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { getStoredUsers, getStoredProperties } from '../lib/storage';
 
 interface PublicCatalogProps {
@@ -134,22 +135,9 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
     return true;
   });
 
-  const rawWa = (captador.whatsapp || captador.phone || '5592981234567').trim();
-  const generalWhatsappMsg = encodeURIComponent(
-    `Olá ${captador.name}! Vi seu catálogo digital na Lopes Manaus e gostaria de saber mais sobre os imóveis disponíveis.`
-  );
-  let mainWhatsappUrl = '';
-  if (rawWa.startsWith('http://') || rawWa.startsWith('https://')) {
-    mainWhatsappUrl = rawWa;
-  } else if (rawWa.startsWith('wa.me/')) {
-    mainWhatsappUrl = `https://${rawWa}`;
-  } else {
-    let cleanWa = rawWa.replace(/\D/g, '');
-    if (!cleanWa.startsWith('55') && (cleanWa.length === 10 || cleanWa.length === 11)) {
-      cleanWa = `55${cleanWa}`;
-    }
-    mainWhatsappUrl = `https://wa.me/${cleanWa}?text=${generalWhatsappMsg}`;
-  }
+  const captadorPhone = getEffectiveWhatsApp(captador, companySettings);
+  const generalWhatsappMsg = `Olá ${captador.name}! Vi seu catálogo digital na Lopes Captação e gostaria de saber mais sobre os imóveis disponíveis.`;
+  const mainWhatsappUrl = buildWhatsAppUrl(captadorPhone, generalWhatsappMsg);
 
   const handleDownloadFullCatalogPdf = async () => {
     setIsGeneratingPdf(true);
@@ -326,15 +314,8 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
                 captador={captador}
                 onView={() => setSelectedProperty(prop)}
                 onShareWhatsApp={() => {
-                  const msg = encodeURIComponent(`Olá ${captador.name}! Vi o imóvel "${prop.title}" no seu catálogo: ${window.location.href}`);
-                  let targetWaUrl = mainWhatsappUrl;
-                  if (!rawWa.startsWith('http') && !rawWa.startsWith('wa.me')) {
-                    let cleanWa = rawWa.replace(/\D/g, '');
-                    if (!cleanWa.startsWith('55') && (cleanWa.length === 10 || cleanWa.length === 11)) {
-                      cleanWa = `55${cleanWa}`;
-                    }
-                    targetWaUrl = `https://wa.me/${cleanWa}?text=${msg}`;
-                  }
+                  const msg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" no seu catálogo: ${window.location.origin}/imovel/${prop.id}`;
+                  const targetWaUrl = buildWhatsAppUrl(captadorPhone, msg);
                   window.open(targetWaUrl, '_blank');
                 }}
                 canEdit={false}

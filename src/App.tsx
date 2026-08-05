@@ -14,6 +14,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
+import { buildWhatsAppUrl, getEffectiveWhatsApp } from './lib/whatsapp';
 import { Property, User, CompanySettings, AuditLog, DashboardStats } from './types';
 import {
   getStoredProperties,
@@ -24,6 +25,7 @@ import {
   saveStoredSettings,
   getStoredLogs,
   saveStoredLogs,
+  saveStoredCurrentUser,
   calculateStats
 } from './lib/storage';
 
@@ -108,6 +110,7 @@ function MainApp() {
 
   useEffect(() => {
     if (user) {
+      setActiveView('dashboard');
       fetchData();
     }
   }, [user]);
@@ -215,11 +218,23 @@ function MainApp() {
     setStats(calculateStats(allProps, users));
   };
 
+  const handleViewPropertyDetails = (prop: Property) => {
+    const updatedViews = (prop.views || 0) + 1;
+    const updatedProp = { ...prop, views: updatedViews };
+    setViewingProperty(updatedProp);
+
+    const allProps = getStoredProperties().map(p => p.id === prop.id ? updatedProp : p);
+    saveStoredProperties(allProps);
+    setProperties(allProps);
+  };
+
   const handleShareWhatsApp = (prop: Property) => {
     const owner = users.find(u => u.id === prop.user_id) || user;
-    const link = `${window.location.origin}/catalogo/${owner.url_slug || owner.username}?code=${prop.code}`;
-    const text = encodeURIComponent(`Confira este imóvel na Lopes Captação: ${prop.title} (${prop.code}) - ${link}`);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    const phone = getEffectiveWhatsApp(owner, companySettings);
+    const link = `${window.location.origin}/imovel/${prop.id}`;
+    const text = `Olá ${owner.name}! Gostaria de informações e agendar visita para o imóvel "${prop.title}": ${link}`;
+    const waUrl = buildWhatsAppUrl(phone, text);
+    window.open(waUrl, '_blank');
   };
 
   const handleAddUser = async (userData: any) => {
@@ -270,6 +285,11 @@ function MainApp() {
     const allUsers = getStoredUsers().map(u => u.id === id ? { ...u, ...userData } : u);
     saveStoredUsers(allUsers);
     setUsers(allUsers);
+
+    if (user && user.id === id) {
+      const updatedSelf = { ...user, ...userData };
+      saveStoredCurrentUser(updatedSelf);
+    }
   };
 
   const handleToggleBlockUser = async (id: string) => {
@@ -355,7 +375,7 @@ function MainApp() {
                 companySettings={companySettings}
                 onOpenNewPropertyModal={handleOpenNewProperty}
                 onOpenPdfModal={() => setIsPdfModalOpen(true)}
-                onViewProperty={(p) => setViewingProperty(p)}
+                onViewProperty={handleViewPropertyDetails}
                 onEditProperty={handleEditProperty}
                 onDeleteProperty={handleDeleteProperty}
                 onShareWhatsApp={handleShareWhatsApp}
@@ -370,7 +390,7 @@ function MainApp() {
               currentUser={user}
               onOpenNewPropertyModal={handleOpenNewProperty}
               onOpenPdfModal={() => setIsPdfModalOpen(true)}
-              onViewProperty={(p) => setViewingProperty(p)}
+              onViewProperty={handleViewPropertyDetails}
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
               onShareWhatsApp={handleShareWhatsApp}
@@ -414,7 +434,9 @@ function MainApp() {
           {activeView === 'settings' && (
             <SettingsPage
               settings={companySettings}
+              currentUser={user}
               onSaveSettings={handleSaveSettings}
+              onUpdateUser={handleUpdateUser}
             />
           )}
 

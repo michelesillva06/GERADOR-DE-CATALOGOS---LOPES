@@ -1,6 +1,7 @@
 import React from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
+import { buildWhatsAppUrl } from '../lib/whatsapp';
 import { Building2, PlusCircle, Share2, FileSpreadsheet, ExternalLink, CheckCircle2, Copy } from 'lucide-react';
 
 interface CaptadorDashboardProps {
@@ -38,10 +39,9 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
   };
 
   const handleShareCatalogWhatsApp = () => {
-    const text = encodeURIComponent(
-      `Olá! Confira meu catálogo de imóveis atualizado na Lopes Manaus: ${publicUrl}`
-    );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    const text = `Olá! Confira meu catálogo de imóveis atualizado na Lopes Captação: ${publicUrl}`;
+    const waUrl = buildWhatsAppUrl(user.whatsapp || user.phone, text);
+    window.open(waUrl, '_blank');
   };
 
   return (

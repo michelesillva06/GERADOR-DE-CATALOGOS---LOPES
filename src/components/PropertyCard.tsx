@@ -67,6 +67,13 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               {property.category}
             </span>
           </div>
+
+          {property.views !== undefined && property.views > 0 && (
+            <span className="bg-slate-900/80 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur border border-slate-700 flex items-center space-x-1">
+              <Eye className="w-3 h-3 text-rose-400" />
+              <span>{property.views} visualizações</span>
+            </span>
+          )}
         </div>
       </div>
 

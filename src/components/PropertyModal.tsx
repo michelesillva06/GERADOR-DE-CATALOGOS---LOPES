@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { generateQRCodeDataUrl } from '../lib/qrCode';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
+import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
 
 interface PropertyModalProps {
   property: Property | null;
@@ -63,22 +64,9 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
     setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
-  const whatsappRaw = captador?.whatsapp || captador?.phone || companySettings?.whatsapp || '5592981234567';
-  const whatsappMsg = encodeURIComponent(
-    `Olá ${captador?.name || 'Lopes Captação'}! Gostaria de mais informações e agendar uma visita para o imóvel "${property.title}".`
-  );
-  let whatsappUrl = '';
-  if (whatsappRaw.startsWith('http://') || whatsappRaw.startsWith('https://')) {
-    whatsappUrl = whatsappRaw;
-  } else if (whatsappRaw.startsWith('wa.me/')) {
-    whatsappUrl = `https://${whatsappRaw}`;
-  } else {
-    let cleanWa = whatsappRaw.replace(/\D/g, '');
-    if (!cleanWa.startsWith('55') && (cleanWa.length === 10 || cleanWa.length === 11)) {
-      cleanWa = `55${cleanWa}`;
-    }
-    whatsappUrl = `https://wa.me/${cleanWa}?text=${whatsappMsg}`;
-  }
+  const effectivePhone = getEffectiveWhatsApp(captador, companySettings);
+  const whatsappMsg = `Olá ${captador?.name || 'Lopes Captação'}! Gostaria de mais informações e agendar uma visita para o imóvel "${property.title}".`;
+  const whatsappUrl = buildWhatsAppUrl(effectivePhone, whatsappMsg);
 
   const handleDownloadPdf = async () => {
     if (!captador) return;
@@ -279,7 +267,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
                   <p className="text-xs text-slate-400 uppercase font-bold">Captador Responsável</p>
                   <h4 className="text-base font-extrabold text-white">{captador.name}</h4>
                   <p className="text-xs text-rose-400 font-semibold">{captador.position}</p>
-                  <p className="text-xs text-slate-300 mt-1">{captador.phone || captador.whatsapp}</p>
+                  <p className="text-xs text-slate-300 mt-1">{formatPhoneDisplay(effectivePhone)}</p>
                 </div>
               </div>
             )}
