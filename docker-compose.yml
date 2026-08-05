@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # App (Express Backend + React Frontend bundled)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - JWT_SECRET=lopes_manaus_secret_key_2026
+      - DATABASE_URL=postgres://lopes_user:lopes_pass@db:5432/lopes_db
+    depends_on:
+      - db
+    restart: always
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: lopes_postgres
+    environment:
+      POSTGRES_USER: lopes_user
+      POSTGRES_PASSWORD: lopes_pass
+      POSTGRES_DB: lopes_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    restart: always
+
+volumes:
+  postgres_data:
