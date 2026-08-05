@@ -1,6 +1,6 @@
 {
-  "name": "Gerador de Catálogos Imobiliários - Lopes Manaus",
-  "description": "Sistema de gestão imobiliária, geração de catálogos em PDF, páginas públicas de captadores e painel de administração.",
+  "name": "Lopes Captação",
+  "description": "Sistema de gestão imobiliária, captação e geração de catálogos digitais em PDF.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

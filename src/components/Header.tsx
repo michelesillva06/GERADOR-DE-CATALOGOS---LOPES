@@ -28,10 +28,10 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
             <div className="flex items-center space-x-2">
               <span className="font-extrabold text-lg tracking-tight text-white">LOPES</span>
               <span className="text-[#F10F4D] font-bold text-xs uppercase px-1.5 py-0.5 bg-rose-950/60 rounded border border-rose-800/50">
-                MANAUS
+                CAPTAÇÃO
               </span>
             </div>
-            <p className="text-xs text-slate-400 font-medium hidden sm:block">Gerador de Catálogos Imobiliários</p>
+            <p className="text-xs text-slate-400 font-medium hidden sm:block">Lopes Captação</p>
           </div>
         </div>
 

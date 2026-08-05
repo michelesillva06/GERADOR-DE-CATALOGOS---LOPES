@@ -31,7 +31,7 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
             <ShieldCheck className="w-4 h-4" />
             <span>Painel de Controle Master Admin</span>
           </div>
-          <h1 className="text-2xl font-black">Visão Geral Imobiliária - Lopes Manaus</h1>
+          <h1 className="text-2xl font-black">Visão Geral Imobiliária - Lopes Captação</h1>
           <p className="text-xs text-slate-300 mt-1">
             Acompanhe usuários captadores, métricas de imóveis e gere catálogos digitais
           </p>

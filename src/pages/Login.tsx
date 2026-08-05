@@ -74,11 +74,11 @@ export const Login: React.FC = () => {
           <div className="flex items-center justify-center space-x-2">
             <h1 className="text-2xl font-black text-white tracking-tight">LOPES</h1>
             <span className="text-[#F10F4D] font-extrabold text-xs uppercase px-2 py-0.5 bg-rose-950 rounded border border-rose-800">
-              MANAUS
+              CAPTAÇÃO
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1 font-medium">
-            Gerador de Catálogos Imobiliários & Gestão
+            Sistema de Captação & Gestão Imobiliária
           </p>
         </div>
 

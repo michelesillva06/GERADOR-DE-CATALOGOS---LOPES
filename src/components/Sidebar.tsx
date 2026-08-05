@@ -126,8 +126,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
 
         {/* Footer info inside sidebar */}
         <div className="pt-6 border-t border-slate-800/80 text-[11px] text-slate-500">
-          <p className="font-bold text-slate-400">Lopes Manaus v2.0</p>
-          <p className="text-[10px]">Gestão Imobiliária & Catálogos</p>
+          <p className="font-bold text-slate-400">Lopes Captação v2.0</p>
+          <p className="text-[10px]">Gestão e Captação Imobiliária</p>
         </div>
 
       </div>

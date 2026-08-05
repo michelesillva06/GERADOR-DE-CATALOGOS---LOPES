@@ -91,7 +91,7 @@ function MainApp() {
       <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 border-4 border-[#F10F4D] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Carregando Lopes Manaus...</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Carregando Lopes Captação...</p>
         </div>
       </div>
     );
