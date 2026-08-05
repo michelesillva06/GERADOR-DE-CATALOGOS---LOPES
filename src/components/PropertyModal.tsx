@@ -41,7 +41,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
   useEffect(() => {
     if (property) {
       setActiveImageIndex(0);
-      const url = `${window.location.origin}/catalogo/${captador?.url_slug || 'lopes'}?code=${property.code}`;
+      const url = `${window.location.origin}/imovel/${property.id}`;
       generateQRCodeDataUrl(url, '#F10F4D').then(setQrCodeUrl);
     }
   }, [property, captador]);
@@ -85,13 +85,13 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
     setIsGeneratingPdf(true);
     try {
       const doc = await generateCatalogPDF({
-        title: `Imóvel Cód. ${property.code} - Lopes Manaus`,
+        title: `Imóvel - ${property.title}`,
         properties: [property],
         captador,
         companySettings: companySettings || {
-          company_name: 'Lopes Manaus',
+          company_name: 'Lopes Captação',
           unit_name: 'Unidade Manaus',
-          logo_url: '',
+          logo_url: '/lopes-logo.svg',
           primary_color: '#F10F4D',
           phone: '(92) 3659-1000',
           whatsapp: '5592981234567',
@@ -103,7 +103,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
           creci_j: '540-J/AM'
         }
       });
-      doc.save(`Imovel_${property.code}_LopesManaus.pdf`);
+      doc.save(`Imovel_${property.title.replace(/\s+/g, '_')}_Lopes.pdf`);
     } catch (e) {
       console.error(e);
       alert('Erro ao gerar o PDF do imóvel.');
@@ -296,13 +296,13 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
           {/* Action CTAs Bottom Bar */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-3">
             <a
-              href={`/imovel/${property.code}`}
+              href={`/imovel/${property.id}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center space-x-2 transition border border-slate-300"
             >
               <Share2 className="w-4 h-4 text-[#F10F4D]" />
-              <span>Ver Página Pública (/imovel/{property.code})</span>
+              <span>Ver Página Pública</span>
             </a>
 
             <button
