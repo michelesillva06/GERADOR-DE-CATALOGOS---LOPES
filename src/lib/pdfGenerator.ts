@@ -17,7 +17,7 @@ async function urlToBase64(url: string): Promise<string> {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.82));
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
         } else {
           resolve('');
         }
@@ -36,358 +36,584 @@ function formatCurrency(val: number): string {
 }
 
 /**
- * Generates a high-resolution, pixel-perfect 1-piece cover image using HTML Canvas
- * that fills 100% of Page 1 in the PDF.
+ * Generates an ultra high-resolution, pixel-perfect 1-piece cover page using HTML Canvas
+ * that fills 100% of Page 1 in the PDF (210mm x 297mm full-bleed).
+ * Matches the exact visual identity and layout of LOPES MANAUS catalog cover.
  */
 export async function renderCoverCanvas(
   type: 'VENDA' | 'LOCACAO' | 'GERAL',
   companySettings?: CompanySettings
 ): Promise<string> {
   const canvas = document.createElement('canvas');
-  canvas.width = 1414;
-  canvas.height = 2000;
+  // High resolution for 300 DPI print quality
+  canvas.width = 2121;
+  canvas.height = 3000;
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
-  // 1. Fill background white
+  // 1. Fill background pure white
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 2. Top-Left Brand Logo "LOPES MANAUS"
-  // Red Heart Logo Icon
-  ctx.fillStyle = '#F10F4D';
+  const LOPES_RED = '#E50938';
+  const LOPES_DARK_RED = '#B91C1C';
+  const TEXT_DARK = '#0F172A';
+  const TEXT_MUTED = '#475569';
+
+  // ------------------------------------------------------------------------
+  // 2. TOP HEADER LOGO & TOP-RIGHT CURVE ACCENT
+  // ------------------------------------------------------------------------
+  // Top-Right Swooping Red Accent Curve
+  ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.arc(150, 140, 32, 0, Math.PI * 2);
-  ctx.arc(195, 140, 32, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(122, 150);
-  ctx.lineTo(223, 150);
-  ctx.lineTo(172.5, 215);
+  ctx.moveTo(1250, 0);
+  ctx.bezierCurveTo(1550, 60, 1850, 200, 2121, 450);
+  ctx.lineTo(2121, 0);
   ctx.closePath();
   ctx.fill();
 
-  // "LOPES" Text
-  ctx.fillStyle = '#0F172A';
-  ctx.font = '900 115px sans-serif';
-  ctx.fillText('LOPES', 260, 170);
-
-  // "MANAUS" Text
-  ctx.fillStyle = '#F10F4D';
-  ctx.font = '800 75px sans-serif';
-  ctx.fillText('MANAUS', 260, 240);
-
-  // Red accent line under logo
-  ctx.fillStyle = '#F10F4D';
-  ctx.fillRect(140, 275, 260, 10);
-
-  // Top-Right Curved Red Shapes
-  ctx.fillStyle = '#991B1B'; // Deep Red
-  ctx.beginPath();
-  ctx.moveTo(850, 0);
-  ctx.lineTo(1414, 0);
-  ctx.lineTo(1414, 380);
-  ctx.bezierCurveTo(1200, 200, 1000, 100, 850, 0);
-  ctx.fill();
-
-  ctx.fillStyle = '#F10F4D'; // Bright Red
-  ctx.beginPath();
-  ctx.moveTo(700, 0);
-  ctx.lineTo(1414, 0);
-  ctx.lineTo(1414, 260);
-  ctx.bezierCurveTo(1100, 140, 900, 50, 700, 0);
-  ctx.fill();
-
-  // CRECI PJ Badge Top Right
+  // CRECI Badge (Top Right inside white area)
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 30px sans-serif';
+  ctx.font = 'bold 36px sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(`CRECI: ${companySettings?.creci_j || '540-J/AM'}`, 1370, 70);
-  ctx.font = '22px sans-serif';
-  ctx.fillText((companySettings?.unit_name || 'PONTA NEGRA').toUpperCase(), 1370, 105);
+  ctx.fillText(`CRECI: ${companySettings?.creci_j || '540-J/AM'}`, 2070, 90);
   ctx.textAlign = 'left';
 
-  // 3. Right Side Curve Frame displaying Manaus Sunset River Panorama
+  // Logo (Top-Left)
+  // Lopes Red Heart Symbol
+  ctx.save();
+  ctx.translate(170, 160);
+  ctx.fillStyle = LOPES_RED;
+  ctx.beginPath();
+  // Left heart lobe
+  ctx.arc(-22, -18, 32, Math.PI * 0.7, Math.PI * 1.85);
+  // Right heart lobe
+  ctx.arc(22, -18, 32, Math.PI * 1.15, Math.PI * 0.3);
+  ctx.lineTo(0, 48);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // "LOPES" Text
+  ctx.fillStyle = TEXT_DARK;
+  ctx.font = '900 128px sans-serif';
+  ctx.fillText('LOPES', 270, 185);
+
+  // "MANAUS" Text
+  ctx.fillStyle = LOPES_RED;
+  ctx.font = '800 82px sans-serif';
+  ctx.fillText('MANAUS', 272, 270);
+
+  // Red accent line under "MANAUS"
+  ctx.fillStyle = LOPES_RED;
+  ctx.fillRect(120, 310, 240, 10);
+
+  // ------------------------------------------------------------------------
+  // 3. RIGHT SIDE PHOTO FRAME & BADGE (Manaus Skyline Sunset River)
+  // ------------------------------------------------------------------------
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(750, 0);
-  ctx.bezierCurveTo(620, 250, 620, 600, 850, 850);
-  ctx.bezierCurveTo(1050, 1050, 1300, 1100, 1414, 1150);
-  ctx.lineTo(1414, 0);
+  ctx.moveTo(1120, 0);
+  ctx.bezierCurveTo(900, 420, 900, 950, 1300, 1380);
+  ctx.bezierCurveTo(1600, 1680, 1920, 1750, 2121, 1800);
+  ctx.lineTo(2121, 0);
   ctx.closePath();
   ctx.clip();
 
-  // Render sunset river water and sky
-  const skyGrad = ctx.createLinearGradient(700, 0, 1414, 1150);
+  // Sunset sky backdrop gradient
+  const skyGrad = ctx.createLinearGradient(1000, 0, 2121, 1800);
   skyGrad.addColorStop(0, '#0F172A');
-  skyGrad.addColorStop(0.3, '#312E81');
-  skyGrad.addColorStop(0.6, '#9A3412');
-  skyGrad.addColorStop(0.85, '#EA580C');
-  skyGrad.addColorStop(1, '#F59E0B');
+  skyGrad.addColorStop(0.2, '#1E1B4B');
+  skyGrad.addColorStop(0.45, '#7C2D12');
+  skyGrad.addColorStop(0.7, '#C2410C');
+  skyGrad.addColorStop(0.88, '#EA580C');
+  skyGrad.addColorStop(1, '#FBBF24');
   ctx.fillStyle = skyGrad;
-  ctx.fillRect(600, 0, 814, 1150);
+  ctx.fillRect(900, 0, 1221, 1800);
 
-  const waterGrad = ctx.createLinearGradient(600, 400, 1414, 1150);
-  waterGrad.addColorStop(0, '#1E293B');
-  waterGrad.addColorStop(1, '#0284C7');
+  // River water reflection gradient
+  const waterGrad = ctx.createLinearGradient(900, 700, 2121, 1800);
+  waterGrad.addColorStop(0, '#0F172A');
+  waterGrad.addColorStop(0.6, '#0369A1');
+  waterGrad.addColorStop(0.9, '#D97706');
+  waterGrad.addColorStop(1, '#F59E0B');
   ctx.fillStyle = waterGrad;
-  ctx.fillRect(600, 350, 814, 800);
+  ctx.fillRect(900, 600, 1221, 1200);
 
-  // Buildings silhouette
+  // Buildings & City Silhouette
   ctx.fillStyle = '#0F172A';
-  const buildings = [
-    { x: 750, w: 40, h: 220 },
-    { x: 800, w: 55, h: 320 },
-    { x: 865, w: 45, h: 280 },
-    { x: 920, w: 60, h: 380 },
-    { x: 990, w: 50, h: 340 },
-    { x: 1050, w: 70, h: 420 },
-    { x: 1130, w: 65, h: 360 },
-    { x: 1200, w: 80, h: 450 },
-    { x: 1290, w: 75, h: 390 },
-    { x: 1370, w: 44, h: 480 },
+  const bldgs = [
+    { x: 1100, w: 65, h: 380 },
+    { x: 1180, w: 80, h: 520 },
+    { x: 1275, w: 70, h: 440 },
+    { x: 1360, w: 90, h: 620 },
+    { x: 1465, w: 80, h: 540 },
+    { x: 1560, w: 105, h: 680 },
+    { x: 1680, w: 95, h: 580 },
+    { x: 1790, w: 120, h: 720 },
+    { x: 1920, w: 110, h: 630 },
+    { x: 2040, w: 80, h: 760 },
   ];
-  buildings.forEach(b => {
-    ctx.fillRect(b.x, 600 - b.h, b.w, b.h);
-    ctx.fillStyle = 'rgba(254, 240, 138, 0.6)';
-    for (let wy = 620 - b.h; wy < 580; wy += 30) {
-      for (let wx = b.x + 8; wx < b.x + b.w - 10; wx += 14) {
-        ctx.fillRect(wx, wy, 8, 12);
+  bldgs.forEach(b => {
+    ctx.fillRect(b.x, 950 - b.h, b.w, b.h);
+    ctx.fillStyle = 'rgba(254, 240, 138, 0.75)';
+    for (let wy = 980 - b.h; wy < 920; wy += 40) {
+      for (let wx = b.x + 12; wx < b.x + b.w - 14; wx += 20) {
+        ctx.fillRect(wx, wy, 10, 16);
       }
     }
     ctx.fillStyle = '#0F172A';
   });
 
-  ctx.restore(); // end clip
-
-  // Red Accent Line along the curve border
-  ctx.strokeStyle = '#F10F4D';
-  ctx.lineWidth = 14;
+  // Cable-stayed bridge silhouette
+  ctx.strokeStyle = '#0F172A';
+  ctx.lineWidth = 18;
   ctx.beginPath();
-  ctx.moveTo(750, 0);
-  ctx.bezierCurveTo(620, 250, 620, 600, 850, 850);
-  ctx.bezierCurveTo(1050, 1050, 1300, 1100, 1414, 1150);
+  ctx.moveTo(1050, 780);
+  ctx.lineTo(2121, 730);
   ctx.stroke();
 
-  // Red Circular Badge intersecting the curve (Key Symbol)
-  ctx.fillStyle = '#F10F4D';
+  // Cable stays
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  const towerX = 1750, towerY = 480;
   ctx.beginPath();
-  ctx.arc(970, 980, 110, 0, Math.PI * 2);
+  ctx.moveTo(towerX, towerY);
+  ctx.lineTo(towerX, 780);
+  ctx.stroke();
+  for (let cx = 1450; cx <= 2050; cx += 40) {
+    ctx.beginPath();
+    ctx.moveTo(towerX, towerY + 30);
+    ctx.lineTo(cx, 740);
+    ctx.stroke();
+  }
+
+  ctx.restore(); // end clip
+
+  // Red Accent Line outlining the photo curve border
+  ctx.strokeStyle = LOPES_RED;
+  ctx.lineWidth = 20;
+  ctx.beginPath();
+  ctx.moveTo(1120, 0);
+  ctx.bezierCurveTo(900, 420, 900, 950, 1300, 1380);
+  ctx.bezierCurveTo(1600, 1680, 1920, 1750, 2121, 1800);
+  ctx.stroke();
+
+  // Circular Badge with House & Key emblem (x=1480, y=1480)
+  const badgeX = 1480;
+  const badgeY = 1480;
+  const badgeR = 170;
+
+  ctx.fillStyle = LOPES_RED;
+  ctx.beginPath();
+  ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 8;
+  ctx.lineWidth = 12;
   ctx.beginPath();
-  ctx.arc(970, 980, 95, 0, Math.PI * 2);
+  ctx.arc(badgeX, badgeY, badgeR - 18, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Key Icon inside badge
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 90px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('🔑', 970, 1010);
-  ctx.textAlign = 'left';
+  // White Line-Art House + Key Icon inside emblem
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 9;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
 
-  // 4. Main Cover Title Section (x=120)
-  ctx.fillStyle = '#475569';
-  ctx.font = '700 68px sans-serif';
-  ctx.fillText('CATÁLOGO DE', 120, 480);
+  // House Roof
+  ctx.beginPath();
+  ctx.moveTo(badgeX - 80, badgeY - 15);
+  ctx.lineTo(badgeX, badgeY - 80);
+  ctx.lineTo(badgeX + 80, badgeY - 15);
+  ctx.stroke();
+
+  // House Frame
+  ctx.beginPath();
+  ctx.moveTo(badgeX - 60, badgeY - 20);
+  ctx.lineTo(badgeX - 60, badgeY + 65);
+  ctx.lineTo(badgeX + 60, badgeY + 65);
+  ctx.lineTo(badgeX + 60, badgeY - 20);
+  ctx.stroke();
+
+  // Key inside
+  ctx.beginPath();
+  ctx.arc(badgeX - 15, badgeY + 20, 20, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(badgeX, badgeY + 30);
+  ctx.lineTo(badgeX + 38, badgeY - 8);
+  ctx.lineTo(badgeX + 30, badgeY - 16);
+  ctx.moveTo(badgeX + 28, badgeY + 4);
+  ctx.lineTo(badgeX + 36, badgeY - 4);
+  ctx.stroke();
+
+  // ------------------------------------------------------------------------
+  // 4. MAIN TITLE SECTION (LEFT SIDE)
+  // ------------------------------------------------------------------------
+  const tx = 130;
+  let ty = 640;
+
+  // "CATÁLOGO DE"
+  ctx.fillStyle = '#334155';
+  ctx.font = '600 82px sans-serif';
+  ctx.fillText('CATÁLOGO DE', tx, ty);
+  ty += 160;
+
+  // "IMÓVEIS"
+  ctx.fillStyle = LOPES_RED;
+  ctx.font = '900 200px sans-serif';
+  ctx.fillText('IMÓVEIS', tx, ty);
+  ty += 40;
+
+  // Banner Box for "PARA LOCAÇÃO" / "PARA VENDA"
+  let bannerLabel = 'PARA LOCAÇÃO';
+  let bannerWidth = 920;
 
   if (type === 'VENDA') {
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '900 145px sans-serif';
-    ctx.fillText('IMÓVEIS', 120, 630);
-    ctx.fillText('PARA VENDA', 120, 780);
-
-    ctx.fillStyle = '#F10F4D';
-    ctx.fillRect(120, 820, 240, 14);
-
-    ctx.fillStyle = '#334155';
-    ctx.font = '500 42px sans-serif';
-    ctx.fillText('Os melhores imóveis para ', 120, 920);
-    
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '800 42px sans-serif';
-    ctx.fillText('investir,', 615, 920);
-
-    ctx.fillText('realizar', 120, 975);
-    ctx.fillStyle = '#334155';
-    ctx.font = '500 42px sans-serif';
-    ctx.fillText(' e ', 270, 975);
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '800 42px sans-serif';
-    ctx.fillText('viver', 320, 975);
-    ctx.fillStyle = '#334155';
-    ctx.font = '500 42px sans-serif';
-    ctx.fillText(' grandes conquistas.', 420, 975);
-
-  } else if (type === 'LOCACAO') {
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '900 140px sans-serif';
-    ctx.fillText('IMÓVEIS', 120, 620);
-    ctx.fillText('PARA', 120, 760);
-    ctx.fillText('LOCAÇÃO', 120, 900);
-
-    ctx.fillStyle = '#F10F4D';
-    ctx.fillRect(120, 935, 240, 14);
-
-    ctx.fillStyle = '#334155';
-    ctx.font = '500 42px sans-serif';
-    ctx.fillText('Os melhores imóveis para morar', 120, 1010);
-    ctx.fillText('com ', 120, 1060);
-
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '800 42px sans-serif';
-    ctx.fillText('conforto, segurança', 210, 1060);
-
-    ctx.fillStyle = '#334155';
-    ctx.font = '500 42px sans-serif';
-    ctx.fillText(' e ', 620, 1060);
-
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '800 42px sans-serif';
-    ctx.fillText('praticidade.', 670, 1060);
-
-  } else {
-    // GERAL
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '900 155px sans-serif';
-    ctx.fillText('IMÓVEIS', 120, 640);
-
-    ctx.fillStyle = '#F10F4D';
-    ctx.fillRect(120, 680, 240, 14);
-
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 58px sans-serif';
-    ctx.fillText('O seu próximo imóvel', 120, 780);
-    ctx.fillStyle = '#F10F4D';
-    ctx.fillText('está aqui.', 120, 850);
-
-    ctx.fillStyle = '#475569';
-    ctx.font = '500 38px sans-serif';
-    ctx.fillText('Conheça todas as oportunidades', 120, 930);
-    ctx.fillText('para ', 120, 980);
-
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '800 38px sans-serif';
-    ctx.fillText('comprar, vender', 210, 980);
-
-    ctx.fillStyle = '#475569';
-    ctx.font = '500 38px sans-serif';
-    ctx.fillText(' ou ', 510, 980);
-
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '800 38px sans-serif';
-    ctx.fillText('alugar', 580, 980);
-
-    ctx.fillStyle = '#475569';
-    ctx.font = '500 38px sans-serif';
-    ctx.fillText('com a LOPES MANAUS.', 120, 1030);
+    bannerLabel = 'PARA VENDA';
+    bannerWidth = 840;
+  } else if (type === 'GERAL') {
+    bannerLabel = 'TODOS OS IMÓVEIS';
+    bannerWidth = 980;
   }
 
-  // 5. Categories Section (y=1220)
-  const catY = 1220;
-  ctx.fillStyle = '#F10F4D';
-  ctx.fillRect(120, catY, 1174, 5);
+  // Draw Red Banner Box
+  ctx.fillStyle = LOPES_RED;
+  const bannerH = 135;
+  ctx.beginPath();
+  ctx.roundRect(tx, ty, bannerWidth, bannerH, 16);
+  ctx.fill();
 
-  ctx.fillStyle = '#F10F4D';
-  ctx.font = '800 36px sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 86px sans-serif';
+  ctx.fillText(bannerLabel, tx + 40, ty + 98);
+
+  ty += bannerH + 90;
+
+  // Subtitle
+  ctx.fillStyle = TEXT_DARK;
+  ctx.font = '600 70px sans-serif';
+  ctx.fillText('O seu próximo imóvel', tx, ty);
+  ty += 85;
+
+  ctx.fillStyle = LOPES_RED;
+  ctx.font = '900 78px sans-serif';
+  ctx.fillText('está aqui.', tx, ty);
+  ty += 110;
+
+  // Body Text Paragraph
+  if (type === 'LOCACAO') {
+    ctx.fillStyle = TEXT_MUTED;
+    ctx.font = '500 52px sans-serif';
+    ctx.fillText('Conheça todas as oportunidades', tx, ty);
+    ty += 70;
+
+    ctx.fillText('para ', tx, ty);
+    ctx.fillStyle = LOPES_RED;
+    ctx.font = '800 52px sans-serif';
+    ctx.fillText('alugar', tx + 120, ty);
+    ctx.fillStyle = TEXT_MUTED;
+    ctx.font = '500 52px sans-serif';
+    ctx.fillText(' com a segurança', tx + 280, ty);
+    ty += 70;
+
+    ctx.fillText('e praticidade da ', tx, ty);
+    ctx.fillStyle = TEXT_DARK;
+    ctx.font = '800 52px sans-serif';
+    ctx.fillText('LOPES MANAUS.', tx + 390, ty);
+    ty += 60;
+  } else if (type === 'VENDA') {
+    ctx.fillStyle = TEXT_MUTED;
+    ctx.font = '500 52px sans-serif';
+    ctx.fillText('Os melhores imóveis para ', tx, ty);
+    ctx.fillStyle = LOPES_RED;
+    ctx.font = '800 52px sans-serif';
+    ctx.fillText('investir,', tx + 630, ty);
+    ty += 70;
+
+    ctx.fillText('realizar', tx, ty);
+    ctx.fillStyle = TEXT_MUTED;
+    ctx.font = '500 52px sans-serif';
+    ctx.fillText(' e ', tx + 180, ty);
+    ctx.fillStyle = LOPES_RED;
+    ctx.font = '800 52px sans-serif';
+    ctx.fillText('viver', tx + 240, ty);
+    ctx.fillStyle = TEXT_MUTED;
+    ctx.font = '500 52px sans-serif';
+    ctx.fillText(' grandes conquistas.', tx + 370, ty);
+    ty += 60;
+  } else {
+    ctx.fillStyle = TEXT_MUTED;
+    ctx.font = '500 52px sans-serif';
+    ctx.fillText('Conheça todas as oportunidades', tx, ty);
+    ty += 70;
+    ctx.fillText('para ', tx, ty);
+    ctx.fillStyle = LOPES_RED;
+    ctx.font = '800 52px sans-serif';
+    ctx.fillText('comprar, vender ou alugar', tx + 120, ty);
+    ty += 70;
+    ctx.fillStyle = TEXT_MUTED;
+    ctx.font = '500 52px sans-serif';
+    ctx.fillText('com a segurança da ', tx, ty);
+    ctx.fillStyle = TEXT_DARK;
+    ctx.font = '800 52px sans-serif';
+    ctx.fillText('LOPES MANAUS.', tx + 490, ty);
+    ty += 60;
+  }
+
+  // Accent horizontal bar under paragraph
+  ctx.fillStyle = LOPES_RED;
+  ctx.fillRect(tx, ty + 15, 320, 10);
+
+  // ------------------------------------------------------------------------
+  // 5. CATEGORIES SECTION (MIDDLE SECTION)
+  // ------------------------------------------------------------------------
+  const catSectionY = 1840;
+
+  // Red line on left and right, centered title
+  ctx.fillStyle = LOPES_RED;
+  ctx.fillRect(130, catSectionY, 480, 5);
+  ctx.fillRect(1511, catSectionY, 480, 5);
+
+  ctx.fillStyle = LOPES_RED;
+  ctx.font = '800 46px sans-serif';
   ctx.textAlign = 'center';
-  const catTitleText = type === 'GERAL' ? 'NOSSAS CATEGORIAS DE IMÓVEIS' : 'TRABALHAMOS COM OS SEGUINTES IMÓVEIS';
-  ctx.fillText(catTitleText, 707, catY - 15);
+  ctx.fillText('NOSSAS CATEGORIAS DE IMÓVEIS', 1060, catSectionY + 15);
+  ctx.textAlign = 'left';
 
-  const categories = [
+  const categoriesData = [
     { title: 'APARTAMENTOS', desc: 'Diversos padrões\ne localizações' },
     { title: 'CASAS', desc: 'Térreas, duplex\ne em condomínio' },
     { title: 'SALAS COMERCIAIS', desc: 'Espaços para seu\nnegócio crescer' },
     { title: 'CONDOMÍNIOS', desc: 'Segurança e lazer\npara sua família' },
     { title: 'KITNETS E STUDIOS', desc: 'Práticos e ideais\npara o dia a dia' },
-    { title: 'IMÓVEIS COMERCIAIS', desc: 'Lojas, pontos e\noutros espaços' }
+    { title: 'IMÓVEIS COMERCIAIS', desc: 'Lojas, pontos e\noutros espaços' },
   ];
 
-  const colW = 180;
-  const colG = 18;
-  const startX = 120;
-  const startY = catY + 30;
+  const catColW = 280;
+  const catStartX = 130;
+  const catStartY = catSectionY + 65;
 
-  for (let idx = 0; idx < categories.length; idx++) {
-    const col = idx % 6;
-    const cx = startX + (col * (colW + colG));
-    const cy = startY;
+  categoriesData.forEach((cat, idx) => {
+    const cx = catStartX + (idx * 312);
+    const cy = catStartY;
 
-    // Card Box
-    ctx.fillStyle = '#F8FAFC';
-    ctx.strokeStyle = '#E2E8F0';
-    ctx.lineWidth = 2;
-    ctx.fillRect(cx, cy, colW, 200);
-    ctx.strokeRect(cx, cy, colW, 200);
+    // Vertical divider lines
+    if (idx > 0) {
+      ctx.strokeStyle = '#CBD5E1';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx - 16, cy + 15);
+      ctx.lineTo(cx - 16, cy + 280);
+      ctx.stroke();
+    }
 
-    // Category Icon
-    ctx.fillStyle = '#F10F4D';
-    ctx.font = '36px sans-serif';
-    ctx.textAlign = 'center';
-    const icons = ['🏢', '🏠', '🏢', '🏡', '🛋️', '🏪'];
-    ctx.fillText(icons[idx], cx + (colW / 2), cy + 45);
+    // Vector Icon
+    ctx.strokeStyle = LOPES_RED;
+    ctx.fillStyle = LOPES_RED;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const icx = cx + (catColW / 2);
+    const icy = cy + 55;
+
+    if (idx === 0) {
+      ctx.beginPath();
+      ctx.strokeRect(icx - 35, icy - 38, 48, 76);
+      ctx.strokeRect(icx + 13, icy - 15, 26, 53);
+      ctx.fillRect(icx - 26, icy - 26, 12, 12);
+      ctx.fillRect(icx - 8, icy - 26, 12, 12);
+      ctx.fillRect(icx - 26, icy - 5, 12, 12);
+      ctx.fillRect(icx - 8, icy - 5, 12, 12);
+    } else if (idx === 1) {
+      ctx.beginPath();
+      ctx.moveTo(icx - 42, icy);
+      ctx.lineTo(icx, icy - 38);
+      ctx.lineTo(icx + 42, icy);
+      ctx.stroke();
+      ctx.strokeRect(icx - 30, icy, 60, 38);
+      ctx.strokeRect(icx - 12, icy + 12, 24, 26);
+    } else if (idx === 2) {
+      ctx.beginPath();
+      ctx.strokeRect(icx - 32, icy - 40, 64, 80);
+      ctx.fillRect(icx - 20, icy - 28, 15, 15);
+      ctx.fillRect(icx + 5, icy - 28, 15, 15);
+      ctx.fillRect(icx - 20, icy - 5, 15, 15);
+      ctx.fillRect(icx + 5, icy - 5, 15, 15);
+    } else if (idx === 3) {
+      ctx.beginPath();
+      ctx.moveTo(icx - 32, icy - 8);
+      ctx.lineTo(icx - 8, icy - 32);
+      ctx.lineTo(icx + 16, icy - 8);
+      ctx.stroke();
+      ctx.strokeRect(icx - 26, icy - 8, 36, 42);
+      ctx.beginPath();
+      ctx.moveTo(icx + 18, icy + 34);
+      ctx.lineTo(icx + 42, icy + 34);
+      ctx.moveTo(icx + 24, icy + 14);
+      ctx.lineTo(icx + 24, icy + 34);
+      ctx.moveTo(icx + 36, icy + 14);
+      ctx.lineTo(icx + 36, icy + 34);
+      ctx.stroke();
+    } else if (idx === 4) {
+      ctx.beginPath();
+      ctx.strokeRect(icx - 38, icy, 60, 32);
+      ctx.moveTo(icx - 30, icy - 20);
+      ctx.lineTo(icx + 12, icy - 20);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(icx + 32, icy - 36);
+      ctx.lineTo(icx + 24, icy - 15);
+      ctx.lineTo(icx + 40, icy - 15);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(icx + 32, icy - 15);
+      ctx.lineTo(icx + 32, icy + 32);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.strokeRect(icx - 36, icy - 6, 72, 42);
+      ctx.moveTo(icx - 38, icy - 6);
+      ctx.lineTo(icx - 38, icy - 30);
+      ctx.lineTo(icx + 38, icy - 30);
+      ctx.lineTo(icx + 38, icy - 6);
+      ctx.stroke();
+      ctx.strokeRect(icx - 18, icy + 10, 36, 26);
+    }
 
     // Title
-    ctx.fillStyle = '#0F172A';
-    ctx.font = '800 20px sans-serif';
-    ctx.fillText(categories[idx].title, cx + (colW / 2), cy + 85);
-
-    // Desc
-    ctx.fillStyle = '#64748B';
-    ctx.font = '400 17px sans-serif';
-    const splitDesc = categories[idx].desc.split('\n');
-    ctx.fillText(splitDesc[0], cx + (colW / 2), cy + 125);
-    if (splitDesc[1]) {
-      ctx.fillText(splitDesc[1], cx + (colW / 2), cy + 150);
-    }
-  }
-
-  // 6. Bottom Deep Red Footer Bar (y=1640 to 2000)
-  ctx.fillStyle = '#991B1B';
-  ctx.fillRect(0, 1640, 1414, 360);
-
-  const pillars = [
-    { icon: '🛡️', title: 'SEGURANÇA', desc: 'Transparência e confiança\nem cada negociação.' },
-    { icon: '🤝', title: 'ATENDIMENTO', desc: 'Atendimento personalizado\nem todas as etapas.' },
-    { icon: '🎖️', title: 'EXPERIÊNCIA', desc: 'Tradição e credibilidade\nno mercado imobiliário.' },
-    { icon: '📍', title: 'ATUAÇÃO EM MANAUS', desc: 'Conhecemos a cidade\ne os melhores bairros.' }
-  ];
-
-  const pW = 310;
-  const pStartX = 70;
-
-  pillars.forEach((p, i) => {
-    const px = pStartX + (i * 335);
-    const py = 1710;
-
-    // Pillar Circle Icon Frame
-    ctx.strokeStyle = '#FEE2E2';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(px + (pW / 2), py + 35, 42, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '36px sans-serif';
+    ctx.fillStyle = TEXT_DARK;
+    ctx.font = '800 28px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(p.icon, px + (pW / 2), py + 48);
+    ctx.fillText(cat.title, icx, cy + 150);
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '800 26px sans-serif';
-    ctx.fillText(p.title, px + (pW / 2), py + 115);
-
-    ctx.fillStyle = '#FEE2E2';
-    ctx.font = '400 21px sans-serif';
-    const descLines = p.desc.split('\n');
-    ctx.fillText(descLines[0], px + (pW / 2), py + 155);
-    if (descLines[1]) {
-      ctx.fillText(descLines[1], px + (pW / 2), py + 185);
+    // Subtitle
+    ctx.fillStyle = TEXT_MUTED;
+    ctx.font = '400 23px sans-serif';
+    const splitDesc = cat.desc.split('\n');
+    ctx.fillText(splitDesc[0], icx, cy + 200);
+    if (splitDesc[1]) {
+      ctx.fillText(splitDesc[1], icx, cy + 235);
     }
+    ctx.textAlign = 'left';
   });
 
-  return canvas.toDataURL('image/jpeg', 0.94);
+  // ------------------------------------------------------------------------
+  // 6. BOTTOM DEEP RED FOOTER BAR
+  // ------------------------------------------------------------------------
+  const footerY = 2430;
+  const footerH = 570;
+
+  ctx.fillStyle = LOPES_DARK_RED;
+  ctx.fillRect(0, footerY, canvas.width, footerH);
+
+  const pillars = [
+    { title: 'SEGURANÇA', desc: 'Transparência e confiança\nem cada negociação.' },
+    { title: 'ATENDIMENTO', desc: 'Atendimento personalizado\nem todas as etapas.' },
+    { title: 'EXPERIÊNCIA', desc: 'Tradição e credibilidade\nno mercado imobiliário.' },
+    { title: 'ATUAÇÃO EM MANAUS', desc: 'Conhecemos a cidade\ne os melhores bairros.' },
+  ];
+
+  const pillarW = 460;
+  const pillarStartX = 80;
+
+  pillars.forEach((p, i) => {
+    const px = pillarStartX + (i * 500);
+    const py = footerY + 85;
+
+    // Vertical dividing lines
+    if (i > 0) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(px - 20, py);
+      ctx.lineTo(px - 20, py + 340);
+      ctx.stroke();
+    }
+
+    const icx = px + (pillarW / 2);
+    const icy = py + 60;
+
+    // Circle Badge Outline
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(icx, icy, 60, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (i === 0) {
+      ctx.beginPath();
+      ctx.moveTo(icx - 24, icy - 26);
+      ctx.lineTo(icx + 24, icy - 26);
+      ctx.lineTo(icx + 24, icy + 6);
+      ctx.bezierCurveTo(icx + 24, icy + 26, icx, icy + 36, icx, icy + 36);
+      ctx.bezierCurveTo(icx, icy + 36, icx - 24, icy + 26, icx - 24, icy + 6);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(icx - 12, icy + 2);
+      ctx.lineTo(icx - 3, icy + 11);
+      ctx.lineTo(icx + 12, icy - 7);
+      ctx.stroke();
+    } else if (i === 1) {
+      ctx.beginPath();
+      ctx.arc(icx - 12, icy - 12, 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(icx + 12, icy - 12, 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(icx, icy + 24, 26, Math.PI, Math.PI * 2);
+      ctx.stroke();
+    } else if (i === 2) {
+      ctx.beginPath();
+      ctx.arc(icx, icy - 10, 26, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(icx - 15, icy + 16);
+      ctx.lineTo(icx - 22, icy + 38);
+      ctx.lineTo(icx - 6, icy + 30);
+      ctx.lineTo(icx + 6, icy + 30);
+      ctx.lineTo(icx + 22, icy + 38);
+      ctx.lineTo(icx + 15, icy + 16);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(icx, icy - 12, 18, Math.PI * 0.85, Math.PI * 0.15);
+      ctx.lineTo(icx, icy + 28);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(icx, icy - 12, 7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Title
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '800 36px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.title, icx, py + 185);
+
+    // Subtitle
+    ctx.fillStyle = '#FEE2E2';
+    ctx.font = '400 27px sans-serif';
+    const splitDesc = p.desc.split('\n');
+    ctx.fillText(splitDesc[0], icx, py + 240);
+    if (splitDesc[1]) {
+      ctx.fillText(splitDesc[1], icx, py + 280);
+    }
+    ctx.textAlign = 'left';
+  });
+
+  return canvas.toDataURL('image/jpeg', 0.95);
 }
 
 export async function generateCatalogPDF(options: {
@@ -396,10 +622,10 @@ export async function generateCatalogPDF(options: {
   captador: User;
   companySettings: CompanySettings;
   appUrl?: string;
+  customCoverImage?: string; // Optional user-provided custom cover image (data URL or Base64)
 }): Promise<jsPDF> {
-  const { properties, captador, companySettings } = options;
+  const { properties, captador, companySettings, customCoverImage } = options;
   const baseUrl = options.appUrl || window.location.origin;
-  const publicCatalogUrl = `${baseUrl}/catalogo/${captador.url_slug || captador.username}`;
   const effectivePhone = getEffectiveWhatsApp(captador, companySettings);
 
   // Create A4 PDF Document (210mm x 297mm)
@@ -421,15 +647,43 @@ export async function generateCatalogPDF(options: {
   }
 
   // ==========================================
-  // PÁGINA 1: CAPA COMPLETA DO CATÁLOGO (IMAGEM FULL-BLEED 210x297mm)
+  // PÁGINA 1: CAPA OFICIAL DO CATÁLOGO (100% FULL-BLEED 210mm x 297mm)
   // ==========================================
-  const coverDataUrl = await renderCoverCanvas(coverType, companySettings);
-  if (coverDataUrl) {
-    doc.addImage(coverDataUrl, 'JPEG', 0, 0, 210, 297);
+  let selectedCoverUrl = customCoverImage;
+
+  // Check admin configured cover per purpose if custom cover is not provided
+  if (!selectedCoverUrl) {
+    if (coverType === 'LOCACAO' && companySettings?.cover_locacao_url) {
+      selectedCoverUrl = companySettings.cover_locacao_url;
+    } else if (coverType === 'VENDA' && companySettings?.cover_venda_url) {
+      selectedCoverUrl = companySettings.cover_venda_url;
+    } else if (companySettings?.cover_geral_url) {
+      selectedCoverUrl = companySettings.cover_geral_url;
+    }
   }
 
-  // NOTE: Página 2 com resumo e ficha do captador foi REMOVIDA conforme solicitação do usuário.
-  // Fichas individuais de cada imóvel começam diretamente na Página 2!
+  let coverDataUrl = '';
+  if (selectedCoverUrl) {
+    if (selectedCoverUrl.startsWith('data:')) {
+      coverDataUrl = selectedCoverUrl;
+    } else {
+      coverDataUrl = await urlToBase64(selectedCoverUrl);
+    }
+  }
+
+  if (!coverDataUrl) {
+    coverDataUrl = await renderCoverCanvas(coverType, companySettings);
+  }
+
+  if (coverDataUrl) {
+    try {
+      doc.addImage(coverDataUrl, 'JPEG', 0, 0, 210, 297);
+    } catch {
+      // Fallback
+      const defaultCanvas = await renderCoverCanvas(coverType, companySettings);
+      doc.addImage(defaultCanvas, 'JPEG', 0, 0, 210, 297);
+    }
+  }
 
   // ==========================================
   // PÁGINA 2 EM DIANTE: FICHA INDIVIDUAL DE CADA IMÓVEL (1 imóvel por página)
@@ -443,7 +697,7 @@ export async function generateCatalogPDF(options: {
     // Top Header Bar
     doc.setFillColor(15, 23, 42);
     doc.rect(0, 0, 210, 12, 'F');
-    doc.setFillColor(241, 15, 77);
+    doc.setFillColor(229, 9, 56);
     doc.rect(0, 11.5, 210, 0.5, 'F');
 
     doc.setTextColor(255, 255, 255);
@@ -464,7 +718,7 @@ export async function generateCatalogPDF(options: {
 
     doc.setFontSize(9.5);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(241, 15, 77);
+    doc.setTextColor(229, 9, 56);
     doc.text(`${prop.category} em ${prop.purpose} • Bairro: ${prop.neighborhood}, ${prop.city}-${prop.state} • Cód: ${prop.code}`, 15, 27);
 
     // Featured Image
@@ -486,7 +740,7 @@ export async function generateCatalogPDF(options: {
     doc.roundedRect(15, currentY, 180, boxHeight, 3, 3, 'FD');
 
     // Price Column
-    doc.setTextColor(241, 15, 77);
+    doc.setTextColor(229, 9, 56);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     const priceFormatted = prop.purpose.includes('Locação') && prop.rent_price
@@ -605,7 +859,7 @@ export async function generateCatalogPDF(options: {
     const btn2W = 58;
     const btn2H = 18;
 
-    doc.setFillColor(241, 15, 77); // Lopes Red
+    doc.setFillColor(229, 9, 56); // Lopes Red
     doc.roundedRect(btn2X, btn2Y, btn2W, btn2H, 3, 3, 'F');
 
     doc.setTextColor(255, 255, 255);
@@ -620,7 +874,7 @@ export async function generateCatalogPDF(options: {
     doc.link(btn2X, btn2Y, btn2W, btn2H, { url: whatsappDirectUrl });
 
     // Property QR Code inside Footer (Right side)
-    const propertyQrCode = await generateQRCodeDataUrl(propertyPublicUrl, '#F10F4D');
+    const propertyQrCode = await generateQRCodeDataUrl(propertyPublicUrl, '#E50938');
     if (propertyQrCode) {
       try {
         doc.setFillColor(255, 255, 255);

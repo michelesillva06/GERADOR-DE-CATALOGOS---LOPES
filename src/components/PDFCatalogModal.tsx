@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Property, User, CompanySettings } from '../types';
-import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2 } from 'lucide-react';
+import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 
 interface PDFCatalogModalProps {
@@ -37,6 +37,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   const [purposeFilter, setPurposeFilter] = useState('todos');
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [selectedPropIds, setSelectedPropIds] = useState<string[]>([]);
+  const [customCoverImage, setCustomCoverImage] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Update title when selected captador changes or modal opens
@@ -45,6 +46,20 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
       setCatalogTitle(`Catálogo Digital - ${selectedCaptador.name}`);
     }
   }, [isOpen, selectedCaptadorId]);
+
+  // Handle custom cover upload
+  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        if (evt.target?.result) {
+          setCustomCoverImage(evt.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Initialize selected properties when modal opens or filters change
   useEffect(() => {
@@ -99,7 +114,8 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
         title: catalogTitle,
         properties: selectedProps,
         captador: selectedCaptador,
-        companySettings
+        companySettings,
+        customCoverImage
       });
 
       doc.save(`Catalogo_LopesManaus_${selectedCaptador.url_slug || 'imoveis'}.pdf`);
@@ -147,6 +163,61 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
               onChange={(e) => setCatalogTitle(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
             />
+          </div>
+
+          {/* Cover Page Customization Block */}
+          <div className="bg-rose-50/60 border border-rose-200 rounded-2xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <ImageIcon className="w-4 h-4 text-[#F10F4D]" />
+                <label className="text-xs font-bold text-slate-800 uppercase">
+                  Imagem de Capa do Catálogo (Full Page 100%)
+                </label>
+              </div>
+              <span className="text-[10px] bg-[#F10F4D]/10 text-[#F10F4D] px-2 py-0.5 rounded-full font-extrabold">
+                {customCoverImage ? 'Capa Personalizada Ativa' : 'Capa Oficial Lopes Manaus (Auto Full)'}
+              </span>
+            </div>
+
+            {customCoverImage ? (
+              <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-rose-200">
+                <div className="flex items-center space-x-3">
+                  <img
+                    src={customCoverImage}
+                    alt="Capa do Catálogo"
+                    className="w-12 h-16 object-cover rounded-lg border shadow-sm"
+                  />
+                  <div>
+                    <p className="text-xs font-bold text-slate-900">Sua Imagem de Capa</p>
+                    <p className="text-[10px] text-slate-500">Será inserida em página inteira (Full Bleed A4) no PDF</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCustomCoverImage('')}
+                  className="p-1.5 text-rose-600 hover:bg-rose-100 rounded-lg transition"
+                  title="Remover e usar Capa Padrão Oficial"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                  Por padrão, usamos a <strong>Capa Oficial da Lopes Manaus (Full Page)</strong>. Se desejar, faça o upload da sua imagem/foto de capa abaixo:
+                </p>
+                <label className="shrink-0 px-3 py-2 bg-white border border-rose-300 hover:border-[#F10F4D] text-[#F10F4D] hover:bg-rose-100/50 rounded-xl text-xs font-bold cursor-pointer transition flex items-center space-x-1.5 shadow-sm">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Subir Capa</span>
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/webp"
+                    onChange={handleCoverUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Select Captador (hidden or disabled if Captador) */}

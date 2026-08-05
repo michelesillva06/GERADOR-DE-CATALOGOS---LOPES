@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CompanySettings, User } from '../types';
-import { Settings, Save, Building2, CheckCircle2, User as UserIcon, Camera, Upload, Phone, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Settings, Save, Building2, CheckCircle2, User as UserIcon, Camera, Upload, Phone, ExternalLink, ShieldCheck, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { buildWhatsAppUrl, formatPhoneDisplay } from '../lib/whatsapp';
 
 interface SettingsPageProps {
@@ -376,6 +376,173 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
             />
+          </div>
+        </div>
+
+        {/* SECTION 3: CAPAS OFICIAIS DOS CATÁLOGOS POR FINALIDADE */}
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
+          <div className="flex items-center space-x-3 pb-4 border-b border-slate-100">
+            <div className="w-10 h-10 rounded-2xl bg-[#F10F4D] text-white flex items-center justify-center">
+              <ImageIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold text-slate-900">Capas Oficiais dos Catálogos (Padrão para Captadores)</h2>
+              <p className="text-xs text-slate-500">
+                Faça o upload das capas oficiais para cada finalidade (Locação, Venda ou Geral). Ao salvar, elas são atualizadas em tempo real em todos os perfis.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* CAPA LOCAÇÃO */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-[#F10F4D] uppercase">Capa Locação</span>
+                {companyForm.cover_locacao_url && (
+                  <button
+                    type="button"
+                    onClick={() => setCompanyForm({ ...companyForm, cover_locacao_url: '' })}
+                    className="text-[10px] font-bold text-rose-600 hover:underline flex items-center space-x-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Remover</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">Usada nos catálogos de imóveis para alugar.</p>
+              
+              <div className="aspect-[1/1.4] w-full rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden flex flex-col items-center justify-center relative group shadow-inner">
+                {companyForm.cover_locacao_url ? (
+                  <img src={companyForm.cover_locacao_url} alt="Capa Locação" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-center p-4">
+                    <ImageIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <span className="text-xs font-bold text-slate-400">Capa Oficial Lopes (Automática)</span>
+                  </div>
+                )}
+                <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
+                  <Upload className="w-6 h-6 mb-1 text-rose-400" />
+                  <span>{companyForm.cover_locacao_url ? 'Substituir Capa de Locação' : 'Upload Capa de Locação'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          if (evt.target?.result) {
+                            setCompanyForm({ ...companyForm, cover_locacao_url: evt.target.result as string });
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* CAPA VENDA */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-[#F10F4D] uppercase">Capa Venda</span>
+                {companyForm.cover_venda_url && (
+                  <button
+                    type="button"
+                    onClick={() => setCompanyForm({ ...companyForm, cover_venda_url: '' })}
+                    className="text-[10px] font-bold text-rose-600 hover:underline flex items-center space-x-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Remover</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">Usada nos catálogos de imóveis para venda.</p>
+              
+              <div className="aspect-[1/1.4] w-full rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden flex flex-col items-center justify-center relative group shadow-inner">
+                {companyForm.cover_venda_url ? (
+                  <img src={companyForm.cover_venda_url} alt="Capa Venda" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-center p-4">
+                    <ImageIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <span className="text-xs font-bold text-slate-400">Capa Oficial Lopes (Automática)</span>
+                  </div>
+                )}
+                <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
+                  <Upload className="w-6 h-6 mb-1 text-rose-400" />
+                  <span>{companyForm.cover_venda_url ? 'Substituir Capa de Venda' : 'Upload Capa de Venda'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          if (evt.target?.result) {
+                            setCompanyForm({ ...companyForm, cover_venda_url: evt.target.result as string });
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* CAPA GERAL */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-[#F10F4D] uppercase">Capa Geral / Todos</span>
+                {companyForm.cover_geral_url && (
+                  <button
+                    type="button"
+                    onClick={() => setCompanyForm({ ...companyForm, cover_geral_url: '' })}
+                    className="text-[10px] font-bold text-rose-600 hover:underline flex items-center space-x-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Remover</span>
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">Usada em catálogos mistos ou padrão geral.</p>
+              
+              <div className="aspect-[1/1.4] w-full rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden flex flex-col items-center justify-center relative group shadow-inner">
+                {companyForm.cover_geral_url ? (
+                  <img src={companyForm.cover_geral_url} alt="Capa Geral" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="text-center p-4">
+                    <ImageIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <span className="text-xs font-bold text-slate-400">Capa Oficial Lopes (Automática)</span>
+                  </div>
+                )}
+                <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
+                  <Upload className="w-6 h-6 mb-1 text-rose-400" />
+                  <span>{companyForm.cover_geral_url ? 'Substituir Capa Geral' : 'Upload Capa Geral'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                          if (evt.target?.result) {
+                            setCompanyForm({ ...companyForm, cover_geral_url: evt.target.result as string });
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
           </div>
         </div>
 

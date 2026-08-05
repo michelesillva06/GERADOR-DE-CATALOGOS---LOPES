@@ -77,6 +77,9 @@ export interface CompanySettings {
   state: string;
   instagram: string;
   creci_j: string;
+  cover_locacao_url?: string;
+  cover_venda_url?: string;
+  cover_geral_url?: string;
 }
 
 export interface DashboardStats {
