@@ -51,10 +51,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-80" />
 
         {/* Top Badges */}
-        <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-          <span className="bg-slate-900/90 text-white font-mono text-[11px] font-bold px-2.5 py-1 rounded-lg backdrop-blur-md shadow-md border border-slate-700">
-            {property.code}
-          </span>
+        <div className="absolute top-3 right-3 pointer-events-none">
           <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg backdrop-blur-md border shadow-md ${statusColors[property.status] || 'bg-slate-100 text-slate-800'}`}>
             {property.status}
           </span>

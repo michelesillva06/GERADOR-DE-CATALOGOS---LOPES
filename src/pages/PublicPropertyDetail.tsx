@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Property, User, CompanySettings } from '../types';
+import { getStoredProperties, getStoredUsers, getStoredSettings } from '../lib/storage';
 import { 
   Building2, MapPin, Bed, Bath, Car, Maximize2, Calendar, Phone, 
   MessageCircle, Share2, ArrowLeft, CheckCircle2, Play, Video, 
@@ -45,36 +46,38 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
   useEffect(() => {
     const loadProperty = async () => {
       setLoading(true);
+      let foundProp: Property | null = null;
+      let foundCaptador: User | null = null;
+
       try {
         const res = await fetch(`/api/properties/public/code/${code}`);
-        if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('json')) {
           const data = await res.json();
-          setProperty(data.property);
-          setCaptador(data.captador);
+          foundProp = data.property;
+          foundCaptador = data.captador;
           if (data.companySettings) setCompanySettings(data.companySettings);
-        } else {
-          // Fallback to fetch all public properties or properties endpoint
-          const resAll = await fetch('/api/properties');
-          if (resAll.ok) {
-            const dataAll = await resAll.json();
-            const found = (dataAll.properties || []).find((p: Property) => p.code.toLowerCase() === code.toLowerCase());
-            if (found) {
-              setProperty(found);
-              // Fetch user
-              const uRes = await fetch('/api/users');
-              if (uRes.ok) {
-                const uData = await uRes.json();
-                const userObj = (uData.users || []).find((u: User) => u.id === found.user_id);
-                if (userObj) setCaptador(userObj);
-              }
-            }
-          }
         }
       } catch (err) {
-        console.error('Error fetching property detail:', err);
-      } finally {
-        setLoading(false);
+        console.warn('Backend API unavailable, searching local storage for property code:', err);
       }
+
+      if (!foundProp) {
+        const allProps = getStoredProperties();
+        const matched = allProps.find(p => p.code.toLowerCase() === code.toLowerCase() || p.id === code);
+        if (matched) {
+          foundProp = matched;
+          const allUsers = getStoredUsers();
+          foundCaptador = allUsers.find(u => u.id === matched.user_id) || allUsers[0] || null;
+          setCompanySettings(getStoredSettings());
+        }
+      }
+
+      if (foundProp) {
+        setProperty(foundProp);
+        if (foundCaptador) setCaptador(foundCaptador);
+      }
+      setLoading(false);
     };
 
     loadProperty();
@@ -127,7 +130,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
   const waPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
   const waInterestUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(
-    `Olá ${captador?.name || 'Lopes Manaus'}! Tenho interesse no imóvel "${property.title}" (Código: ${property.code}). Poderia me passar mais informações?`
+    `Olá ${captador?.name || 'Lopes Captação'}! Tenho interesse no imóvel "${property.title}". Poderia me passar mais informações?`
   )}`;
 
   const handleScheduleSubmit = (e: React.FormEvent) => {
@@ -137,14 +140,14 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
       return;
     }
 
-    const msg = `*Agendamento de Visita - Lopes Manaus*\n\n` +
-      `*Imóvel:* ${property.title} (${property.code})\n` +
+    const msg = `*Agendamento de Visita - Lopes Captação*\n\n` +
+      `*Imóvel:* ${property.title}\n` +
       `*Nome:* ${visitorName}\n` +
       `*Telefone:* ${visitorPhone}\n` +
       `*Data da Visita:* ${visitDate}\n` +
       `*Horário Preferido:* ${visitTime}\n` +
       (visitNotes ? `*Observações:* ${visitNotes}\n` : '') +
-      `\nSolicitação enviada via Portal Lopes Manaus.`;
+      `\nSolicitação enviada via Portal Lopes Captação.`;
 
     const waScheduleUrl = `https://wa.me/${waPhone}?text=${encodeURIComponent(msg)}`;
     
@@ -159,8 +162,8 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: `${property.title} - Lopes Manaus`,
-        text: `Confira este imóvel incrível em Manaus: ${property.title} (${property.code})`,
+        title: `${property.title} - Lopes Captação`,
+        text: `Confira este imóvel incrível: ${property.title}`,
         url: window.location.href,
       }).catch(() => {});
     } else {
@@ -237,7 +240,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
               </a>
             )}
             <span>/</span>
-            <span className="text-slate-900 font-bold">{property.code}</span>
+            <span className="text-slate-900 font-bold truncate max-w-[200px]">{property.title}</span>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -565,7 +568,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
       <div className="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 p-3 z-40 lg:hidden shadow-2xl">
         <div className="max-w-md mx-auto flex items-center justify-between gap-3">
           <div>
-            <span className="text-[10px] text-slate-400 block uppercase font-bold">Código {property.code}</span>
+            <span className="text-[10px] text-slate-400 block uppercase font-bold">{property.category}</span>
             <span className="text-sm font-black text-rose-400">{formattedPrice}</span>
           </div>
 
@@ -645,7 +648,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
               </div>
               <div>
                 <h3 className="text-base font-extrabold text-slate-900">Agendar Visita ao Imóvel</h3>
-                <p className="text-xs text-slate-500 font-mono">{property.code} • {property.title}</p>
+                <p className="text-xs text-slate-500 font-medium">{property.title}</p>
               </div>
             </div>
 

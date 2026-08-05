@@ -270,7 +270,7 @@ export async function generateCatalogPDF(options: {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'bold');
-    doc.text(`LOPES MANAUS • CÓDIGO: ${prop.code}`, 15, 8);
+    doc.text(`LOPES CAPTAÇÃO • ${companySettings.company_name || 'Lopes Manaus'}`, 15, 8);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(226, 232, 240);
@@ -441,7 +441,7 @@ export async function generateCatalogPDF(options: {
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(203, 213, 225);
-    doc.text(`WhatsApp: ${captador.whatsapp || captador.phone} • Código: ${prop.code}`, 22, 258);
+    doc.text(`WhatsApp: ${captador.whatsapp || captador.phone}`, 22, 258);
 
     // --- INTERACTIVE BUTTON 1: "Ver detalhes completos" ---
     const btn1X = 22;

@@ -249,36 +249,23 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
-          {/* Internal Code & Captador Owner */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Captador Owner selection if Master */}
+          {isMaster && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Código Interno</label>
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-800"
-                required
-              />
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Captador Responsável</label>
+              <select
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+              >
+                {users.map(u => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.role === 'MASTER_ADMIN' ? 'Admin' : 'Captador'})
+                  </option>
+                ))}
+              </select>
             </div>
-
-            {isMaster && (
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Captador Responsável</label>
-                <select
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-                >
-                  {users.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.role === 'MASTER_ADMIN' ? 'Admin' : 'Captador'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Purpose, Category & Status */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -65,7 +65,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
 
   const whatsappRaw = captador?.whatsapp || captador?.phone || companySettings?.whatsapp || '5592981234567';
   const whatsappMsg = encodeURIComponent(
-    `Olá ${captador?.name || 'Lopes Manaus'}! Gostaria de mais informações e agendar uma visita para o imóvel Cód: ${property.code} - ${property.title}.`
+    `Olá ${captador?.name || 'Lopes Captação'}! Gostaria de mais informações e agendar uma visita para o imóvel "${property.title}".`
   );
   let whatsappUrl = '';
   if (whatsappRaw.startsWith('http://') || whatsappRaw.startsWith('https://')) {
@@ -190,8 +190,6 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
               <div className="flex items-center space-x-2 text-slate-500 text-xs font-semibold mb-1">
-                <span className="font-mono bg-slate-100 text-slate-800 px-2 py-0.5 rounded font-bold">{property.code}</span>
-                <span>•</span>
                 <MapPin className="w-3.5 h-3.5 text-[#F10F4D]" />
                 <span>{property.neighborhood}, {property.city} - {property.state}</span>
               </div>

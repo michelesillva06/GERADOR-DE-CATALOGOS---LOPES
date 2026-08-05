@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 import { generateQRCodeDataUrl } from '../lib/qrCode';
+import { getStoredUsers, getStoredProperties } from '../lib/storage';
 
 interface PublicCatalogProps {
   slug: string;
@@ -39,26 +40,48 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
   useEffect(() => {
     async function loadPublicData() {
       setLoading(true);
+      let loadedCaptador: User | null = null;
+      let loadedProps: Property[] = [];
+
       try {
         const res = await fetch(`/api/properties/public/user/${slug}`);
-        if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('json')) {
           const data = await res.json();
-          setCaptador(data.captador);
-          setProperties(data.properties || []);
-          document.title = `Catálogo Digital - ${data.captador?.name || 'Lopes Manaus'}`;
-
-          // Generate QR code for this public catalog
-          const pageUrl = window.location.href;
-          generateQRCodeDataUrl(pageUrl, '#F10F4D').then(setQrDataUrl);
-        } else {
-          setNotFound(true);
+          loadedCaptador = data.captador;
+          loadedProps = data.properties || [];
         }
       } catch (e) {
-        console.error(e);
-        setNotFound(true);
-      } finally {
-        setLoading(false);
+        console.warn('Backend API unavailable, using local storage for public catalog:', e);
       }
+
+      if (!loadedCaptador) {
+        const users = getStoredUsers();
+        const foundUser = users.find(
+          u =>
+            u.url_slug.toLowerCase() === slug.toLowerCase() ||
+            u.username.toLowerCase() === slug.toLowerCase() ||
+            u.id.toLowerCase() === slug.toLowerCase()
+        );
+
+        if (foundUser) {
+          loadedCaptador = foundUser;
+          const allProps = getStoredProperties();
+          loadedProps = allProps.filter(p => p.user_id === foundUser.id || foundUser.role === 'MASTER_ADMIN');
+        }
+      }
+
+      if (loadedCaptador) {
+        setCaptador(loadedCaptador);
+        setProperties(loadedProps);
+        document.title = `Catálogo Digital - ${loadedCaptador.name || 'Lopes Captação'}`;
+        const pageUrl = window.location.href;
+        generateQRCodeDataUrl(pageUrl, '#F10F4D').then(setQrDataUrl);
+        setNotFound(false);
+      } else {
+        setNotFound(true);
+      }
+      setLoading(false);
     }
     loadPublicData();
   }, [slug]);
@@ -312,7 +335,7 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
                 captador={captador}
                 onView={() => setSelectedProperty(prop)}
                 onShareWhatsApp={() => {
-                  const msg = encodeURIComponent(`Olá ${captador.name}! Vi o imóvel ${prop.code} no seu catálogo: ${window.location.href}`);
+                  const msg = encodeURIComponent(`Olá ${captador.name}! Vi o imóvel "${prop.title}" no seu catálogo: ${window.location.href}`);
                   let targetWaUrl = mainWhatsappUrl;
                   if (!rawWa.startsWith('http') && !rawWa.startsWith('wa.me')) {
                     let cleanWa = rawWa.replace(/\D/g, '');

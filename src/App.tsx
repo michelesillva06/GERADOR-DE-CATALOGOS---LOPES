@@ -15,26 +15,24 @@ import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
 import { Property, User, CompanySettings, AuditLog, DashboardStats } from './types';
+import {
+  getStoredProperties,
+  saveStoredProperties,
+  getStoredUsers,
+  saveStoredUsers,
+  getStoredSettings,
+  saveStoredSettings,
+  getStoredLogs,
+  saveStoredLogs,
+  calculateStats
+} from './lib/storage';
 
 function MainApp() {
   const { user, loading } = useAuth();
   const [activeView, setActiveView] = useState('dashboard');
   const [properties, setProperties] = useState<Property[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [companySettings, setCompanySettings] = useState<CompanySettings>({
-    company_name: 'Lopes Manaus',
-    unit_name: 'Lopes Imobiliária - Shopping Ponta Negra',
-    logo_url: '',
-    primary_color: '#F10F4D',
-    phone: '(92) 3659-1000',
-    whatsapp: '5592981234567',
-    email: 'contato@lopesmanaus.com.br',
-    address: 'Av. Coronel Teixeira, 5705, Loja LUC 15.2 no Shopping Ponta Negra, Bairro Ponta Negra, CEP 69037-000, Manaus - AM',
-    city: 'Manaus',
-    state: 'AM',
-    instagram: '@lopesmanaus',
-    creci_j: '540-J/AM'
-  });
+  const [companySettings, setCompanySettings] = useState<CompanySettings>(getStoredSettings());
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
@@ -46,37 +44,65 @@ function MainApp() {
 
   // Fetch initial data
   const fetchData = async () => {
+    let currentProps = getStoredProperties();
+    let currentUsers = getStoredUsers();
+    let currentSettings = getStoredSettings();
+    let currentLogs = getStoredLogs();
+
     try {
       const [propsRes, usersRes, settingsRes, logsRes, statsRes] = await Promise.all([
-        fetch('/api/properties'),
-        fetch('/api/users'),
-        fetch('/api/settings'),
-        fetch('/api/logs'),
-        fetch('/api/stats')
+        fetch('/api/properties').catch(() => null),
+        fetch('/api/users').catch(() => null),
+        fetch('/api/settings').catch(() => null),
+        fetch('/api/logs').catch(() => null),
+        fetch('/api/stats').catch(() => null)
       ]);
 
-      if (propsRes.ok) {
+      if (propsRes && propsRes.ok && (propsRes.headers.get('content-type') || '').includes('json')) {
         const d = await propsRes.json();
-        setProperties(d.properties || []);
+        if (d.properties) {
+          currentProps = d.properties;
+          saveStoredProperties(currentProps);
+        }
       }
-      if (usersRes.ok) {
+      if (usersRes && usersRes.ok && (usersRes.headers.get('content-type') || '').includes('json')) {
         const d = await usersRes.json();
-        setUsers(d.users || []);
+        if (d.users) {
+          currentUsers = d.users;
+          saveStoredUsers(currentUsers);
+        }
       }
-      if (settingsRes.ok) {
+      if (settingsRes && settingsRes.ok && (settingsRes.headers.get('content-type') || '').includes('json')) {
         const d = await settingsRes.json();
-        if (d.settings) setCompanySettings(d.settings);
+        if (d.settings) {
+          currentSettings = d.settings;
+          saveStoredSettings(currentSettings);
+        }
       }
-      if (logsRes.ok) {
+      if (logsRes && logsRes.ok && (logsRes.headers.get('content-type') || '').includes('json')) {
         const d = await logsRes.json();
-        setLogs(d.logs || []);
+        if (d.logs) {
+          currentLogs = d.logs;
+          saveStoredLogs(currentLogs);
+        }
       }
-      if (statsRes.ok) {
+      if (statsRes && statsRes.ok && (statsRes.headers.get('content-type') || '').includes('json')) {
         const d = await statsRes.json();
-        setStats(d.stats || null);
+        if (d.stats) setStats(d.stats);
+      } else {
+        setStats(calculateStats(currentProps, currentUsers));
       }
     } catch (e) {
-      console.error('Failed to load data:', e);
+      console.warn('Failed to load data from backend, using local storage:', e);
+      setStats(calculateStats(currentProps, currentUsers));
+    }
+
+    setProperties(currentProps);
+    setUsers(currentUsers);
+    setCompanySettings(currentSettings);
+    setLogs(currentLogs);
+    if (!stats) {
+      setStats(calculateStats(currentProps, currentUsers));
     }
   };
 
@@ -113,91 +139,180 @@ function MainApp() {
   };
 
   const handleSaveProperty = async (propData: Partial<Property>) => {
-    if (editingProperty) {
-      const res = await fetch(`/api/properties/${editingProperty.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(propData)
-      });
-      if (!res.ok) throw new Error('Falha ao atualizar imóvel.');
-    } else {
-      const res = await fetch('/api/properties', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...propData, user_id: propData.user_id || user.id })
-      });
-      if (!res.ok) throw new Error('Falha ao cadastrar imóvel.');
+    try {
+      if (editingProperty) {
+        await fetch(`/api/properties/${editingProperty.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(propData)
+        });
+      } else {
+        await fetch('/api/properties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...propData, user_id: propData.user_id || user.id })
+        });
+      }
+    } catch (e) {
+      console.warn('Backend API unavailable, saving property locally:', e);
     }
-    await fetchData();
+
+    // Local state fallback / synchronization
+    const allProps = getStoredProperties();
+    let updatedProps: Property[] = [];
+    if (editingProperty) {
+      updatedProps = allProps.map(p => p.id === editingProperty.id ? { ...p, ...propData } as Property : p);
+    } else {
+      const newCode = `LOP-${Math.floor(100 + Math.random() * 900)}`;
+      const mainImg = propData.images?.[0] || propData.main_image || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
+      const newProp: Property = {
+        id: `prop_${Date.now()}`,
+        code: propData.code || newCode,
+        title: propData.title || 'Imóvel sem título',
+        category: propData.category || 'Apartamento',
+        purpose: propData.purpose || 'Venda',
+        price: propData.price || 0,
+        rent_price: propData.rent_price || 0,
+        condo_fee: propData.condo_fee || 0,
+        iptu: propData.iptu || 0,
+        address: propData.address || '',
+        neighborhood: propData.neighborhood || '',
+        city: propData.city || 'Manaus',
+        state: propData.state || 'AM',
+        bedrooms: propData.bedrooms || 0,
+        suites: propData.suites || 0,
+        bathrooms: propData.bathrooms || 0,
+        parking_spaces: propData.parking_spaces || 0,
+        total_area: propData.total_area || 0,
+        built_area: propData.built_area || 0,
+        description: propData.description || '',
+        features: propData.features || [],
+        images: propData.images || [mainImg],
+        main_image: mainImg,
+        status: propData.status || 'Disponível',
+        user_id: propData.user_id || user.id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      updatedProps = [newProp, ...allProps];
+    }
+    saveStoredProperties(updatedProps);
+    setProperties(updatedProps);
+    setStats(calculateStats(updatedProps, users));
   };
 
   const handleDeleteProperty = async (prop: Property) => {
     if (!confirm(`Deseja realmente excluir o imóvel ${prop.code}?`)) return;
     try {
-      const res = await fetch(`/api/properties/${prop.id}`, { method: 'DELETE' });
-      if (res.ok) {
-        await fetchData();
-      }
+      await fetch(`/api/properties/${prop.id}`, { method: 'DELETE' });
     } catch (e) {
-      console.error(e);
-      alert('Erro ao excluir imóvel.');
+      console.warn('Backend API unavailable, deleting property locally:', e);
     }
+
+    const allProps = getStoredProperties().filter(p => p.id !== prop.id);
+    saveStoredProperties(allProps);
+    setProperties(allProps);
+    setStats(calculateStats(allProps, users));
   };
 
   const handleShareWhatsApp = (prop: Property) => {
     const owner = users.find(u => u.id === prop.user_id) || user;
     const link = `${window.location.origin}/catalogo/${owner.url_slug || owner.username}?code=${prop.code}`;
-    const text = encodeURIComponent(`Confira este imóvel na Lopes Manaus: ${prop.title} (${prop.code}) - ${link}`);
+    const text = encodeURIComponent(`Confira este imóvel na Lopes Captação: ${prop.title} (${prop.code}) - ${link}`);
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
   const handleAddUser = async (userData: any) => {
-    const res = await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error || 'Erro ao criar usuário.');
+    try {
+      await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+    } catch (e) {
+      console.warn('Backend API unavailable, adding user locally:', e);
     }
-    await fetchData();
+
+    const allUsers = getStoredUsers();
+    const newUser: User = {
+      id: `usr_${Date.now()}`,
+      name: userData.name || 'Novo Usuário',
+      email: userData.email || '',
+      username: userData.username || `user_${Date.now()}`,
+      phone: userData.phone || '',
+      whatsapp: userData.whatsapp || userData.phone || '',
+      role: userData.role || 'CAPTADOR',
+      position: userData.position || 'Corretor',
+      url_slug: userData.url_slug || userData.username || `user_${Date.now()}`,
+      status: 'active',
+      photo_url: userData.photo_url || '',
+      creci: userData.creci || '',
+      instagram: userData.instagram || '',
+      created_at: new Date().toISOString()
+    };
+    const updatedUsers = [...allUsers, newUser];
+    saveStoredUsers(updatedUsers);
+    setUsers(updatedUsers);
+    setStats(calculateStats(properties, updatedUsers));
   };
 
   const handleUpdateUser = async (id: string, userData: any) => {
-    const res = await fetch(`/api/users/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(userData)
-    });
-    if (!res.ok) {
-      const d = await res.json();
-      throw new Error(d.error || 'Erro ao atualizar usuário.');
+    try {
+      await fetch(`/api/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+    } catch (e) {
+      console.warn('Backend API unavailable, updating user locally:', e);
     }
-    await fetchData();
+
+    const allUsers = getStoredUsers().map(u => u.id === id ? { ...u, ...userData } : u);
+    saveStoredUsers(allUsers);
+    setUsers(allUsers);
   };
 
   const handleToggleBlockUser = async (id: string) => {
-    const res = await fetch(`/api/users/${id}/block`, { method: 'PATCH' });
-    if (res.ok) await fetchData();
+    try {
+      await fetch(`/api/users/${id}/block`, { method: 'PATCH' });
+    } catch (e) {
+      console.warn('Backend API unavailable, toggling user block locally:', e);
+    }
+
+    const allUsers = getStoredUsers().map(u => u.id === id ? { ...u, status: u.status === 'blocked' ? 'active' : 'blocked' } as User : u);
+    saveStoredUsers(allUsers);
+    setUsers(allUsers);
+    setStats(calculateStats(properties, allUsers));
   };
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Excluir este usuário permamente?')) return;
-    const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-    if (res.ok) await fetchData();
+    try {
+      await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Backend API unavailable, deleting user locally:', e);
+    }
+
+    const allUsers = getStoredUsers().filter(u => u.id !== id);
+    saveStoredUsers(allUsers);
+    setUsers(allUsers);
+    setStats(calculateStats(properties, allUsers));
   };
 
   const handleSaveSettings = async (newSettings: Partial<CompanySettings>) => {
-    const res = await fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newSettings)
-    });
-    if (res.ok) {
-      const d = await res.json();
-      if (d.settings) setCompanySettings(d.settings);
+    try {
+      await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      });
+    } catch (e) {
+      console.warn('Backend API unavailable, saving settings locally:', e);
     }
+
+    const updated = { ...companySettings, ...newSettings };
+    saveStoredSettings(updated);
+    setCompanySettings(updated);
   };
 
   const isMaster = user.role === 'MASTER_ADMIN';

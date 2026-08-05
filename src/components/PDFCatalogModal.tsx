@@ -245,8 +245,8 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
                         )}
                         <div>
                           <p className="text-xs font-bold text-slate-900 line-clamp-1">{p.title}</p>
-                          <p className="text-[10px] text-slate-500 font-mono">
-                            {p.code} • {p.neighborhood} • {p.category} ({p.purpose})
+                          <p className="text-[10px] text-slate-500 font-medium">
+                            {p.neighborhood} • {p.category} ({p.purpose})
                           </p>
                         </div>
                       </div>
