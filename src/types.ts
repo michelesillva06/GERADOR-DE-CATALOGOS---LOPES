@@ -50,6 +50,15 @@ export interface Property {
   images: string[];
   main_image: string;
   views?: number;
+  // Informações do Cliente Comprador / Inquilino
+  client_name?: string;
+  client_cpf_cnpj?: string;
+  client_phone?: string;
+  client_email?: string;
+  client_type?: 'COMPRADOR' | 'INQUILINO';
+  transaction_date?: string;
+  transaction_value?: number;
+  transaction_notes?: string;
   created_at: string;
   updated_at: string;
 }

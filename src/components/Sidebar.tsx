@@ -48,9 +48,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       show: isMasterOrGestora
     },
     {
+      id: 'reports',
+      label: 'Planilha & Controle',
+      icon: FileSpreadsheet,
+      show: isMasterOrGestora
+    },
+    {
       id: 'pdf-catalog',
       label: 'Gerar Catálogo PDF',
-      icon: FileSpreadsheet,
+      icon: FileText,
       show: true
     },
     {

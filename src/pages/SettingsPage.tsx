@@ -18,6 +18,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   // Company Form State
   const [companyForm, setCompanyForm] = useState<CompanySettings>(settings);
+  const isAdmin = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'MASTER';
   
   // User Profile Form State
   const [name, setName] = useState(currentUser.name || '');
@@ -380,15 +381,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
 
         {/* SECTION 3: CAPAS OFICIAIS DOS CATÁLOGOS POR FINALIDADE */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-6">
           <div className="flex items-center space-x-3 pb-4 border-b border-slate-100">
             <div className="w-10 h-10 rounded-2xl bg-[#F10F4D] text-white flex items-center justify-center">
               <ImageIcon className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900">Capas Oficiais dos Catálogos (Padrão para Captadores)</h2>
+              <h2 className="text-base font-extrabold text-slate-900">Capas Oficiais dos Catálogos</h2>
               <p className="text-xs text-slate-500">
-                Faça o upload das capas oficiais para cada finalidade (Locação, Venda ou Geral). Ao salvar, elas são atualizadas em tempo real em todos os perfis.
+                {isAdmin
+                  ? 'Faça o upload ou insira a URL das capas oficiais por finalidade (Locação, Venda ou Geral). Ao salvar, as capas são aplicadas automaticamente aos PDFs gerados no sistema.'
+                  : 'Visualização das capas oficiais ativas (Definidas exclusivamente pelo Administrador Master).'}
               </p>
             </div>
           </div>
@@ -398,7 +401,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-[#F10F4D] uppercase">Capa Locação</span>
-                {companyForm.cover_locacao_url && (
+                {isAdmin && companyForm.cover_locacao_url && (
                   <button
                     type="button"
                     onClick={() => setCompanyForm({ ...companyForm, cover_locacao_url: '' })}
@@ -420,35 +423,54 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <span className="text-xs font-bold text-slate-400">Capa Oficial Lopes (Automática)</span>
                   </div>
                 )}
-                <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
-                  <Upload className="w-6 h-6 mb-1 text-rose-400" />
-                  <span>{companyForm.cover_locacao_url ? 'Substituir Capa de Locação' : 'Upload Capa de Locação'}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (evt) => {
-                          if (evt.target?.result) {
-                            setCompanyForm({ ...companyForm, cover_locacao_url: evt.target.result as string });
-                          }
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                </label>
+                {isAdmin && (
+                  <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
+                    <Upload className="w-6 h-6 mb-1 text-rose-400" />
+                    <span>{companyForm.cover_locacao_url ? 'Substituir Capa de Locação' : 'Upload Capa de Locação'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) {
+                              setCompanyForm({ ...companyForm, cover_locacao_url: evt.target.result as string });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
+
+              {isAdmin ? (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">ou Cole a URL da Imagem</label>
+                  <input
+                    type="text"
+                    placeholder="https://exemplo.com/capa-locacao.jpg"
+                    value={companyForm.cover_locacao_url || ''}
+                    onChange={(e) => setCompanyForm({ ...companyForm, cover_locacao_url: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
+                  />
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-400 italic text-center pt-1">
+                  Somente Leitura
+                </div>
+              )}
             </div>
 
             {/* CAPA VENDA */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-[#F10F4D] uppercase">Capa Venda</span>
-                {companyForm.cover_venda_url && (
+                {isAdmin && companyForm.cover_venda_url && (
                   <button
                     type="button"
                     onClick={() => setCompanyForm({ ...companyForm, cover_venda_url: '' })}
@@ -470,35 +492,54 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <span className="text-xs font-bold text-slate-400">Capa Oficial Lopes (Automática)</span>
                   </div>
                 )}
-                <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
-                  <Upload className="w-6 h-6 mb-1 text-rose-400" />
-                  <span>{companyForm.cover_venda_url ? 'Substituir Capa de Venda' : 'Upload Capa de Venda'}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (evt) => {
-                          if (evt.target?.result) {
-                            setCompanyForm({ ...companyForm, cover_venda_url: evt.target.result as string });
-                          }
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                </label>
+                {isAdmin && (
+                  <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
+                    <Upload className="w-6 h-6 mb-1 text-rose-400" />
+                    <span>{companyForm.cover_venda_url ? 'Substituir Capa de Venda' : 'Upload Capa de Venda'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) {
+                              setCompanyForm({ ...companyForm, cover_venda_url: evt.target.result as string });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
+
+              {isAdmin ? (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">ou Cole a URL da Imagem</label>
+                  <input
+                    type="text"
+                    placeholder="https://exemplo.com/capa-venda.jpg"
+                    value={companyForm.cover_venda_url || ''}
+                    onChange={(e) => setCompanyForm({ ...companyForm, cover_venda_url: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
+                  />
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-400 italic text-center pt-1">
+                  Somente Leitura
+                </div>
+              )}
             </div>
 
             {/* CAPA GERAL */}
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-[#F10F4D] uppercase">Capa Geral / Todos</span>
-                {companyForm.cover_geral_url && (
+                {isAdmin && companyForm.cover_geral_url && (
                   <button
                     type="button"
                     onClick={() => setCompanyForm({ ...companyForm, cover_geral_url: '' })}
@@ -520,28 +561,47 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <span className="text-xs font-bold text-slate-400">Capa Oficial Lopes (Automática)</span>
                   </div>
                 )}
-                <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
-                  <Upload className="w-6 h-6 mb-1 text-rose-400" />
-                  <span>{companyForm.cover_geral_url ? 'Substituir Capa Geral' : 'Upload Capa Geral'}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (evt) => {
-                          if (evt.target?.result) {
-                            setCompanyForm({ ...companyForm, cover_geral_url: evt.target.result as string });
-                          }
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                    className="hidden"
-                  />
-                </label>
+                {isAdmin && (
+                  <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
+                    <Upload className="w-6 h-6 mb-1 text-rose-400" />
+                    <span>{companyForm.cover_geral_url ? 'Substituir Capa Geral' : 'Upload Capa Geral'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) {
+                              setCompanyForm({ ...companyForm, cover_geral_url: evt.target.result as string });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
+
+              {isAdmin ? (
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">ou Cole a URL da Imagem</label>
+                  <input
+                    type="text"
+                    placeholder="https://exemplo.com/capa-geral.jpg"
+                    value={companyForm.cover_geral_url || ''}
+                    onChange={(e) => setCompanyForm({ ...companyForm, cover_geral_url: e.target.value })}
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
+                  />
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-400 italic text-center pt-1">
+                  Somente Leitura
+                </div>
+              )}
             </div>
           </div>
         </div>

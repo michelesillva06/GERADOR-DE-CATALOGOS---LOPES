@@ -248,6 +248,61 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
             </div>
           )}
 
+          {/* Client Buyer / Tenant details if registered */}
+          {(property.client_name || property.client_phone || property.client_email) && (
+            <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Cliente {property.client_type || (property.status === 'Alugado' ? 'Inquilino / Locatário' : 'Comprador')} Cadastrado
+                </span>
+                {property.transaction_date && (
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Data: {new Date(property.transaction_date).toLocaleDateString('pt-BR')}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2 text-xs">
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Nome do Cliente</span>
+                  <p className="font-extrabold text-slate-900">{property.client_name || '-'}</p>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">CPF / CNPJ</span>
+                  <p className="font-mono font-semibold text-slate-800">{property.client_cpf_cnpj || '-'}</p>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Telefone / WhatsApp</span>
+                  <p className="font-semibold text-slate-800">{property.client_phone || '-'}</p>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">E-mail</span>
+                  <p className="font-semibold text-slate-800">{property.client_email || '-'}</p>
+                </div>
+
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-bold block">Valor do Negócio Fechado</span>
+                  <p className="font-black text-emerald-700">
+                    {property.transaction_value
+                      ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(property.transaction_value)
+                      : '-'}
+                  </p>
+                </div>
+
+                {property.transaction_notes && (
+                  <div className="col-span-1 sm:col-span-2">
+                    <span className="text-slate-400 text-[10px] uppercase font-bold block">Observações do Negócio</span>
+                    <p className="font-medium text-slate-700 italic">{property.transaction_notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Captador Contact Card & QR Code */}
           <div className="bg-slate-900 text-white rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
             {captador && (

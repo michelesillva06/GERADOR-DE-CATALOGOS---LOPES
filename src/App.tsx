@@ -11,6 +11,7 @@ import { PublicCatalog } from './pages/PublicCatalog';
 import { PublicPropertyDetail } from './pages/PublicPropertyDetail';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
@@ -406,6 +407,16 @@ function MainApp() {
               onUpdateUser={handleUpdateUser}
               onToggleBlock={handleToggleBlockUser}
               onDeleteUser={handleDeleteUser}
+            />
+          )}
+
+          {activeView === 'reports' && isMasterOrGestora && (
+            <ReportsPage
+              properties={properties}
+              users={users}
+              logs={logs}
+              companySettings={companySettings}
+              currentUser={user}
             />
           )}
 

@@ -3,7 +3,7 @@ import { Property, User, CompanySettings } from '../types';
 import { generateQRCodeDataUrl } from './qrCode';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from './whatsapp';
 
-// Helper to convert image URL to Base64 DataURL safely
+// Helper to convert image URL or Data URL to Base64 JPEG DataURL safely for jsPDF
 async function urlToBase64(url: string): Promise<string> {
   if (!url) return '';
   return new Promise((resolve) => {
@@ -12,20 +12,20 @@ async function urlToBase64(url: string): Promise<string> {
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
-        canvas.width = img.width || 800;
-        canvas.height = img.height || 600;
+        canvas.width = img.width || 1200;
+        canvas.height = img.height || 1600;
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
+          resolve(canvas.toDataURL('image/jpeg', 0.90));
         } else {
-          resolve('');
+          resolve(url.startsWith('data:') ? url : '');
         }
       } catch {
-        resolve('');
+        resolve(url.startsWith('data:') ? url : '');
       }
     };
-    img.onerror = () => resolve('');
+    img.onerror = () => resolve(url.startsWith('data:') ? url : '');
     img.src = url;
   });
 }
@@ -623,6 +623,7 @@ export async function generateCatalogPDF(options: {
   companySettings: CompanySettings;
   appUrl?: string;
   customCoverImage?: string; // Optional user-provided custom cover image (data URL or Base64)
+  coverType?: 'VENDA' | 'LOCACAO' | 'GERAL';
 }): Promise<jsPDF> {
   const { properties, captador, companySettings, customCoverImage } = options;
   const baseUrl = options.appUrl || window.location.origin;
@@ -636,14 +637,16 @@ export async function generateCatalogPDF(options: {
   });
 
   // Determine Catalog Type for Cover Page 1
-  let coverType: 'VENDA' | 'LOCACAO' | 'GERAL' = 'GERAL';
-  const allVenda = properties.length > 0 && properties.every(p => p.purpose === 'Venda');
-  const allLocacao = properties.length > 0 && properties.every(p => p.purpose === 'Locação');
+  let coverType: 'VENDA' | 'LOCACAO' | 'GERAL' = options.coverType || 'GERAL';
+  if (!options.coverType) {
+    const allVenda = properties.length > 0 && properties.every(p => p.purpose === 'Venda');
+    const allLocacao = properties.length > 0 && properties.every(p => p.purpose === 'Locação');
 
-  if (allVenda || (options.title && options.title.toLowerCase().includes('venda'))) {
-    coverType = 'VENDA';
-  } else if (allLocacao || (options.title && options.title.toLowerCase().includes('loca'))) {
-    coverType = 'LOCACAO';
+    if (allVenda || (options.title && options.title.toLowerCase().includes('venda'))) {
+      coverType = 'VENDA';
+    } else if (allLocacao || (options.title && options.title.toLowerCase().includes('loca'))) {
+      coverType = 'LOCACAO';
+    }
   }
 
   // ==========================================
@@ -651,24 +654,20 @@ export async function generateCatalogPDF(options: {
   // ==========================================
   let selectedCoverUrl = customCoverImage;
 
-  // Check admin configured cover per purpose if custom cover is not provided
+  // Check admin/gestor configured cover per purpose if custom cover is not provided
   if (!selectedCoverUrl) {
-    if (coverType === 'LOCACAO' && companySettings?.cover_locacao_url) {
-      selectedCoverUrl = companySettings.cover_locacao_url;
-    } else if (coverType === 'VENDA' && companySettings?.cover_venda_url) {
-      selectedCoverUrl = companySettings.cover_venda_url;
-    } else if (companySettings?.cover_geral_url) {
-      selectedCoverUrl = companySettings.cover_geral_url;
+    if (coverType === 'LOCACAO') {
+      selectedCoverUrl = companySettings?.cover_locacao_url || companySettings?.cover_geral_url;
+    } else if (coverType === 'VENDA') {
+      selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_geral_url;
+    } else {
+      selectedCoverUrl = companySettings?.cover_geral_url || companySettings?.cover_venda_url || companySettings?.cover_locacao_url;
     }
   }
 
   let coverDataUrl = '';
   if (selectedCoverUrl) {
-    if (selectedCoverUrl.startsWith('data:')) {
-      coverDataUrl = selectedCoverUrl;
-    } else {
-      coverDataUrl = await urlToBase64(selectedCoverUrl);
-    }
+    coverDataUrl = await urlToBase64(selectedCoverUrl);
   }
 
   if (!coverDataUrl) {
@@ -678,8 +677,8 @@ export async function generateCatalogPDF(options: {
   if (coverDataUrl) {
     try {
       doc.addImage(coverDataUrl, 'JPEG', 0, 0, 210, 297);
-    } catch {
-      // Fallback
+    } catch (err) {
+      console.warn('Error applying cover image to PDF, falling back to canvas:', err);
       const defaultCanvas = await renderCoverCanvas(coverType, companySettings);
       doc.addImage(defaultCanvas, 'JPEG', 0, 0, 210, 297);
     }

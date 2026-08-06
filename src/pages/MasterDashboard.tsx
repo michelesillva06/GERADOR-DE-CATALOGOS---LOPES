@@ -1,6 +1,6 @@
 import React from 'react';
 import { DashboardStats, Property, User, AuditLog } from '../types';
-import { Users, Building2, CheckCircle2, ShoppingBag, Key, TrendingUp, Award, ExternalLink, PlusCircle, ShieldCheck } from 'lucide-react';
+import { Users, Building2, CheckCircle2, ShoppingBag, Key, TrendingUp, Award, ExternalLink, PlusCircle, ShieldCheck, FileSpreadsheet } from 'lucide-react';
 
 interface MasterDashboardProps {
   stats: DashboardStats | null;
@@ -37,16 +37,23 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setActiveView('reports')}
+            className="px-3.5 py-2 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-900/30 transition flex items-center space-x-1.5"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Planilha para Diretoria</span>
+          </button>
           <button
             onClick={onOpenNewUserModal}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
           >
-            Novo Usuário Captador
+            Novo Captador
           </button>
           <button
             onClick={onOpenNewPropertyModal}
-            className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-900/30 transition"
+            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
           >
             Cadastrar Imóvel
           </button>

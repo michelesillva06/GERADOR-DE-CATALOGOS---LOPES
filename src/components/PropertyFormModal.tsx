@@ -67,6 +67,17 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const [imageUrlInput, setImageUrlInput] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [mainImage, setMainImage] = useState<string>('');
+  
+  // Client Buyer/Tenant information
+  const [clientName, setClientName] = useState('');
+  const [clientCpfCnpj, setClientCpfCnpj] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientType, setClientType] = useState<'COMPRADOR' | 'INQUILINO'>('COMPRADOR');
+  const [transactionDate, setTransactionDate] = useState('');
+  const [transactionValue, setTransactionValue] = useState<number | ''>('');
+  const [transactionNotes, setTransactionNotes] = useState('');
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -96,6 +107,15 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setSelectedFeatures(property.features || []);
       setImages(property.images || []);
       setMainImage(property.main_image || (property.images?.[0] || ''));
+      
+      setClientName(property.client_name || '');
+      setClientCpfCnpj(property.client_cpf_cnpj || '');
+      setClientPhone(property.client_phone || '');
+      setClientEmail(property.client_email || '');
+      setClientType(property.client_type || (property.status === 'Alugado' ? 'INQUILINO' : 'COMPRADOR'));
+      setTransactionDate(property.transaction_date ? property.transaction_date.split('T')[0] : '');
+      setTransactionValue(property.transaction_value || property.price || property.rent_price || '');
+      setTransactionNotes(property.transaction_notes || '');
     } else {
       setCode(`LOP-${Math.floor(1000 + Math.random() * 9000)}`);
       setUserId(currentUserId);
@@ -124,6 +144,15 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'
       ]);
       setMainImage('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80');
+      
+      setClientName('');
+      setClientCpfCnpj('');
+      setClientPhone('');
+      setClientEmail('');
+      setClientType('COMPRADOR');
+      setTransactionDate('');
+      setTransactionValue('');
+      setTransactionNotes('');
     }
   }, [property, currentUserId, isOpen]);
 
@@ -209,7 +238,15 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         parking_spaces: Number(parkingSpaces),
         features: selectedFeatures,
         images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'],
-        main_image: mainImage || images[0] || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'
+        main_image: mainImage || images[0] || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
+        client_name: clientName.trim() || undefined,
+        client_cpf_cnpj: clientCpfCnpj.trim() || undefined,
+        client_phone: clientPhone.trim() || undefined,
+        client_email: clientEmail.trim() || undefined,
+        client_type: clientType,
+        transaction_date: transactionDate ? new Date(transactionDate).toISOString() : undefined,
+        transaction_value: transactionValue !== '' ? Number(transactionValue) : undefined,
+        transaction_notes: transactionNotes.trim() || undefined
       });
       onClose();
     } catch (err: any) {
@@ -499,6 +536,118 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                   <span>{feat}</span>
                 </label>
               ))}
+            </div>
+          </div>
+
+          {/* Section: Cadastrar Cliente Comprador ou Inquilino */}
+          <div className="bg-rose-50/60 p-4 rounded-2xl border border-rose-200/80 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-black uppercase text-[#F10F4D] tracking-wider">
+                  Cadastro do Cliente Comprador / Inquilino
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Preencha os dados do cliente que adquiriu ou alugou este imóvel para constar nos relatórios e planilhas da imobiliária.
+                </p>
+              </div>
+              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                status === 'Vendido' ? 'bg-emerald-100 text-emerald-800' :
+                status === 'Alugado' ? 'bg-sky-100 text-sky-800' :
+                status === 'Reservado' ? 'bg-amber-100 text-amber-800' :
+                'bg-slate-200 text-slate-700'
+              }`}>
+                {status}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo do Cliente</label>
+                <input
+                  type="text"
+                  placeholder="Ex: João da Silva Santos"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">CPF / CNPJ do Cliente</label>
+                <input
+                  type="text"
+                  placeholder="000.000.000-00"
+                  value={clientCpfCnpj}
+                  onChange={(e) => setClientCpfCnpj(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Telefone / WhatsApp do Cliente</label>
+                <input
+                  type="text"
+                  placeholder="(92) 99999-9999"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">E-mail do Cliente</label>
+                <input
+                  type="email"
+                  placeholder="cliente@email.com"
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tipo de Cliente</label>
+                <select
+                  value={clientType}
+                  onChange={(e) => setClientType(e.target.value as 'COMPRADOR' | 'INQUILINO')}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#F10F4D]"
+                >
+                  <option value="COMPRADOR">Comprador</option>
+                  <option value="INQUILINO">Inquilino / Locatário</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Data do Negócio / Contrato</label>
+                <input
+                  type="date"
+                  value={transactionDate}
+                  onChange={(e) => setTransactionDate(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Valor Fechado do Negócio (R$)</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={transactionValue}
+                  onChange={(e) => setTransactionValue(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-emerald-700 focus:outline-none focus:border-[#F10F4D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Observações do Negócio</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Pagamento à vista / Financiamento Caixa..."
+                  value={transactionNotes}
+                  onChange={(e) => setTransactionNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                />
+              </div>
             </div>
           </div>
 
