@@ -109,6 +109,46 @@ export interface DashboardStats {
   }[];
 }
 
+export interface JournalEntry {
+  id: string;
+  user_id: string;
+  user_name: string;
+  date: string; // YYYY-MM-DD
+  summary_notes: string;
+  key_highlights: string[];
+  next_day_goals: string;
+  rating?: 'Produtivo' | 'Excelente' | 'Desafiador' | 'Regular';
+  auto_metrics?: {
+    properties_created: number;
+    properties_updated: number;
+    status_changes: number;
+    visits_count: number;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export type ScheduleEventType = 'VISITA' | 'TREINAMENTO' | 'EVENTO' | 'FERIADO';
+
+export interface ScheduleEvent {
+  id: string;
+  title: string;
+  type: ScheduleEventType;
+  date: string; // YYYY-MM-DD
+  start_time: string; // HH:MM e.g. "09:00"
+  end_time: string; // HH:MM e.g. "10:00"
+  user_id: string; // Captador ID
+  user_name: string;
+  property_id?: string;
+  property_code?: string;
+  client_name?: string;
+  client_phone?: string;
+  location?: string;
+  notes?: string;
+  exclusive_visit?: boolean; // true = "Ir Só" (No concurrent visit allowed for this property), false = "Pode Ir Acompanhado"
+  created_at: string;
+}
+
 export interface PDFExportOptions {
   title?: string;
   includeCover: boolean;

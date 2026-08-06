@@ -40,6 +40,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [selectedPropIds, setSelectedPropIds] = useState<string[]>([]);
   const [customCoverImage, setCustomCoverImage] = useState<string>('');
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Active cover URL from companySettings based on purposeFilter
@@ -132,7 +133,8 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
         captador: selectedCaptador,
         companySettings,
         customCoverImage,
-        coverType: determinedCoverType
+        coverType: determinedCoverType,
+        orientation
       });
 
       doc.save(`Catalogo_LopesManaus_${selectedCaptador.url_slug || 'imoveis'}.pdf`);
@@ -180,6 +182,56 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
               onChange={(e) => setCatalogTitle(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
             />
+          </div>
+
+          {/* Catalog Layout Orientation Selector */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Formato / Orientação do Catálogo</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setOrientation('landscape')}
+                className={`p-3.5 rounded-2xl border text-left flex items-start space-x-3 transition ${
+                  orientation === 'landscape'
+                    ? 'bg-rose-50/90 border-[#F10F4D] ring-2 ring-[#F10F4D]/20 shadow-sm'
+                    : 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100'
+                }`}
+              >
+                <div className={`w-8 h-6 rounded border border-current shrink-0 flex items-center justify-center mt-0.5 ${
+                  orientation === 'landscape' ? 'bg-[#F10F4D] text-white border-[#F10F4D]' : 'bg-white text-slate-400 border-slate-300'
+                }`}>
+                  <span className="text-[9px] font-black">21x30</span>
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-900">🖼️ Catálogo Horizontal (Paisagem)</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Layout completo com galeria, destaques, infraestrutura do condomínio e banner de agendamento (Modelo Lopes Manaus).
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOrientation('portrait')}
+                className={`p-3.5 rounded-2xl border text-left flex items-start space-x-3 transition ${
+                  orientation === 'portrait'
+                    ? 'bg-rose-50/90 border-[#F10F4D] ring-2 ring-[#F10F4D]/20 shadow-sm'
+                    : 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100'
+                }`}
+              >
+                <div className={`w-6 h-8 rounded border border-current shrink-0 flex items-center justify-center ${
+                  orientation === 'portrait' ? 'bg-[#F10F4D] text-white border-[#F10F4D]' : 'bg-white text-slate-400 border-slate-300'
+                }`}>
+                  <span className="text-[9px] font-black">A4</span>
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-900">📄 Catálogo Vertical (Retrato)</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Formato tradicional de 1 imóvel por página A4 vertical com link interativo e QR Code.
+                  </p>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Cover Page Customization Block */}

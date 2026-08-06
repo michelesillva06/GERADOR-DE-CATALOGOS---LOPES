@@ -10,7 +10,9 @@ import {
   Settings,
   Share2,
   History,
-  ExternalLink
+  ExternalLink,
+  BookOpen,
+  Calendar
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -33,6 +35,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       id: 'dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard,
+      show: true
+    },
+    {
+      id: 'schedule',
+      label: 'Agenda & Visitas',
+      icon: Calendar,
+      show: true
+    },
+    {
+      id: 'journal',
+      label: 'Diário do Captador',
+      icon: BookOpen,
       show: true
     },
     {

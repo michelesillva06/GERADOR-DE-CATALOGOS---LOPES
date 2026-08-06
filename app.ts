@@ -1,8 +1,8 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { initialUsers, initialProperties, initialCompanySettings, initialAuditLogs } from './src/data/mockData.ts';
-import { User, Property, CompanySettings, AuditLog, DashboardStats } from './src/types.ts';
+import { initialUsers, initialProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData.ts';
+import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
 
@@ -11,6 +11,8 @@ let users: User[] = [...initialUsers];
 let properties: Property[] = [...initialProperties];
 let companySettings: CompanySettings = { ...initialCompanySettings };
 let auditLogs: AuditLog[] = [...initialAuditLogs];
+let journalEntries: JournalEntry[] = [...initialJournalEntries] as JournalEntry[];
+let scheduleEvents: ScheduleEvent[] = [...initialScheduleEvents] as ScheduleEvent[];
 
 // Default password for all pre-seeded users is "mudar123"
 const passwordHashes: Record<string, string> = {
@@ -505,6 +507,154 @@ app.put('/api/settings', (req, res) => {
   companySettings = { ...companySettings, ...req.body };
   addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária', req);
   res.json({ settings: companySettings });
+});
+
+// --- JOURNAL ENDPOINTS ---
+app.get('/api/journal', (req, res) => {
+  const { user_id, date } = req.query;
+  let filtered = [...journalEntries];
+  if (user_id) {
+    filtered = filtered.filter(j => j.user_id === user_id);
+  }
+  if (date) {
+    filtered = filtered.filter(j => j.date === date);
+  }
+  res.json({ journals: filtered });
+});
+
+app.post('/api/journal', (req, res) => {
+  const data = req.body;
+  if (!data.user_id || !data.date) {
+    return res.status(400).json({ error: 'Usuário e data são obrigatórios.' });
+  }
+
+  const existingIndex = journalEntries.findIndex(j => j.user_id === data.user_id && j.date === data.date);
+  
+  const entry: JournalEntry = {
+    id: existingIndex !== -1 ? journalEntries[existingIndex].id : `jrn_${Date.now()}`,
+    user_id: data.user_id,
+    user_name: data.user_name || 'Captador',
+    date: data.date,
+    summary_notes: data.summary_notes || '',
+    key_highlights: Array.isArray(data.key_highlights) ? data.key_highlights : [],
+    next_day_goals: data.next_day_goals || '',
+    rating: data.rating || 'Produtivo',
+    auto_metrics: data.auto_metrics || {
+      properties_created: 0,
+      properties_updated: 0,
+      status_changes: 0,
+      visits_count: 0
+    },
+    created_at: existingIndex !== -1 ? journalEntries[existingIndex].created_at : new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (existingIndex !== -1) {
+    journalEntries[existingIndex] = entry;
+  } else {
+    journalEntries.unshift(entry);
+  }
+
+  res.json({ journal: entry });
+});
+
+// --- SCHEDULE / AGENDA ENDPOINTS ---
+app.get('/api/schedule', (req, res) => {
+  res.json({ events: scheduleEvents });
+});
+
+app.post('/api/schedule', (req, res) => {
+  const eventData = req.body as ScheduleEvent;
+
+  if (!eventData.title || !eventData.date || !eventData.start_time || !eventData.type) {
+    return res.status(400).json({ error: 'Preencha título, data, horário e tipo de agendamento.' });
+  }
+
+  // HOLIDAY CHECK CONSTRAINT: Feriados não será possível agendar nada!
+  const isHoliday = scheduleEvents.some(
+    e => e.type === 'FERIADO' && e.date === eventData.date
+  );
+
+  if (isHoliday && eventData.type !== 'FERIADO') {
+    return res.status(400).json({
+      error: 'Data bloqueada! Não é possível agendar compromissos em feriados ou datas de folga oficial.'
+    });
+  }
+
+  // CONFLICT CHECK FOR VISITS:
+  // Cannot schedule visit on same property at same overlapping time if either is exclusive / "Ir Só"
+  if (eventData.type === 'VISITA' && eventData.property_id) {
+    const conflictingEvent = scheduleEvents.find(e => {
+      if (e.type !== 'VISITA' || e.date !== eventData.date || e.property_id !== eventData.property_id) {
+        return false;
+      }
+      // Check time overlap
+      const startA = eventData.start_time;
+      const endA = eventData.end_time || eventData.start_time;
+      const startB = e.start_time;
+      const endB = e.end_time || e.start_time;
+
+      const overlap = (startA < endB && endA > startB) || (startA === startB);
+
+      if (!overlap) return false;
+
+      // If either is exclusive (Ir Só), or same captador, it conflicts
+      if (e.exclusive_visit || eventData.exclusive_visit || e.user_id === eventData.user_id) {
+        return true;
+      }
+
+      return false;
+    });
+
+    if (conflictingEvent) {
+      return res.status(400).json({
+        error: `Conflito de Horário! O captador(a) ${conflictingEvent.user_name} já possui uma visita agendada neste imóvel (${conflictingEvent.property_code || ''}) às ${conflictingEvent.start_time}.`
+      });
+    }
+  }
+
+  const newEvent: ScheduleEvent = {
+    id: `event_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    title: eventData.title,
+    type: eventData.type,
+    date: eventData.date,
+    start_time: eventData.start_time,
+    end_time: eventData.end_time || eventData.start_time,
+    user_id: eventData.user_id || 'usr_admin',
+    user_name: eventData.user_name || 'Sistema',
+    property_id: eventData.property_id,
+    property_code: eventData.property_code,
+    client_name: eventData.client_name,
+    client_phone: eventData.client_phone,
+    location: eventData.location,
+    notes: eventData.notes,
+    exclusive_visit: eventData.exclusive_visit ?? true,
+    created_at: new Date().toISOString()
+  };
+
+  scheduleEvents.unshift(newEvent);
+
+  addAuditLog(
+    newEvent.user_id,
+    newEvent.user_name,
+    'Agendamento',
+    `Agendou ${newEvent.type}: "${newEvent.title}" para ${newEvent.date} às ${newEvent.start_time}`,
+    req
+  );
+
+  res.status(201).json({ event: newEvent });
+});
+
+app.delete('/api/schedule/:id', (req, res) => {
+  const { id } = req.params;
+  const existing = scheduleEvents.find(e => e.id === id);
+  if (!existing) return res.status(404).json({ error: 'Compromisso não encontrado.' });
+
+  scheduleEvents = scheduleEvents.filter(e => e.id !== id);
+
+  addAuditLog('usr_admin', 'Sistema', 'Cancelamento de Agendamento', `Cancelou ${existing.type}: "${existing.title}"`, req);
+
+  res.json({ success: true });
 });
 
 export default app;

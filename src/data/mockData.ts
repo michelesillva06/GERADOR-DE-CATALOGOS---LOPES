@@ -110,3 +110,239 @@ export const initialAuditLogs: AuditLog[] = [
     created_at: new Date().toISOString()
   }
 ];
+
+export const initialScheduleEvents = [
+  // Feriados Oficiais em Manaus / Brasil (Feriados Nacionais, Estaduais e Municipais)
+  {
+    id: 'hol_0101',
+    title: 'Confraternização Universal',
+    type: 'FERIADO' as const,
+    date: '2026-01-01',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional. Agendamentos suspensos por política da imobiliária.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_1602',
+    title: 'Carnaval (Segunda-feira)',
+    type: 'FERIADO' as const,
+    date: '2026-02-16',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Ponto Facultativo / Feriado.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_1702',
+    title: 'Carnaval (Terça-feira)',
+    type: 'FERIADO' as const,
+    date: '2026-02-17',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado de Carnaval.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_0304',
+    title: 'Sexta-feira Santa',
+    type: 'FERIADO' as const,
+    date: '2026-04-03',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional (Paixão de Cristo).',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_2104',
+    title: 'Tiradentes',
+    type: 'FERIADO' as const,
+    date: '2026-04-21',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_0105',
+    title: 'Dia do Trabalhador',
+    type: 'FERIADO' as const,
+    date: '2026-05-01',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_0406',
+    title: 'Corpus Christi',
+    type: 'FERIADO' as const,
+    date: '2026-06-04',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Religioso.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_0509',
+    title: 'Elevação do Amazonas à Província',
+    type: 'FERIADO' as const,
+    date: '2026-09-05',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Estadual do Amazonas.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_0709',
+    title: 'Independência do Brasil',
+    type: 'FERIADO' as const,
+    date: '2026-09-07',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_1210',
+    title: 'Nossa Senhora Aparecida',
+    type: 'FERIADO' as const,
+    date: '2026-10-12',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_2410',
+    title: 'Aniversário de Manaus',
+    type: 'FERIADO' as const,
+    date: '2026-10-24',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Municipal de Manaus.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_0211',
+    title: 'Finados',
+    type: 'FERIADO' as const,
+    date: '2026-11-02',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_1511',
+    title: 'Proclamação da República',
+    type: 'FERIADO' as const,
+    date: '2026-11-15',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_2011',
+    title: 'Dia Nacional da Consciência Negra',
+    type: 'FERIADO' as const,
+    date: '2026-11-20',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_0812',
+    title: 'Nossa Senhora da Conceição (Padroeira de Manaus)',
+    type: 'FERIADO' as const,
+    date: '2026-12-08',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Municipal em Manaus.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  {
+    id: 'hol_2512',
+    title: 'Natal',
+    type: 'FERIADO' as const,
+    date: '2026-12-25',
+    start_time: '00:00',
+    end_time: '23:59',
+    user_id: 'usr_admin',
+    user_name: 'Sistema Lopes',
+    notes: 'Feriado Nacional de Natal.',
+    created_at: '2026-01-01T00:00:00Z'
+  },
+  // Training & Events
+  {
+    id: 'event_train_1',
+    title: 'Treinamento de Captação de Imóveis de Alto Padrão em Manaus',
+    type: 'TREINAMENTO' as const,
+    date: new Date().toISOString().split('T')[0],
+    start_time: '14:00',
+    end_time: '16:00',
+    user_id: 'usr_larissa',
+    user_name: 'Larissa Maia',
+    location: 'Auditório Lopes - Shopping Ponta Negra',
+    notes: 'Alinhamento estratégico com os captadores sobre prospecção no Adrianópolis e Ponta Negra.',
+    created_at: new Date().toISOString()
+  }
+];
+
+export const initialJournalEntries = [
+  {
+    id: 'jrn_demo_1',
+    user_id: 'usr_michele',
+    user_name: 'Michele Silva',
+    date: new Date().toISOString().split('T')[0],
+    summary_notes: 'Dia dedicado à prospecção no bairro Adrianópolis e atualização das fotos de cobertura dos imóveis de luxo.',
+    key_highlights: [
+      'Visita agendada com proprietário do apartamento no Reserva das Águas',
+      'Atendimento a 2 clientes compradores interessados na Ponta Negra',
+      'Ajuste nos valores de VGV da carteira'
+    ],
+    next_day_goals: 'Fazer acompanhamento das propostas de locação pendentes e enviar links dos catálogos públicos para investidores.',
+    rating: 'Excelente' as const,
+    auto_metrics: {
+      properties_created: 1,
+      properties_updated: 3,
+      status_changes: 1,
+      visits_count: 2
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+

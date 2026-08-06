@@ -20,7 +20,11 @@ import {
   Eye,
   ShieldCheck,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Target,
+  Compass,
+  BarChart3,
+  PieChart
 } from 'lucide-react';
 
 interface ReportsPageProps {
@@ -100,7 +104,23 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
     .filter(p => p.purpose.includes('Locação') && (p.rent_price || p.price))
     .reduce((acc, p) => acc + (p.rent_price || p.price || 0), 0);
 
+  const avgTicketVenda = totalVgvVenda / Math.max(properties.filter(p => p.purpose.includes('Venda')).length, 1);
+
   const activeCaptadores = users.filter(u => u.status === 'active');
+
+  // Breakdown by Neighborhood for Strategy
+  const neighborhoodStats = useMemo(() => {
+    const map: Record<string, { count: number; vgv: number }> = {};
+    properties.forEach(p => {
+      const neigh = p.neighborhood?.trim() || 'Outros';
+      if (!map[neigh]) map[neigh] = { count: 0, vgv: 0 };
+      map[neigh].count += 1;
+      map[neigh].vgv += (p.price || p.rent_price || 0);
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 5);
+  }, [properties]);
 
   // Breakdown per captador
   const captadoresPerformance = useMemo(() => {
@@ -119,6 +139,18 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         .filter(p => p.purpose.includes('Locação') && (p.rent_price || p.price))
         .reduce((acc, p) => acc + (p.rent_price || p.price || 0), 0);
 
+      const uTotalVgv = uVgvVenda + uVgvLocacao;
+      const uAvgTicket = uTotalVgv / Math.max(uProps.length, 1);
+
+      // Top Neighborhoods
+      const uNeighMap: Record<string, number> = {};
+      uProps.forEach(p => {
+        const n = p.neighborhood || 'Outro';
+        uNeighMap[n] = (uNeighMap[n] || 0) + 1;
+      });
+      const topNeigh = Object.entries(uNeighMap)
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Geral';
+
       const uLogs = logs.filter(l => l.user_id === u.id || l.user_name?.toLowerCase() === u.name.toLowerCase());
       const lastActivity = uLogs[0]?.created_at;
 
@@ -131,7 +163,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         reserved: uReserved,
         vgvVenda: uVgvVenda,
         vgvLocacao: uVgvLocacao,
-        totalVgv: uVgvVenda + uVgvLocacao,
+        totalVgv: uTotalVgv,
+        avgTicket: uAvgTicket,
+        topNeigh,
         lastActivity,
         activityCount: uLogs.length
       };
@@ -156,13 +190,13 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
 
   if (!isMasterOrGestora) {
     return (
-      <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-sm max-w-xl mx-auto text-center space-y-4">
+      <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-xs max-w-xl mx-auto text-center space-y-4">
         <div className="w-16 h-16 rounded-2xl bg-rose-50 text-[#F10F4D] flex items-center justify-center mx-auto">
           <ShieldCheck className="w-8 h-8" />
         </div>
         <h2 className="text-xl font-extrabold text-slate-900">Acesso Restrito à Gestão</h2>
         <p className="text-xs text-slate-500 leading-relaxed">
-          O relatório de controle de movimentações e geração de planilhas executivas é exclusivo para o perfil de <strong>Gestora</strong> e <strong>Administrador Master</strong>.
+          O relatório executivo para a diretoria e controle de movimentações é exclusivo para a <strong>Gestora</strong> e <strong>Administrador Master</strong>.
         </p>
       </div>
     );
@@ -172,126 +206,207 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
     <div className="space-y-8">
       
       {/* 1. HEADER BANNER & EXPORT BUTTONS */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div className="space-y-2 max-w-2xl">
-          <div className="flex items-center space-x-2 text-[#F10F4D] text-xs font-bold uppercase tracking-wider">
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>Relatório & Planilha de Controle de Gestão</span>
+          <div className="inline-flex items-center space-x-2 bg-[#F10F4D]/15 text-[#F10F4D] border border-[#F10F4D]/30 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
+            <Target className="w-3.5 h-3.5" />
+            <span>Relatório Executivo para a Diretoria</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Movimentação dos Captadores e Métricas Gerais
+            Estratégia, Desempenho Geral e Produtividade da Equipe
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-            Acompanhe o desempenho individual da equipe, alteração de status de imóveis, histórico de atualizações e gere a <strong>Planilha Excel (.XLSX) oficial</strong> para entrega ao diretor da imobiliária.
+            Relatório analítico reunindo a <strong>Estratégia de Captação</strong>, métricas de <strong>Desempenho Geral</strong> da carteira e matriz de <strong>Produtividade Individual dos Captadores</strong> para apresentação ao Diretor.
           </p>
         </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto shrink-0">
           <button
-            onClick={handleDownloadXLSX}
-            disabled={downloadingFormat !== null}
-            className="px-5 py-3.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-rose-900/40 transition flex items-center justify-center space-x-2 transform active:scale-95"
-          >
-            {downloadingFormat === 'xlsx' ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="w-4 h-4" />
-            )}
-            <span>{downloadingFormat === 'xlsx' ? 'Gerando Planilha...' : 'Baixar Planilha Excel (.XLSX)'}</span>
-          </button>
-
-          <button
             onClick={handleDownloadPDF}
             disabled={downloadingFormat !== null}
-            className="px-5 py-3.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl border border-slate-700 transition flex items-center justify-center space-x-2 transform active:scale-95"
+            className="px-5 py-3.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-rose-950/50 transition flex items-center justify-center space-x-2 transform active:scale-95 cursor-pointer"
           >
             {downloadingFormat === 'pdf' ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
             ) : (
-              <FileText className="w-4 h-4 text-rose-400" />
+              <FileText className="w-4 h-4 text-white" />
             )}
-            <span>{downloadingFormat === 'pdf' ? 'Gerando PDF...' : 'Baixar Relatório PDF'}</span>
+            <span>{downloadingFormat === 'pdf' ? 'Gerando PDF Landscape...' : 'Baixar Relatório PDF (Horizontal/Paisagem)'}</span>
+          </button>
+
+          <button
+            onClick={handleDownloadXLSX}
+            disabled={downloadingFormat !== null}
+            className="px-5 py-3.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl border border-slate-700 transition flex items-center justify-center space-x-2 transform active:scale-95 cursor-pointer"
+          >
+            {downloadingFormat === 'xlsx' ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            )}
+            <span>{downloadingFormat === 'xlsx' ? 'Gerando Planilha...' : 'Exportar Planilha Excel (.XLSX)'}</span>
           </button>
         </div>
       </div>
 
-      {/* 2. STATS OVERVIEW CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Imóveis na Carteira</span>
-            <p className="text-2xl font-black text-slate-900">{totalPropertiesCount}</p>
-            <div className="flex items-center space-x-2 text-[10px] font-extrabold">
-              <span className="text-emerald-600">{availableCount} disponíveis</span>
-              <span className="text-slate-300">•</span>
-              <span className="text-sky-600">{soldCount + rentedCount} concluídos</span>
+      {/* 2. PILARES DA ESTRATÉGIA DE CAPTAÇÃO & COBERTURA */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-6">
+        <div className="flex items-center space-x-3 pb-4 border-b border-slate-100">
+          <div className="w-10 h-10 rounded-2xl bg-rose-50 text-[#F10F4D] flex items-center justify-center font-bold">
+            <Compass className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-slate-900">1. Estratégia de Captação e Cobertura do Mercado</h2>
+            <p className="text-xs text-slate-500">Apresentação dos pilares operacionais, modelo de catálogos e foco geográfico</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+            <div className="flex items-center space-x-2 text-[#F10F4D] font-extrabold text-xs uppercase">
+              <Target className="w-4 h-4" />
+              <span>Foco Geográfico de Alta Liquidez</span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Prospecção direcionada aos bairros nobres e de maior apelo comercial em Manaus: <strong>Adrianópolis, Ponta Negra, Vieiralves, Dom Pedro e Tarumã</strong>.
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+            <div className="flex items-center space-x-2 text-[#F10F4D] font-extrabold text-xs uppercase">
+              <Building2 className="w-4 h-4" />
+              <span>Catálogos Públicos Individuais</span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Cada captador possui um link público individual (URL amigável) personalizado com a marca oficial Lopes para envio imediato a clientes e investidores.
+            </p>
+          </div>
+
+          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+            <div className="flex items-center space-x-2 text-[#F10F4D] font-extrabold text-xs uppercase">
+              <BarChart3 className="w-4 h-4" />
+              <span>Giro de Carteira & Controle de Status</span>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Monitoramento continuo das etapas: <em>Disponível → Reservado → Vendido/Alugado</em>, assegurando informações confiáveis em tempo real.
+            </p>
+          </div>
+        </div>
+
+        {/* Neighborhood Distribution Cards */}
+        {neighborhoodStats.length > 0 && (
+          <div className="pt-2">
+            <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-3">
+              Top Bairros com Maior Volume de Captações
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {neighborhoodStats.map(([neigh, data]) => (
+                <div key={neigh} className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 text-center space-y-1">
+                  <p className="text-xs font-bold text-slate-900 truncate">{neigh}</p>
+                  <p className="text-lg font-black text-[#F10F4D]">{data.count} <span className="text-[10px] font-semibold text-slate-400">imóveis</span></p>
+                  <p className="text-[10px] text-slate-500 font-bold">
+                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(data.vgv)}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#F10F4D] flex items-center justify-center shrink-0">
-            <Building2 className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">VGV Acumulado (Venda)</span>
-            <p className="text-xl font-black text-emerald-600">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(totalVgvVenda)}
-            </p>
-            <p className="text-[10px] text-slate-400 font-bold">Total em Venda na Imobiliária</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-            <DollarSign className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Captadores Ativos</span>
-            <p className="text-2xl font-black text-slate-900">{activeCaptadores.length}</p>
-            <p className="text-[10px] text-indigo-600 font-bold">
-              Média: {(totalPropertiesCount / Math.max(activeCaptadores.length, 1)).toFixed(1)} imóveis / captador
-            </p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-            <Users className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Movimentações Rastradas</span>
-            <p className="text-2xl font-black text-sky-600">{logs.length}</p>
-            <p className="text-[10px] text-slate-400 font-bold">Logs no histórico de auditoria</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-            <History className="w-6 h-6" />
-          </div>
-        </div>
-
+        )}
       </div>
 
-      {/* 3. MATRIZ DE PRODUTIVIDADE E DESEMPENHO DOS CAPTADORES */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
+      {/* 3. DESEMPENHO GERAL DA EQUIPE (STATS OVERVIEW) */}
+      <div className="space-y-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-extrabold text-slate-900">2. Desempenho Geral da Equipe e Métrica Financeira</h2>
+            <p className="text-xs text-slate-500">Indicadores consolidados da carteira de imóveis gerenciada pelos captadores</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Imóveis na Carteira</span>
+              <p className="text-2xl font-black text-slate-900">{totalPropertiesCount}</p>
+              <div className="flex items-center space-x-2 text-[10px] font-extrabold">
+                <span className="text-emerald-600">{availableCount} disponíveis</span>
+                <span className="text-slate-300">•</span>
+                <span className="text-sky-600">{soldCount + rentedCount} concluídos</span>
+              </div>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#F10F4D] flex items-center justify-center shrink-0">
+              <Building2 className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">VGV Acumulado (Venda)</span>
+              <p className="text-xl font-black text-emerald-600">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(totalVgvVenda)}
+              </p>
+              <p className="text-[10px] text-slate-400 font-bold">
+                Ticket Médio: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(avgTicketVenda)}
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <DollarSign className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Captadores Ativos</span>
+              <p className="text-2xl font-black text-slate-900">{activeCaptadores.length}</p>
+              <p className="text-[10px] text-indigo-600 font-bold">
+                Média: {(totalPropertiesCount / Math.max(activeCaptadores.length, 1)).toFixed(1)} imóveis / captador
+              </p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <Users className="w-6 h-6" />
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">VGV Locação Mensal</span>
+              <p className="text-xl font-black text-sky-600">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(totalVgvLocacao)}
+              </p>
+              <p className="text-[10px] text-slate-400 font-bold">Soma de aluguéis mensais</p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-6 h-6" />
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* 4. MATRIZ DE PRODUTIVIDADE E DESEMPENHO DOS CAPTADORES */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
               <Award className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900">Desempenho e Produtividade dos Captadores</h2>
-              <p className="text-xs text-slate-500">Resumo da carteira individual, VGV acumulado e última atividade registrada</p>
+              <h2 className="text-base font-extrabold text-slate-900">3. Desempenho e Produtividade Individual dos Captadores</h2>
+              <p className="text-xs text-slate-500">Detalhamento individual: volume captado, VGV sob gestão, ticket médio e bairro foco</p>
             </div>
           </div>
 
           <button
-            onClick={handleDownloadXLSX}
-            className="text-xs font-bold text-[#F10F4D] hover:underline flex items-center space-x-1"
+            onClick={handleDownloadPDF}
+            className="text-xs font-bold text-[#F10F4D] hover:underline flex items-center space-x-1.5 cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span>Exportar esta tabela para Excel</span>
+            <FileText className="w-4 h-4" />
+            <span>Gerar este relatório em PDF Landscape</span>
           </button>
         </div>
 
@@ -306,7 +421,8 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                 <th className="p-3.5 text-center">Vendidos</th>
                 <th className="p-3.5 text-center">Alugados</th>
                 <th className="p-3.5 text-right">VGV Venda (R$)</th>
-                <th className="p-3.5 text-right">VGV Locação (R$)</th>
+                <th className="p-3.5 text-right">Ticket Médio (R$)</th>
+                <th className="p-3.5">Bairro Foco</th>
                 <th className="p-3.5">Última Atividade</th>
                 <th className="p-3.5 rounded-r-xl text-center">Catálogo</th>
               </tr>
@@ -346,9 +462,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                     <td className="p-3.5 text-right font-extrabold text-slate-900">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(item.vgvVenda)}
                     </td>
-                    <td className="p-3.5 text-right font-bold text-slate-700">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(item.vgvLocacao)}
+                    <td className="p-3.5 text-right font-bold text-slate-600">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(item.avgTicket)}
                     </td>
+                    <td className="p-3.5 text-slate-700 font-semibold">{item.topNeigh}</td>
                     <td className="p-3.5 text-[11px] text-slate-500">
                       {item.lastActivity ? (
                         new Date(item.lastActivity).toLocaleDateString('pt-BR') + ' ' + new Date(item.lastActivity).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -374,15 +491,15 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         </div>
       </div>
 
-      {/* 4. SEÇÃO: CADASTRO DE CLIENTES (COMPRADORES & INQUILINOS) */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
+      {/* 5. SEÇÃO: CADASTRO DE CLIENTES (COMPRADORES & INQUILINOS) */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
               <ShoppingBag className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900">Clientes Cadastrados & Negócios Concluídos</h2>
+              <h2 className="text-base font-extrabold text-slate-900">4. Clientes Cadastrados & Negócios Concluídos</h2>
               <p className="text-xs text-slate-500">Registro de compradores e inquilinos associados aos imóveis negociados pela imobiliária</p>
             </div>
           </div>
@@ -466,16 +583,16 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         </div>
       </div>
 
-      {/* 5. SEÇÃO DE LINHA DO TEMPO & MOVIMENTAÇÕES DOS CAPTADORES */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm space-y-6">
+      {/* 6. SEÇÃO DE LINHA DO TEMPO & MOVIMENTAÇÕES DOS CAPTADORES */}
+      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-2xl bg-rose-50 text-[#F10F4D] flex items-center justify-center font-bold">
               <History className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-slate-900">Linha do Tempo de Movimentações dos Captadores</h2>
-              <p className="text-xs text-slate-500">Registro em tempo real de cadastros de imóveis, mudanças de status, edições e logins</p>
+              <h2 className="text-base font-extrabold text-slate-900">5. Histórico e Linha do Tempo de Auditagem</h2>
+              <p className="text-xs text-slate-500">Registro em tempo real de cadastros de imóveis, mudanças de status, edições e acessos</p>
             </div>
           </div>
 

@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { Property, User, AuditLog, CompanySettings } from '../types';
 
 function formatCurrencyNumber(val: number | undefined): string {
-  if (!val || isNaN(val)) return 'R$ 0,00';
+  if (val === undefined || val === null || isNaN(val)) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 }
 
@@ -14,6 +14,35 @@ function formatDate(isoStr: string | undefined): string {
   } catch {
     return isoStr;
   }
+}
+
+// Helper to auto-calculate column widths and apply them cleanly
+function applyColumnWidths(ws: XLSX.WorkSheet, data: any[][], minWidths: Record<number, number> = {}) {
+  const colWidths: { wch: number }[] = [];
+  if (!data || data.length === 0) return;
+
+  const maxCols = Math.max(...data.map(row => row ? row.length : 0));
+
+  for (let c = 0; c < maxCols; c++) {
+    let maxLen = minWidths[c] || 12;
+    for (let r = 0; r < data.length; r++) {
+      const row = data[r];
+      if (!row || row.length <= c) continue;
+      const val = row[c];
+      if (val !== null && val !== undefined) {
+        const strVal = String(val);
+        // Skip header banners in early rows if they are super long title strings
+        if (r < 5 && strVal.length > 50) continue;
+        const calcLen = strVal.length + 4;
+        if (calcLen > maxLen) {
+          maxLen = Math.min(calcLen, 55); // max column width cap
+        }
+      }
+    }
+    colWidths.push({ wch: maxLen });
+  }
+
+  ws['!cols'] = colWidths;
 }
 
 export function exportControlSpreadsheet(
@@ -50,25 +79,26 @@ export function exportControlSpreadsheet(
 
   const resumoData = [
     ["PLANILHA DE CONTROLE E MOVIMENTAÇÃO DE CAPTAÇÃO - LOPES MANAUS"],
-    [`Unidade / Imobiliária: ${companySettings.company_name || 'Lopes Manaus'} - ${companySettings.unit_name || ''}`],
+    [`Unidade / Imobiliária: ${companySettings.company_name || 'Lopes Manaus'} - ${companySettings.unit_name || 'Shopping Ponta Negra'}`],
     [`Relatório Gerado por: ${currentUser.name} (${currentUser.position || 'Gestora'})`],
     [`Destinatário: Diretoria Geral da Imobiliária`],
     [`Data e Hora de Emissão: ${dateFormatted}`],
     [""],
-    ["INDICADOR CHAVE DE DESEMPENHO", "VALOR / QUANTIDADE", "OBSERVAÇÕES E MÉTRICAS"],
+    ["INDICADOR CHAVE DE DESEMPENHO", "VALOR / QUANTIDADE", "OBSERVAÇÕES E MÉTRICAS ESTRATÉGICAS"],
     ["Total de Imóveis Cadastrados", totalProperties, "Total acumulado na carteira da imobiliária"],
     ["Imóveis Disponíveis", availableProps, `${((availableProps / Math.max(totalProperties, 1)) * 100).toFixed(1)}% do total da carteira`],
-    ["Imóveis Vendidos", soldProps, "Status Vendido concluído"],
+    ["Imóveis Vendidos", soldProps, "Status Vendido concluído com sucesso"],
     ["Imóveis Alugados", rentedProps, "Status Alugado concluído"],
-    ["Imóveis Reservados / Em Negociação", reservedProps, "Status Reservado em andamento"],
+    ["Imóveis Reservados / Em Negociação", reservedProps, "Status Reservado aguardando fechamento"],
     ["VGV Total em Venda (R$)", formatCurrencyNumber(totalVgvVenda), "Valor Geral de Venda acumulado"],
-    ["VGV Total em Locação (R$/mês)", formatCurrencyNumber(totalVgvLocacao), "Valor Geral de Locação mensal"],
-    ["Total de Captadores Ativos", captadoresAtivos, `De um total de ${totalCaptadores} usuários`],
-    ["Média de Imóveis por Captador", (totalProperties / Math.max(captadoresAtivos, 1)).toFixed(1), "Imóveis por captador ativo"],
-    ["Total de Movimentações Registradas", logs.length, "Logs de auditoria e atualizações"]
+    ["VGV Total em Locação (R$/mês)", formatCurrencyNumber(totalVgvLocacao), "Valor Geral de Locação mensal somado"],
+    ["Total de Captadores Ativos", captadoresAtivos, `De um total de ${totalCaptadores} usuários cadastrados`],
+    ["Média de Imóveis por Captador", (totalProperties / Math.max(captadoresAtivos, 1)).toFixed(1), "Produtividade média de imóveis por captador ativo"],
+    ["Total de Movimentações Registradas", logs.length, "Logs de auditoria e atualizações em tempo real"]
   ];
 
   const wsResumo = XLSX.utils.aoa_to_sheet(resumoData);
+  applyColumnWidths(wsResumo, resumoData, { 0: 42, 1: 28, 2: 55 });
   XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo Executivo");
 
   // -------------------------------------------------------------
@@ -129,7 +159,12 @@ export function exportControlSpreadsheet(
     ];
   });
 
-  const wsCaptadores = XLSX.utils.aoa_to_sheet([captadoresHeader, ...captadoresRows]);
+  const captadoresData = [captadoresHeader, ...captadoresRows];
+  const wsCaptadores = XLSX.utils.aoa_to_sheet(captadoresData);
+  applyColumnWidths(wsCaptadores, captadoresData, {
+    0: 28, 1: 20, 2: 32, 3: 20, 4: 16, 5: 16,
+    6: 22, 7: 20, 8: 18, 9: 18, 10: 20, 11: 24, 12: 24, 13: 22, 14: 32
+  });
   XLSX.utils.book_append_sheet(wb, wsCaptadores, "Desempenho dos Captadores");
 
   // -------------------------------------------------------------
@@ -140,7 +175,7 @@ export function exportControlSpreadsheet(
     "Captador / Usuário Responsável",
     "Ação Executada",
     "Descrição Detalhada da Movimentação",
-    "IP / Origem"
+    "Origem do Evento"
   ];
 
   const logsRows = logs.map(l => [
@@ -148,10 +183,14 @@ export function exportControlSpreadsheet(
     l.user_name || 'Sistema',
     l.action || 'Atualização',
     l.description || '-',
-    l.ip_address || 'Servidor'
+    l.ip_address || 'Sistema'
   ]);
 
-  const wsLogs = XLSX.utils.aoa_to_sheet([logsHeader, ...logsRows]);
+  const logsData = [logsHeader, ...logsRows];
+  const wsLogs = XLSX.utils.aoa_to_sheet(logsData);
+  applyColumnWidths(wsLogs, logsData, {
+    0: 22, 1: 28, 2: 24, 3: 65, 4: 16
+  });
   XLSX.utils.book_append_sheet(wb, wsLogs, "Movimentações do Sistema");
 
   // -------------------------------------------------------------
@@ -174,7 +213,7 @@ export function exportControlSpreadsheet(
     "Dormitórios",
     "Suítes",
     "Banheiros",
-    "Vagas de Garagem",
+    "Vagas Garagem",
     "Área Total (m²)",
     "Cliente Comprador/Inquilino",
     "CPF/CNPJ Cliente",
@@ -184,7 +223,7 @@ export function exportControlSpreadsheet(
     "Data do Negócio",
     "Valor Fechado (R$)",
     "Obs Negócio",
-    "Visualizações no Catálogo",
+    "Visualizações Catálogo",
     "Data de Cadastro",
     "Última Atualização"
   ];
@@ -224,7 +263,15 @@ export function exportControlSpreadsheet(
     ];
   });
 
-  const wsImoveis = XLSX.utils.aoa_to_sheet([imoveisHeader, ...imoveisRows]);
+  const imoveisData = [imoveisHeader, ...imoveisRows];
+  const wsImoveis = XLSX.utils.aoa_to_sheet(imoveisData);
+  applyColumnWidths(wsImoveis, imoveisData, {
+    0: 16, 1: 45, 2: 26, 3: 18, 4: 18, 5: 16,
+    6: 22, 7: 22, 8: 20, 9: 16, 10: 22, 11: 16, 12: 35,
+    13: 14, 14: 12, 15: 12, 16: 18, 17: 16,
+    18: 30, 19: 20, 20: 18, 21: 30, 22: 16, 23: 20, 24: 22,
+    25: 35, 26: 22, 27: 20, 28: 20
+  });
   XLSX.utils.book_append_sheet(wb, wsImoveis, "Inventário de Imóveis");
 
   // -------------------------------------------------------------
@@ -265,7 +312,12 @@ export function exportControlSpreadsheet(
     ];
   });
 
-  const wsClientes = XLSX.utils.aoa_to_sheet([clientesHeader, ...clientesRows]);
+  const clientesData = [clientesHeader, ...clientesRows];
+  const wsClientes = XLSX.utils.aoa_to_sheet(clientesData);
+  applyColumnWidths(wsClientes, clientesData, {
+    0: 16, 1: 42, 2: 26, 3: 16, 4: 30, 5: 20,
+    6: 18, 7: 30, 8: 16, 9: 22, 10: 24, 11: 40
+  });
   XLSX.utils.book_append_sheet(wb, wsClientes, "Clientes & Negócios Concluídos");
 
   // Nome do arquivo para a diretoria
@@ -274,3 +326,4 @@ export function exportControlSpreadsheet(
 
   XLSX.writeFile(wb, fileName);
 }
+

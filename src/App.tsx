@@ -12,11 +12,13 @@ import { PublicPropertyDetail } from './pages/PublicPropertyDetail';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { CaptadorJournalPage } from './pages/CaptadorJournalPage';
+import { SchedulePage } from './pages/SchedulePage';
 import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
 import { buildWhatsAppUrl, getEffectiveWhatsApp } from './lib/whatsapp';
-import { Property, User, CompanySettings, AuditLog, DashboardStats } from './types';
+import { Property, User, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './types';
 import {
   getStoredProperties,
   saveStoredProperties,
@@ -26,6 +28,10 @@ import {
   saveStoredSettings,
   getStoredLogs,
   saveStoredLogs,
+  getStoredJournal,
+  saveStoredJournal,
+  getStoredSchedule,
+  saveStoredSchedule,
   saveStoredCurrentUser,
   calculateStats
 } from './lib/storage';
@@ -37,6 +43,8 @@ function MainApp() {
   const [users, setUsers] = useState<User[]>([]);
   const [companySettings, setCompanySettings] = useState<CompanySettings>(getStoredSettings());
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(getStoredJournal());
+  const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>(getStoredSchedule());
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   // Modals state
@@ -51,14 +59,18 @@ function MainApp() {
     let currentUsers = getStoredUsers();
     let currentSettings = getStoredSettings();
     let currentLogs = getStoredLogs();
+    let currentJournals = getStoredJournal();
+    let currentSchedule = getStoredSchedule();
 
     try {
-      const [propsRes, usersRes, settingsRes, logsRes, statsRes] = await Promise.all([
+      const [propsRes, usersRes, settingsRes, logsRes, statsRes, journalsRes, scheduleRes] = await Promise.all([
         fetch('/api/properties').catch(() => null),
         fetch('/api/users').catch(() => null),
         fetch('/api/settings').catch(() => null),
         fetch('/api/logs').catch(() => null),
-        fetch('/api/stats').catch(() => null)
+        fetch('/api/stats').catch(() => null),
+        fetch('/api/journal').catch(() => null),
+        fetch('/api/schedule').catch(() => null)
       ]);
 
       if (propsRes && propsRes.ok && (propsRes.headers.get('content-type') || '').includes('json')) {
@@ -89,6 +101,20 @@ function MainApp() {
           saveStoredLogs(currentLogs);
         }
       }
+      if (journalsRes && journalsRes.ok && (journalsRes.headers.get('content-type') || '').includes('json')) {
+        const d = await journalsRes.json();
+        if (d.journals) {
+          currentJournals = d.journals;
+          saveStoredJournal(currentJournals);
+        }
+      }
+      if (scheduleRes && scheduleRes.ok && (scheduleRes.headers.get('content-type') || '').includes('json')) {
+        const d = await scheduleRes.json();
+        if (d.events) {
+          currentSchedule = d.events;
+          saveStoredSchedule(currentSchedule);
+        }
+      }
       if (statsRes && statsRes.ok && (statsRes.headers.get('content-type') || '').includes('json')) {
         const d = await statsRes.json();
         if (d.stats) setStats(d.stats);
@@ -104,6 +130,8 @@ function MainApp() {
     setUsers(currentUsers);
     setCompanySettings(currentSettings);
     setLogs(currentLogs);
+    setJournalEntries(currentJournals);
+    setScheduleEvents(currentSchedule);
     if (!stats) {
       setStats(calculateStats(currentProps, currentUsers));
     }
@@ -336,6 +364,149 @@ function MainApp() {
     setCompanySettings(updated);
   };
 
+  const handleSaveJournal = async (entryData: Partial<JournalEntry>) => {
+    try {
+      const res = await fetch('/api/journal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entryData)
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.journal) {
+          const currentList = getStoredJournal();
+          const idx = currentList.findIndex(j => j.id === d.journal.id || (j.user_id === d.journal.user_id && j.date === d.journal.date));
+          let updatedList = [...currentList];
+          if (idx !== -1) {
+            updatedList[idx] = d.journal;
+          } else {
+            updatedList.unshift(d.journal);
+          }
+          saveStoredJournal(updatedList);
+          setJournalEntries(updatedList);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Backend API unavailable, saving journal locally:', e);
+    }
+
+    // Local fallback
+    const currentList = getStoredJournal();
+    const idx = currentList.findIndex(j => j.user_id === entryData.user_id && j.date === entryData.date);
+    const newEntry: JournalEntry = {
+      id: idx !== -1 ? currentList[idx].id : `jrn_${Date.now()}`,
+      user_id: entryData.user_id || user.id,
+      user_name: entryData.user_name || user.name,
+      date: entryData.date || new Date().toISOString().split('T')[0],
+      summary_notes: entryData.summary_notes || '',
+      key_highlights: entryData.key_highlights || [],
+      next_day_goals: entryData.next_day_goals || '',
+      rating: entryData.rating || 'Produtivo',
+      auto_metrics: entryData.auto_metrics || { properties_created: 0, properties_updated: 0, status_changes: 0, visits_count: 0 },
+      created_at: idx !== -1 ? currentList[idx].created_at : new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    let updatedList = [...currentList];
+    if (idx !== -1) {
+      updatedList[idx] = newEntry;
+    } else {
+      updatedList.unshift(newEntry);
+    }
+    saveStoredJournal(updatedList);
+    setJournalEntries(updatedList);
+  };
+
+  const handleAddScheduleEvent = async (eventData: Partial<ScheduleEvent>): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(eventData)
+      });
+
+      const d = await res.json();
+      if (!res.ok) {
+        return { success: false, error: d.error || 'Erro ao agendar compromisso.' };
+      }
+
+      if (d.event) {
+        const currentSchedule = getStoredSchedule();
+        const updated = [d.event, ...currentSchedule];
+        saveStoredSchedule(updated);
+        setScheduleEvents(updated);
+        return { success: true };
+      }
+    } catch (e) {
+      console.warn('Backend API unavailable, saving schedule locally:', e);
+    }
+
+    // Local Fallback validation & saving
+    const currentSchedule = getStoredSchedule();
+
+    // Check holiday
+    const isHoliday = currentSchedule.some(e => e.type === 'FERIADO' && e.date === eventData.date);
+    if (isHoliday && eventData.type !== 'FERIADO') {
+      return { success: false, error: 'Data bloqueada por feriado oficial!' };
+    }
+
+    // Conflict check
+    if (eventData.type === 'VISITA' && eventData.property_id) {
+      const conflict = currentSchedule.find(e => {
+        if (e.type !== 'VISITA' || e.date !== eventData.date || e.property_id !== eventData.property_id) return false;
+        const startA = eventData.start_time || '00:00';
+        const endA = eventData.end_time || startA;
+        const startB = e.start_time;
+        const endB = e.end_time || startB;
+        const overlap = (startA < endB && endA > startB) || (startA === startB);
+        if (!overlap) return false;
+        if (e.exclusive_visit || eventData.exclusive_visit || e.user_id === eventData.user_id) return true;
+        return false;
+      });
+
+      if (conflict) {
+        return { success: false, error: `Conflito de horário! O captador ${conflict.user_name} já possui uma visita neste imóvel às ${conflict.start_time}.` };
+      }
+    }
+
+    const newEv: ScheduleEvent = {
+      id: `event_${Date.now()}`,
+      title: eventData.title || 'Visita / Agendamento',
+      type: eventData.type || 'VISITA',
+      date: eventData.date || new Date().toISOString().split('T')[0],
+      start_time: eventData.start_time || '09:00',
+      end_time: eventData.end_time || '10:00',
+      user_id: eventData.user_id || user.id,
+      user_name: eventData.user_name || user.name,
+      property_id: eventData.property_id,
+      property_code: eventData.property_code,
+      client_name: eventData.client_name,
+      client_phone: eventData.client_phone,
+      location: eventData.location,
+      notes: eventData.notes,
+      exclusive_visit: eventData.exclusive_visit ?? true,
+      created_at: new Date().toISOString()
+    };
+
+    const updated = [newEv, ...currentSchedule];
+    saveStoredSchedule(updated);
+    setScheduleEvents(updated);
+    return { success: true };
+  };
+
+  const handleDeleteScheduleEvent = async (id: string) => {
+    try {
+      await fetch(`/api/schedule/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Backend API unavailable, deleting event locally:', e);
+    }
+
+    const currentSchedule = getStoredSchedule().filter(e => e.id !== id);
+    saveStoredSchedule(currentSchedule);
+    setScheduleEvents(currentSchedule);
+  };
+
   const isMaster = user.role === 'MASTER_ADMIN';
   const isGestora = user.role === 'GESTORA';
   const isMasterOrGestora = isMaster || isGestora;
@@ -382,6 +553,29 @@ function MainApp() {
                 onShareWhatsApp={handleShareWhatsApp}
               />
             )
+          )}
+
+          {activeView === 'schedule' && (
+            <SchedulePage
+              currentUser={user}
+              users={users}
+              properties={properties}
+              scheduleEvents={scheduleEvents}
+              onAddEvent={handleAddScheduleEvent}
+              onDeleteEvent={handleDeleteScheduleEvent}
+            />
+          )}
+
+          {activeView === 'journal' && (
+            <CaptadorJournalPage
+              currentUser={user}
+              users={users}
+              properties={properties}
+              logs={logs}
+              scheduleEvents={scheduleEvents}
+              journalEntries={journalEntries}
+              onSaveJournal={handleSaveJournal}
+            />
           )}
 
           {activeView === 'properties' && (

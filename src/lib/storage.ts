@@ -1,11 +1,13 @@
-import { User, Property, CompanySettings, AuditLog, DashboardStats } from '../types';
-import { initialUsers, initialProperties, initialCompanySettings } from '../data/mockData';
+import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from '../types';
+import { initialUsers, initialProperties, initialCompanySettings, initialScheduleEvents, initialJournalEntries } from '../data/mockData';
 
 const KEYS = {
   USERS: 'lopes_users',
   PROPERTIES: 'lopes_properties',
   SETTINGS: 'lopes_settings',
   LOGS: 'lopes_logs',
+  JOURNAL: 'lopes_journal',
+  SCHEDULE: 'lopes_schedule',
   CURRENT_USER: 'lopes_current_user',
   TOKEN: 'lopes_token'
 };
@@ -87,6 +89,48 @@ export function saveStoredLogs(logs: AuditLog[]) {
     localStorage.setItem(KEYS.LOGS, JSON.stringify(logs));
   } catch (e) {
     console.error('Failed to save logs to localStorage', e);
+  }
+}
+
+export function getStoredJournal(): JournalEntry[] {
+  try {
+    const raw = localStorage.getItem(KEYS.JOURNAL);
+    if (!raw) {
+      localStorage.setItem(KEYS.JOURNAL, JSON.stringify(initialJournalEntries));
+      return initialJournalEntries as JournalEntry[];
+    }
+    return JSON.parse(raw);
+  } catch {
+    return initialJournalEntries as JournalEntry[];
+  }
+}
+
+export function saveStoredJournal(journals: JournalEntry[]) {
+  try {
+    localStorage.setItem(KEYS.JOURNAL, JSON.stringify(journals));
+  } catch (e) {
+    console.error('Failed to save journal entries', e);
+  }
+}
+
+export function getStoredSchedule(): ScheduleEvent[] {
+  try {
+    const raw = localStorage.getItem(KEYS.SCHEDULE);
+    if (!raw) {
+      localStorage.setItem(KEYS.SCHEDULE, JSON.stringify(initialScheduleEvents));
+      return initialScheduleEvents as ScheduleEvent[];
+    }
+    return JSON.parse(raw);
+  } catch {
+    return initialScheduleEvents as ScheduleEvent[];
+  }
+}
+
+export function saveStoredSchedule(events: ScheduleEvent[]) {
+  try {
+    localStorage.setItem(KEYS.SCHEDULE, JSON.stringify(events));
+  } catch (e) {
+    console.error('Failed to save schedule events', e);
   }
 }
 
