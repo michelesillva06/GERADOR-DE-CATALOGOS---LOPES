@@ -3,6 +3,7 @@ import { Property, User, CompanySettings } from '../types';
 import { getStoredProperties, getStoredUsers, getStoredSettings } from '../lib/storage';
 import { LopesLogo } from '../components/LopesLogo';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
+import { getPropertyImages, handleImageError } from '../lib/imageUtils';
 import { 
   Building2, MapPin, Bed, Bath, Car, Maximize2, Calendar, Phone, 
   MessageCircle, Share2, ArrowLeft, CheckCircle2, Play, Video, 
@@ -87,10 +88,10 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-800">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-[#F10F4D] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Carregando imóvel {code}...</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Carregando imóvel {code}...</p>
         </div>
       </div>
     );
@@ -119,9 +120,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
     );
   }
 
-  const allImages = property.images && property.images.length > 0 
-    ? property.images 
-    : [property.main_image || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'];
+  const allImages = getPropertyImages(property);
 
   const formattedPrice = property.purpose.includes('Locação') && property.rent_price
     ? `R$ ${property.rent_price.toLocaleString('pt-BR')} /mês`
@@ -177,11 +176,11 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-24">
       
       {/* Top Institutional Bar */}
-      <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+      <header className="bg-white/95 backdrop-blur-md text-slate-900 border-b border-slate-200/80 sticky top-0 z-40 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <a href="/" className="flex items-center space-x-2 group">
-              <LopesLogo size="sm" variant="white" showBadge badgeText="CAPTAÇÃO" />
+              <LopesLogo size="sm" variant="color" showBadge badgeText="CAPTAÇÃO" />
             </a>
           </div>
 
@@ -189,7 +188,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
             {captador && (
               <a
                 href={`/catalogo/${captador.url_slug || captador.username}`}
-                className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition"
+                className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold border border-slate-200/80 transition"
               >
                 <UserIcon className="w-3.5 h-3.5 text-[#F10F4D]" />
                 <span>Ver Catálogo do Captador</span>
@@ -198,7 +197,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
 
             <button
               onClick={handleShare}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition border border-slate-200/80"
               title="Compartilhar imóvel"
             >
               <Share2 className="w-4 h-4" />
@@ -250,6 +249,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
             <img
               src={allImages[activeImageIdx]}
               alt={property.title}
+              onError={handleImageError}
               className="w-full h-full object-cover transition-all duration-300"
             />
             
@@ -292,7 +292,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
                     activeImageIdx === idx ? 'border-[#F10F4D] ring-2 ring-[#F10F4D]/30 scale-105' : 'border-transparent opacity-70 hover:opacity-100'
                   }`}
                 >
-                  <img src={img} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                  <img src={img} alt={`Foto ${idx + 1}`} onError={handleImageError} className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -486,11 +486,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
                     alt={captador.name}
                     className="w-16 h-16 rounded-full object-cover border-2 border-[#F10F4D] shadow shrink-0"
                   />
-                ) : (
-                  <div className="w-16 h-16 rounded-full bg-slate-900 text-white border-2 border-[#F10F4D] flex items-center justify-center font-black text-xl shadow shrink-0">
-                    {captador?.name ? captador.name.charAt(0).toUpperCase() : 'L'}
-                  </div>
-                )}
+                ) : null}
                 <div>
                   <span className="text-[10px] font-extrabold text-[#F10F4D] uppercase tracking-wider block">
                     Captador Responsável

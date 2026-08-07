@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Property, User, CompanySettings } from '../types';
-import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2, Upload, Image as ImageIcon, User as UserIcon, ShieldCheck } from 'lucide-react';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
+import { PROPERTY_CATEGORIES } from '../lib/constants';
+import { compressImage } from '../utils/imageCompressor';
 
 interface PDFCatalogModalProps {
   isOpen: boolean;
@@ -9,6 +11,7 @@ interface PDFCatalogModalProps {
   captadores: User[];
   currentCaptador: User;
   companySettings: CompanySettings;
+  onSaveSettings?: (newSettings: Partial<CompanySettings>) => Promise<void>;
   onClose: () => void;
 }
 
@@ -18,37 +21,33 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   captadores,
   currentCaptador,
   companySettings,
+  onSaveSettings,
   onClose
 }) => {
   const isManagerOrAdmin = currentCaptador.role === 'MASTER_ADMIN' || currentCaptador.role === 'GESTORA' || currentCaptador.role === 'MASTER' || currentCaptador.role === 'GESTOR';
   const isAdmin = currentCaptador.role === 'MASTER_ADMIN' || currentCaptador.role === 'MASTER';
-  const isCaptadorOnly = !isManagerOrAdmin;
 
-  // Scope base properties: Captadores only see their own properties
-  const baseProperties = isCaptadorOnly
-    ? properties.filter(p => p.user_id === currentCaptador.id)
-    : properties;
-
+  // Scope: 'meus' (Apenas meus imóveis captados) vs 'todos' (Todos imóveis do sistema)
+  const [scope, setScope] = useState<'meus' | 'todos'>('meus');
   const [selectedCaptadorId, setSelectedCaptadorId] = useState(currentCaptador.id);
 
-  const selectedCaptador = isCaptadorOnly
-    ? currentCaptador
-    : (captadores.find(c => c.id === selectedCaptadorId) || currentCaptador);
+  const selectedCaptador = (captadores.find(c => c.id === selectedCaptadorId) || currentCaptador);
 
   const [catalogTitle, setCatalogTitle] = useState(`Catálogo Digital - ${selectedCaptador.name}`);
   const [purposeFilter, setPurposeFilter] = useState('todos');
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [selectedPropIds, setSelectedPropIds] = useState<string[]>([]);
   const [customCoverImage, setCustomCoverImage] = useState<string>('');
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Active cover URL from companySettings based on purposeFilter
-  let officialCoverUrl = companySettings.cover_geral_url || '';
+  // Resolution of official cover from companySettings based on purpose
+  let officialCoverUrl = '';
   if (purposeFilter === 'Locação') {
-    officialCoverUrl = companySettings.cover_locacao_url || companySettings.cover_geral_url || '';
+    officialCoverUrl = companySettings.cover_locacao_url || companySettings.cover_horizontal_url || companySettings.cover_geral_url || '';
   } else if (purposeFilter === 'Venda') {
-    officialCoverUrl = companySettings.cover_venda_url || companySettings.cover_geral_url || '';
+    officialCoverUrl = companySettings.cover_venda_url || companySettings.cover_horizontal_url || companySettings.cover_geral_url || '';
+  } else {
+    officialCoverUrl = companySettings.cover_geral_url || companySettings.cover_horizontal_url || companySettings.cover_venda_url || companySettings.cover_locacao_url || '';
   }
 
   const activeCoverImage = customCoverImage || officialCoverUrl;
@@ -60,39 +59,24 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
     }
   }, [isOpen, selectedCaptadorId]);
 
-  // Handle custom cover upload
-  const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        if (evt.target?.result) {
-          setCustomCoverImage(evt.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  // Handle scope base properties
+  const myProperties = properties.filter(p => p.user_id === currentCaptador.id);
+  const scopeProperties = scope === 'meus' ? myProperties : properties;
 
-  // Initialize selected properties when modal opens or filters change
-  useEffect(() => {
-    if (isOpen) {
-      const initialIds = baseProperties
-        .filter(p => {
-          if (purposeFilter !== 'todos' && !p.purpose.includes(purposeFilter)) return false;
-          if (categoryFilter !== 'todos' && p.category !== categoryFilter) return false;
-          return true;
-        })
-        .map(p => p.id);
-      setSelectedPropIds(initialIds);
-    }
-  }, [isOpen, purposeFilter, categoryFilter, currentCaptador.id]);
-
-  const displayProperties = baseProperties.filter(p => {
+  // Filtered properties based on purpose & category
+  const displayProperties = scopeProperties.filter(p => {
     if (purposeFilter !== 'todos' && !p.purpose.includes(purposeFilter)) return false;
     if (categoryFilter !== 'todos' && p.category !== categoryFilter) return false;
     return true;
   });
+
+  // Re-select all matching when filters change or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const matchIds = displayProperties.map(p => p.id);
+      setSelectedPropIds(matchIds);
+    }
+  }, [isOpen, scope, purposeFilter, categoryFilter]);
 
   const toggleSelectAll = () => {
     const displayIds = displayProperties.map(p => p.id);
@@ -112,6 +96,33 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
     } else {
       setSelectedPropIds([...selectedPropIds, id]);
     }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione uma imagem válida (PNG, JPG ou WEBP).');
+      return;
+    }
+
+    const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.8 });
+    if (compressed) {
+      setCustomCoverImage(compressed);
+
+      if (onSaveSettings) {
+        let updateKey: keyof CompanySettings = 'cover_horizontal_url';
+        if (purposeFilter === 'Locação') updateKey = 'cover_locacao_url';
+        else if (purposeFilter === 'Venda') updateKey = 'cover_venda_url';
+        else updateKey = 'cover_geral_url';
+
+        await onSaveSettings({
+          [updateKey]: compressed,
+          cover_horizontal_url: compressed
+        });
+      }
+    }
+    e.target.value = '';
   };
 
   const handleDownload = async () => {
@@ -134,7 +145,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
         companySettings,
         customCoverImage,
         coverType: determinedCoverType,
-        orientation
+        orientation: 'landscape'
       });
 
       doc.save(`Catalogo_LopesManaus_${selectedCaptador.url_slug || 'imoveis'}.pdf`);
@@ -147,35 +158,126 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 relative">
         
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-[#F10F4D]/10 text-[#F10F4D] flex items-center justify-center">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-extrabold text-slate-900">Gerador de Catálogo em PDF</h2>
+              <h2 className="text-xl font-extrabold text-slate-900">Gerador de Catálogo PDF</h2>
               <p className="text-xs text-slate-500">
-                {isCaptadorOnly
-                  ? `Modo Captador (${currentCaptador.name}) - Imóveis sob sua captação`
-                  : 'Selecione os imóveis e o captador para personalizar o catálogo'}
+                Apresentado por: <strong className="text-slate-800">{selectedCaptador.name}</strong>
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600">
+          <button onClick={onClose} className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 transition cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="space-y-5">
-          
+
+          {/* Scope Selection: Meus vs Todos */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
+              1. Origem / Escopo dos Imóveis
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setScope('meus')}
+                className={`p-3.5 rounded-2xl border text-left flex items-center space-x-3 transition cursor-pointer ${
+                  scope === 'meus'
+                    ? 'bg-rose-50/90 border-[#F10F4D] ring-2 ring-[#F10F4D]/20 shadow-sm'
+                    : 'bg-slate-50 border-slate-200 opacity-75 hover:opacity-100'
+                }`}
+              >
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  scope === 'meus' ? 'bg-[#F10F4D] text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  <UserIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-900">Apenas Meus Imóveis</p>
+                  <p className="text-[11px] text-slate-500 font-medium">{myProperties.length} imóveis sob sua captação</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setScope('todos')}
+                className={`p-3.5 rounded-2xl border text-left flex items-center space-x-3 transition cursor-pointer ${
+                  scope === 'todos'
+                    ? 'bg-rose-50/90 border-[#F10F4D] ring-2 ring-[#F10F4D]/20 shadow-sm'
+                    : 'bg-slate-50 border-slate-200 opacity-75 hover:opacity-100'
+                }`}
+              >
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  scope === 'todos' ? 'bg-[#F10F4D] text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold text-slate-900">Todos os Imóveis do Sistema</p>
+                  <p className="text-[11px] text-slate-500 font-medium">{properties.length} imóveis de todos captadores</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Filters: Purpose & Category */}
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+            <div className="flex items-center space-x-1 text-xs font-bold text-slate-700 uppercase mb-1">
+              <Filter className="w-3.5 h-3.5 text-[#F10F4D]" />
+              <span>2. Filtrar Por Finalidade e Categoria</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Finalidade</label>
+                <div className="grid grid-cols-3 gap-1 bg-white p-1 rounded-xl border border-slate-200">
+                  {['todos', 'Venda', 'Locação'].map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setPurposeFilter(p)}
+                      className={`py-1.5 text-xs font-bold rounded-lg transition cursor-pointer ${
+                        purposeFilter === p
+                          ? 'bg-[#F10F4D] text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {p === 'todos' ? 'Todas' : p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Categoria</label>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                >
+                  <option value="todos">Todas Categorias</option>
+                  {PROPERTY_CATEGORIES.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
           {/* Title input */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Título da Capa do Catálogo</label>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Título da Capa do PDF</label>
             <input
               type="text"
               value={catalogTitle}
@@ -184,136 +286,10 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
             />
           </div>
 
-          {/* Catalog Layout Orientation Selector */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Formato / Orientação do Catálogo</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setOrientation('landscape')}
-                className={`p-3.5 rounded-2xl border text-left flex items-start space-x-3 transition ${
-                  orientation === 'landscape'
-                    ? 'bg-rose-50/90 border-[#F10F4D] ring-2 ring-[#F10F4D]/20 shadow-sm'
-                    : 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100'
-                }`}
-              >
-                <div className={`w-8 h-6 rounded border border-current shrink-0 flex items-center justify-center mt-0.5 ${
-                  orientation === 'landscape' ? 'bg-[#F10F4D] text-white border-[#F10F4D]' : 'bg-white text-slate-400 border-slate-300'
-                }`}>
-                  <span className="text-[9px] font-black">21x30</span>
-                </div>
-                <div>
-                  <p className="text-xs font-extrabold text-slate-900">🖼️ Catálogo Horizontal (Paisagem)</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    Layout completo com galeria, destaques, infraestrutura do condomínio e banner de agendamento (Modelo Lopes Manaus).
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setOrientation('portrait')}
-                className={`p-3.5 rounded-2xl border text-left flex items-start space-x-3 transition ${
-                  orientation === 'portrait'
-                    ? 'bg-rose-50/90 border-[#F10F4D] ring-2 ring-[#F10F4D]/20 shadow-sm'
-                    : 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100'
-                }`}
-              >
-                <div className={`w-6 h-8 rounded border border-current shrink-0 flex items-center justify-center ${
-                  orientation === 'portrait' ? 'bg-[#F10F4D] text-white border-[#F10F4D]' : 'bg-white text-slate-400 border-slate-300'
-                }`}>
-                  <span className="text-[9px] font-black">A4</span>
-                </div>
-                <div>
-                  <p className="text-xs font-extrabold text-slate-900">📄 Catálogo Vertical (Retrato)</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
-                    Formato tradicional de 1 imóvel por página A4 vertical com link interativo e QR Code.
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Cover Page Customization Block */}
-          <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-xs">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <ImageIcon className="w-4 h-4 text-[#F10F4D]" />
-                <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wide">
-                  Capa do Catálogo (Página 1 Full Bleed)
-                </label>
-              </div>
-              <span className="text-[10px] bg-[#F10F4D]/10 text-[#F10F4D] px-2.5 py-0.5 rounded-full font-bold">
-                {customCoverImage
-                  ? 'Capa Personalizada (Admin)'
-                  : officialCoverUrl
-                  ? `Capa Oficial ${purposeFilter !== 'todos' ? purposeFilter : 'Geral'}`
-                  : 'Capa Padrão Lopes Manaus'}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-200 gap-4">
-              <div className="flex items-center space-x-3.5">
-                {activeCoverImage ? (
-                  <img
-                    src={activeCoverImage}
-                    alt="Capa do Catálogo"
-                    className="w-12 h-16 object-cover rounded-lg border border-slate-200 shadow-sm shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-16 bg-slate-100 rounded-lg border border-dashed border-slate-300 flex items-center justify-center shrink-0">
-                    <ImageIcon className="w-5 h-5 text-slate-400" />
-                  </div>
-                )}
-                <div>
-                  <p className="text-xs font-bold text-slate-900">
-                    {customCoverImage
-                      ? 'Imagem Enviada neste PDF'
-                      : officialCoverUrl
-                      ? `Capa Oficial Salva (${purposeFilter === 'Locação' ? 'Locação' : purposeFilter === 'Venda' ? 'Venda' : 'Geral'})`
-                      : 'Capa Oficial Lopes Manaus (Gerada em Alta Definição)'}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    {isAdmin
-                      ? (customCoverImage || officialCoverUrl
-                          ? 'Capa pronta para ser aplicada na primeira página do PDF.'
-                          : 'Como Admin, você pode alterar esta capa ou definir capas oficiais em Configurações.')
-                      : 'As capas dos catálogos são padronizadas e gerenciadas exclusivamente pelo Administrador Master.'}
-                  </p>
-                </div>
-              </div>
-
-              {isAdmin && (
-                <div className="flex items-center space-x-2 shrink-0">
-                  {customCoverImage && (
-                    <button
-                      type="button"
-                      onClick={() => setCustomCoverImage('')}
-                      className="px-2.5 py-1.5 text-[11px] font-bold text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                      title="Remover capa temporária e usar a oficial salva"
-                    >
-                      Usar Oficial
-                    </button>
-                  )}
-                  <label className="px-3 py-2 bg-white border border-rose-300 hover:border-[#F10F4D] text-[#F10F4D] hover:bg-rose-50 rounded-xl text-xs font-bold cursor-pointer transition flex items-center space-x-1.5 shadow-xs">
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>{customCoverImage ? 'Substituir' : 'Alterar Capa'}</span>
-                    <input
-                      type="file"
-                      accept="image/png, image/jpeg, image/webp"
-                      onChange={handleCoverUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Select Captador (hidden or disabled if Captador) */}
-          {!isCaptadorOnly && (
+          {/* Select Captador (If Manager or Admin) */}
+          {isManagerOrAdmin && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Apresentado por (Captador)</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Apresentador do Catálogo (Captador)</label>
               <select
                 value={selectedCaptadorId}
                 onChange={(e) => setSelectedCaptadorId(e.target.value)}
@@ -328,90 +304,54 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
             </div>
           )}
 
-          {/* Filters for Purpose and Category */}
-          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
-            <div className="flex items-center space-x-1 text-xs font-bold text-slate-700 uppercase mb-1">
-              <Filter className="w-3.5 h-3.5 text-[#F10F4D]" />
-              <span>Filtros do Catálogo (Finalidade e Categoria)</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Finalidade</label>
-                <select
-                  value={purposeFilter}
-                  onChange={(e) => setPurposeFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-                >
-                  <option value="todos">Todas Finalidades</option>
-                  <option value="Venda">Venda</option>
-                  <option value="Locação">Locação</option>
-                </select>
-              </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Categoria</label>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-                >
-                  <option value="todos">Todas Categorias</option>
-                  <option value="Apartamento">Apartamento</option>
-                  <option value="Casa">Casa</option>
-                  <option value="Sala comercial">Sala comercial</option>
-                  <option value="Terreno">Terreno</option>
-                  <option value="Condomínio">Condomínio</option>
-                  <option value="Cobertura">Cobertura</option>
-                </select>
-              </div>
-            </div>
-          </div>
 
-          {/* Select Properties */}
+          {/* Select Properties List */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-bold text-slate-700 uppercase">
-                Selecione os Imóveis ({selectedPropIds.length} selecionados de {displayProperties.length})
+                3. Imóveis para Incluir ({selectedPropIds.length} de {displayProperties.length})
               </label>
               {displayProperties.length > 0 && (
                 <button
                   type="button"
                   onClick={toggleSelectAll}
-                  className="text-xs font-bold text-[#F10F4D] hover:underline"
+                  className="text-xs font-bold text-[#F10F4D] hover:underline cursor-pointer"
                 >
                   {displayProperties.every(p => selectedPropIds.includes(p.id))
-                    ? 'Desmarcar Exibidos'
-                    : 'Marcar Todos Exibidos'}
+                    ? 'Desmarcar Todos'
+                    : 'Marcar Todos'}
                 </button>
               )}
             </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-2 p-2 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="max-h-56 overflow-y-auto space-y-2 p-2 bg-slate-50 rounded-2xl border border-slate-200">
               {displayProperties.length > 0 ? (
                 displayProperties.map(p => {
                   const isSelected = selectedPropIds.includes(p.id);
+                  const captadorObj = captadores.find(c => c.id === p.user_id);
                   return (
                     <div
                       key={p.id}
                       onClick={() => togglePropSelection(p.id)}
                       className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition ${
-                        isSelected ? 'bg-rose-50/90 border-rose-300' : 'bg-white border-slate-200 opacity-70 hover:opacity-100'
+                        isSelected ? 'bg-rose-50/90 border-rose-300' : 'bg-white border-slate-200 opacity-75 hover:opacity-100'
                       }`}
                     >
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-3 min-w-0 pr-2">
                         {isSelected ? (
                           <CheckSquare className="w-5 h-5 text-[#F10F4D] shrink-0" />
                         ) : (
                           <Square className="w-5 h-5 text-slate-400 shrink-0" />
                         )}
-                        <div>
-                          <p className="text-xs font-bold text-slate-900 line-clamp-1">{p.title}</p>
-                          <p className="text-[10px] text-slate-500 font-medium">
-                            {p.neighborhood} • {p.category} ({p.purpose})
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-900 truncate">{p.title}</p>
+                          <p className="text-[10px] text-slate-500 font-medium truncate">
+                            {p.neighborhood} • {p.category} ({p.purpose}) {scope === 'todos' && captadorObj ? `• Captador: ${captadorObj.name}` : ''}
                           </p>
                         </div>
                       </div>
-                      <span className="text-xs font-extrabold text-[#F10F4D]">
+                      <span className="text-xs font-extrabold text-[#F10F4D] shrink-0">
                         R$ {p.price.toLocaleString('pt-BR')}
                       </span>
                     </div>
@@ -430,7 +370,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-100 transition"
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-100 transition cursor-pointer"
             >
               Cancelar
             </button>
@@ -438,10 +378,10 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
               type="button"
               onClick={handleDownload}
               disabled={isGenerating || selectedPropIds.length === 0}
-              className="px-6 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-900/30 flex items-center space-x-2 transition transform active:scale-95 disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-900/30 flex items-center space-x-2 transition transform active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>{isGenerating ? 'Gerando Catálogo PDF...' : `Baixar PDF (${selectedPropIds.length} Imóveis)`}</span>
+              <span>{isGenerating ? 'Gerando Catálogo PDF...' : `Gerar Catálogo PDF (${selectedPropIds.length} Imóveis)`}</span>
             </button>
           </div>
 

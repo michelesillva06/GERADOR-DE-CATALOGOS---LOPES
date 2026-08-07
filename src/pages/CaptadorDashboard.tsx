@@ -1,7 +1,7 @@
 import React from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
-import { buildWhatsAppUrl } from '../lib/whatsapp';
+import { buildWhatsAppUrl, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { Building2, PlusCircle, Share2, FileSpreadsheet, ExternalLink, CheckCircle2, Copy } from 'lucide-react';
 
 interface CaptadorDashboardProps {
@@ -40,7 +40,8 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
 
   const handleShareCatalogWhatsApp = () => {
     const text = `Olá! Confira meu catálogo de imóveis atualizado na Lopes Captação: ${publicUrl}`;
-    const waUrl = buildWhatsAppUrl(user.whatsapp || user.phone, text);
+    const targetWa = getEffectiveWhatsApp(user, companySettings);
+    const waUrl = buildWhatsAppUrl(targetWa, text);
     window.open(waUrl, '_blank');
   };
 
@@ -48,7 +49,7 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
     <div className="space-y-6">
       
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-[#333333] rounded-3xl p-6 text-white border border-[#444444] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           {user.photo_url ? (
             <img
@@ -57,21 +58,21 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
               className="w-16 h-16 rounded-full object-cover border-2 border-[#F10F4D] shadow-lg shrink-0"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-[#F10F4D] flex items-center justify-center text-white font-black text-xl shrink-0 shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-[#282828] border-2 border-[#F10F4D] flex items-center justify-center text-white font-black text-xl shrink-0 shadow-lg">
               {user.name ? user.name.charAt(0).toUpperCase() : 'C'}
             </div>
           )}
           <div>
-            <p className="text-xs text-[#F10F4D] font-bold uppercase tracking-wider">Painel do Captador</p>
+            <p className="text-[10px] text-[#F10F4D] font-extrabold uppercase tracking-widest">Painel do Captador</p>
             <h1 className="text-2xl font-black text-white">Bem-vindo(a), {user.name}!</h1>
-            <p className="text-xs text-slate-300 mt-0.5">{user.position} • CRECI: {user.creci || '1234-F/AM'}</p>
+            <p className="text-xs text-neutral-300 mt-0.5">{user.position} • CRECI: {user.creci || '1234-F/AM'}</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onOpenPdfModal}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 flex items-center space-x-2 transition"
+            className="px-4 py-2.5 rounded-xl bg-[#282828] hover:bg-[#202020] text-white font-bold text-xs border border-[#444444] flex items-center space-x-2 transition cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 text-[#F10F4D]" />
             <span>Gerar Catálogo PDF</span>
@@ -79,7 +80,7 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
           
           <button
             onClick={onOpenNewPropertyModal}
-            className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-rose-900/30 transition"
+            className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-rose-950/30 transition cursor-pointer"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Novo Imóvel</span>
@@ -149,9 +150,9 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase">Vendidos / Alugados</p>
-            <p className="text-2xl font-black text-sky-600 mt-1">{soldCount}</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">{soldCount}</p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-800 flex items-center justify-center">
             <FileSpreadsheet className="w-6 h-6" />
           </div>
         </div>

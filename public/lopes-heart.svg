@@ -1,6 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
-  <!-- Favicon Lopes Heart Emblem -->
+  <!-- Official Lopes Heart Emblem -->
+  <!-- Overlapping Circle Head -->
   <circle cx="75" cy="28" r="18" fill="#F10F4D"/>
+  
+  <!-- Heart Body with cutout -->
   <path d="M 46 92 
            C 25 74 2 52 2 30 
            C 2 12 16 0 34 0 

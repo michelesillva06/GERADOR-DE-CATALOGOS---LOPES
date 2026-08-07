@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface LopesLogoProps {
-  variant?: 'default' | 'white' | 'dark';
+  variant?: 'default' | 'white' | 'dark' | 'color';
   showBadge?: boolean;
   badgeText?: string;
   className?: string;
@@ -17,11 +17,11 @@ export const LopesLogo: React.FC<LopesLogoProps> = ({
   size = 'md',
   onClick
 }) => {
-  const sizeClasses = {
-    sm: 'h-6',
-    md: 'h-8',
-    lg: 'h-11',
-    xl: 'h-16'
+  const heartSizes = {
+    sm: 'w-6 h-6',
+    md: 'w-8 h-8',
+    lg: 'w-11 h-11',
+    xl: 'w-16 h-16'
   };
 
   const textSizes = {
@@ -29,13 +29,6 @@ export const LopesLogo: React.FC<LopesLogoProps> = ({
     md: 'text-2xl',
     lg: 'text-3xl',
     xl: 'text-5xl'
-  };
-
-  const heartSizes = {
-    sm: 'w-6 h-6',
-    md: 'w-8 h-8',
-    lg: 'w-11 h-11',
-    xl: 'w-16 h-16'
   };
 
   const textColor = variant === 'white' 
@@ -49,32 +42,27 @@ export const LopesLogo: React.FC<LopesLogoProps> = ({
       className={`inline-flex items-center space-x-2.5 select-none ${onClick ? 'cursor-pointer' : ''} ${className}`}
       onClick={onClick}
     >
-      {/* Official Lopes Heart Icon SVG */}
+      {/* Official Lopes Heart Emblem SVG */}
       <svg 
         className={`${heartSizes[size]} shrink-0`} 
-        viewBox="0 0 70 60" 
+        viewBox="0 0 100 100" 
         fill="none" 
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Left Crescent */}
+        <circle cx="75" cy="28" r="18" fill={variant === 'white' ? '#FFFFFF' : '#F10F4D'} />
         <path 
-          d="M14 29C10 20 11 9 19 4.5C26 0.5 33 4 36.5 11C34 4 24 0 16 4C6.5 8.8 5.5 21.5 10.5 31.5C13.5 37 18 42.5 24 47.5C19 41.5 15 35 14 29Z" 
-          fill="#F10F4D"
-        />
-        {/* Main Right Heart */}
-        <path 
-          d="M33 11C28 4.5 19 5.5 15 12.5C11 19.5 13 28 20 36C26 43 36 52.5 39 55C42 52.5 52 43 58 36C65 28 67 19.5 63 12.5C59 5.5 50 4.5 45 11C42.5 14.5 40.5 17 39 18C37.5 17 35.5 14.5 33 11Z" 
-          fill="#F10F4D"
+          d="M 46 92 C 25 74 2 52 2 30 C 2 12 16 0 34 0 C 44 0 52 5 57 14 C 52 23 50 33 53 43 C 57 55 67 62 76 62 C 68 76 57 86 46 92 Z" 
+          fill={variant === 'white' ? '#FFFFFF' : '#F10F4D'} 
         />
       </svg>
 
-      {/* Lopes Text & Optional Badge */}
+      {/* Lopes Captação Text & Badge */}
       <div className="flex items-center space-x-2">
         <span className={`${textSizes[size]} font-black tracking-tight ${textColor} leading-none`}>
           Lopes
         </span>
         {showBadge && (
-          <span className="text-[#F10F4D] font-extrabold text-[10px] sm:text-xs uppercase px-2 py-0.5 bg-rose-950/80 rounded border border-rose-800/60 tracking-wider">
+          <span className="text-[#F10F4D] font-extrabold text-[10px] sm:text-xs uppercase px-2 py-0.5 bg-rose-50 rounded border border-rose-200/80 tracking-wider">
             {badgeText}
           </span>
         )}

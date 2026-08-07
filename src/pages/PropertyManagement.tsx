@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
 import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin } from 'lucide-react';
+import { PROPERTY_CATEGORIES } from '../lib/constants';
 
 interface PropertyManagementProps {
   properties: Property[];
@@ -157,12 +158,9 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
               className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
             >
               <option value="todos">Todas Categorias</option>
-              <option value="Apartamento">Apartamento</option>
-              <option value="Casa">Casa</option>
-              <option value="Sala comercial">Sala comercial</option>
-              <option value="Terreno">Terreno</option>
-              <option value="Condomínio">Condomínio</option>
-              <option value="Cobertura">Cobertura</option>
+              {PROPERTY_CATEGORIES.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
 

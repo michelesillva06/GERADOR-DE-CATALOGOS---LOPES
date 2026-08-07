@@ -42,6 +42,31 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (!editingUser) {
+      const slug = val
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, "");
+      setUsername(slug);
+      setUrlSlug(slug);
+    }
+  };
+
+  const handlePhoneChange = (val: string) => {
+    setPhone(val);
+    if (!editingUser || !whatsapp) {
+      const digits = val.replace(/\D/g, '');
+      if (digits.length > 0) {
+        setWhatsapp(digits.startsWith('55') ? digits : `55${digits}`);
+      } else {
+        setWhatsapp('');
+      }
+    }
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -358,23 +383,25 @@ export const UserManagement: React.FC<UserManagementProps> = ({
               
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo</label>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo *</label>
                   <input
                     type="text"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                    placeholder="Ex: Michele Silva"
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">E-mail Corporativo</label>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">E-mail Corporativo *</label>
                   <input
                     type="email"
                     value={email}
+                    placeholder="ex: michele@lopes.com.br"
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
                     required
                   />
                 </div>
@@ -382,24 +409,26 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome de Usuário (Login)</label>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                    Nome de Usuário (Login) <span className="text-[9px] text-slate-400 lowercase font-normal">(automático)</span>
+                  </label>
                   <input
                     type="text"
                     value={username}
                     disabled={!!editingUser}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 disabled:opacity-60"
+                    className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono font-bold text-rose-600 disabled:opacity-80"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Senha {editingUser && '(deixe em branco se mantiver)'}</label>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Senha {editingUser && '(opcional)'}</label>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={editingUser ? '••••••••' : 'Sua senha'}
+                    placeholder={editingUser ? '••••••••' : '123456'}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                     required={!editingUser}
                   />
@@ -412,45 +441,62 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                   <input
                     type="text"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="(92) 99123-4567"
+                    onChange={(e) => handlePhoneChange(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">WhatsApp (com DDD ex: 5592...)</label>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">WhatsApp <span className="text-[9px] text-[#F10F4D] lowercase font-normal">(sincronizado)</span></label>
                   <input
                     type="text"
                     value={whatsapp}
+                    placeholder="5592991234567"
                     onChange={(e) => setWhatsapp(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-emerald-700"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Função / Nível de Acesso</label>
-                  <select
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase">Função / Nível de Acesso</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRole('CAPTADOR')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold border transition ${
+                      role === 'CAPTADOR'
+                        ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
                   >
-                    <option value="CAPTADOR">Captador</option>
-                    <option value="GESTORA">Gestora (Apenas Visualização e Catálogo)</option>
-                    {isMasterUser && <option value="MASTER_ADMIN">Master Admin</option>}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Cargo Exibido</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Corretora de Alto Padrão"
-                    value={position}
-                    onChange={(e) => setPosition(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
-                  />
+                    Captador
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('GESTORA')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold border transition ${
+                      role === 'GESTORA'
+                        ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    Gestora
+                  </button>
+                  {isMasterUser && (
+                    <button
+                      type="button"
+                      onClick={() => setRole('MASTER_ADMIN')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold border transition ${
+                        role === 'MASTER_ADMIN'
+                          ? 'bg-slate-900 text-white border-slate-900 shadow'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      Master Admin
+                    </button>
+                  )}
                 </div>
               </div>
 

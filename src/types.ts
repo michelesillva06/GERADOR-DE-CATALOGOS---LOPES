@@ -20,7 +20,26 @@ export interface User {
 }
 
 export type PropertyPurpose = 'Venda' | 'Locação' | 'Venda e Locação';
-export type PropertyCategory = 'Apartamento' | 'Casa' | 'Sala comercial' | 'Terreno' | 'Condomínio' | 'Cobertura';
+export type PropertyCategory =
+  | 'Apartamento'
+  | 'Casa'
+  | 'Casa em Condomínio'
+  | 'Cobertura'
+  | 'Flat / Studio / Kitnet'
+  | 'Terreno / Lote'
+  | 'Terreno em Condomínio'
+  | 'Sala Comercial'
+  | 'Prédio Comercial'
+  | 'Loja / Ponto Comercial'
+  | 'Galpão / Depósito / Armazém'
+  | 'Chácara / Sítio / Fazenda'
+  | 'Área Industrial'
+  | 'Loft'
+  | 'Duplex / Triplex'
+  | 'Sobrado'
+  | 'Hotel / Pousada'
+  | 'Outro'
+  | string;
 export type PropertyStatus = 'Disponível' | 'Reservado' | 'Vendido' | 'Alugado';
 
 export interface Property {
@@ -39,17 +58,28 @@ export interface Property {
   neighborhood: string;
   city: string;
   state: string;
-  address: string;
-  total_area: number;
-  built_area: number;
+  address?: string;
+  street?: string;
+  number?: string;
+  zip_code?: string;
+  total_area?: number;
+  built_area?: number;
+  usable_area?: number;
   bedrooms: number;
   suites: number;
   bathrooms: number;
   parking_spaces: number;
-  features: string[];
-  images: string[];
-  main_image: string;
+  features?: string[];
+  images?: string[];
+  main_image?: string;
   views?: number;
+  featured?: boolean;
+  photos?: any[];
+  owner_name?: string;
+  owner_phone?: string;
+  owner_email?: string;
+  notes?: string;
+  user_name?: string;
   // Informações do Cliente Comprador / Inquilino
   client_name?: string;
   client_cpf_cnpj?: string;
@@ -89,6 +119,8 @@ export interface CompanySettings {
   cover_locacao_url?: string;
   cover_venda_url?: string;
   cover_geral_url?: string;
+  cover_horizontal_url?: string;
+  cover_vertical_url?: string;
 }
 
 export interface DashboardStats {

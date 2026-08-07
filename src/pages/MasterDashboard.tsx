@@ -25,14 +25,14 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
     <div className="space-y-6">
       
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-[#333333] rounded-3xl p-6 text-white border border-[#444444] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2 text-[#F10F4D] text-xs font-bold uppercase tracking-wider mb-1">
             <ShieldCheck className="w-4 h-4" />
             <span>Painel de Controle Master Admin</span>
           </div>
           <h1 className="text-2xl font-black">Visão Geral Imobiliária - Lopes Captação</h1>
-          <p className="text-xs text-slate-300 mt-1">
+          <p className="text-xs text-neutral-300 mt-1">
             Acompanhe usuários captadores, métricas de imóveis e gere catálogos digitais
           </p>
         </div>
@@ -47,13 +47,13 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
           </button>
           <button
             onClick={onOpenNewUserModal}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
+            className="px-3.5 py-2 rounded-xl bg-[#282828] hover:bg-[#202020] text-white font-bold text-xs border border-[#444444] transition"
           >
             Novo Captador
           </button>
           <button
             onClick={onOpenNewPropertyModal}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
+            className="px-3.5 py-2 rounded-xl bg-[#282828] hover:bg-[#202020] text-white font-bold text-xs border border-[#444444] transition"
           >
             Cadastrar Imóvel
           </button>
@@ -105,14 +105,14 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-bold text-slate-400 uppercase">Vendidos / Alugados</p>
-            <p className="text-2xl font-black text-sky-600 mt-1">
+            <p className="text-2xl font-black text-slate-900 mt-1">
               {(stats?.sold_properties || 0) + (stats?.rented_properties || 0)}
             </p>
             <p className="text-[10px] text-slate-400 font-bold mt-1">
               {stats?.sold_properties || 0} vendidos • {stats?.rented_properties || 0} alugados
             </p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-800 flex items-center justify-center">
             <ShoppingBag className="w-6 h-6" />
           </div>
         </div>

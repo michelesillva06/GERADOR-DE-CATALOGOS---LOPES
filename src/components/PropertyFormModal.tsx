@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Property, User, PropertyCategory, PropertyPurpose, PropertyStatus } from '../types';
-import { X, Plus, Trash2, Image as ImageIcon, Sparkles, Upload } from 'lucide-react';
+import { X, Plus, Trash2, Image as ImageIcon, Sparkles, Upload, Zap } from 'lucide-react';
+import { MANAUS_NEIGHBORHOODS, PROPERTY_CATEGORIES } from '../lib/constants';
+import { compressMultipleImages } from '../utils/imageCompressor';
 
 interface PropertyFormModalProps {
   isOpen: boolean;
@@ -69,6 +71,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const [mainImage, setMainImage] = useState<string>('');
   
   // Client Buyer/Tenant information
+  const [showClientDetails, setShowClientDetails] = useState(false);
   const [clientName, setClientName] = useState('');
   const [clientCpfCnpj, setClientCpfCnpj] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -79,6 +82,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const [transactionNotes, setTransactionNotes] = useState('');
 
   const [saving, setSaving] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -166,26 +170,31 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file: File) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        if (result) {
-          setImages((prev) => {
-            const next = [...prev, result];
-            if (!mainImage) setMainImage(result);
-            return next;
-          });
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    e.target.value = '';
+    setIsCompressing(true);
+    try {
+      const compressed = await compressMultipleImages(files, {
+        maxWidth: 1400,
+        maxHeight: 1400,
+        quality: 0.78
+      });
+
+      if (compressed.length > 0) {
+        setImages((prev) => {
+          const next = [...prev, ...compressed];
+          if (!mainImage && next.length > 0) setMainImage(next[0]);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Erro ao otimizar imagens:', err);
+    } finally {
+      setIsCompressing(false);
+      e.target.value = '';
+    }
   };
 
   const handleAddImageUrl = () => {
@@ -257,7 +266,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 relative">
         
         {/* Modal Header */}
@@ -304,50 +313,79 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             </div>
           )}
 
-          {/* Purpose, Category & Status */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Purpose & Status quick pills */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Finalidade</label>
-              <select
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value as PropertyPurpose)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-              >
-                <option value="Venda">Venda</option>
-                <option value="Locação">Locação</option>
-                <option value="Venda e Locação">Venda e Locação</option>
-              </select>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Finalidade do Imóvel</label>
+              <div className="flex items-center gap-1.5">
+                {(['Venda', 'Locação', 'Venda e Locação'] as PropertyPurpose[]).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPurpose(p)}
+                    className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-extrabold border transition ${
+                      purpose === p
+                        ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Categoria</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as PropertyCategory)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-              >
-                <option value="Apartamento">Apartamento</option>
-                <option value="Casa">Casa</option>
-                <option value="Sala comercial">Sala comercial</option>
-                <option value="Terreno">Terreno</option>
-                <option value="Condomínio">Condomínio</option>
-                <option value="Cobertura">Cobertura</option>
-              </select>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Status da Captação</label>
+              <div className="flex items-center gap-1.5">
+                {(['Disponível', 'Reservado', 'Vendido', 'Alugado'] as PropertyStatus[]).map(st => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setStatus(st)}
+                    className={`flex-1 py-2 px-2 rounded-xl text-xs font-extrabold border transition ${
+                      status === st
+                        ? 'bg-slate-900 text-white border-slate-900 shadow'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Status do Imóvel</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as PropertyStatus)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-              >
-                <option value="Disponível">Disponível</option>
-                <option value="Reservado">Reservado</option>
-                <option value="Vendido">Vendido</option>
-                <option value="Alugado">Alugado</option>
-              </select>
+          {/* Category quick chips + dropdown */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-700 uppercase">Tipo / Categoria do Imóvel</label>
             </div>
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+              {['Apartamento', 'Casa', 'Terreno', 'Comercial', 'Cobertura', 'Duplex/Triplex', 'Sítio/Chácara'].map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategory(cat as PropertyCategory)}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-bold border transition ${
+                    category === cat
+                      ? 'bg-rose-50 border-[#F10F4D] text-[#F10F4D] ring-1 ring-[#F10F4D]'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as PropertyCategory)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#F10F4D]"
+            >
+              {PROPERTY_CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
           </div>
 
           {/* Title & Description */}
@@ -376,37 +414,65 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
           {/* Location Details */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Bairro</label>
-              <input
-                type="text"
-                placeholder="Ex: Adrianópolis, Ponta Negra, Vieiralves"
-                value={neighborhood}
-                onChange={(e) => setNeighborhood(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900"
-                required
-              />
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Bairro de Manaus
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                {['Adrianópolis', 'Ponta Negra', 'Vieiralves', 'Dom Pedro', 'Flores', 'Aleixo', 'Parque 10', 'Tarumã'].map(b => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => setNeighborhood(b)}
+                    className={`py-1 px-2.5 rounded-lg text-xs font-bold border transition ${
+                      neighborhood === b
+                        ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow-xs'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-1.5">
+                <select
+                  value={MANAUS_NEIGHBORHOODS.includes(neighborhood) ? neighborhood : (neighborhood ? 'OUTRO' : '')}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val !== 'OUTRO') {
+                      setNeighborhood(val);
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                >
+                  <option value="">-- Ou Selecione da Lista de Bairros --</option>
+                  {MANAUS_NEIGHBORHOODS.map(b => (
+                    <option key={b} value={b}>{b}</option>
+                  ))}
+                  <option value="OUTRO">Outro Bairro (Digitar Manualmente...)</option>
+                </select>
+
+                {(!MANAUS_NEIGHBORHOODS.includes(neighborhood) || neighborhood === '') && (
+                  <input
+                    type="text"
+                    placeholder="Digite o nome do bairro..."
+                    value={neighborhood}
+                    onChange={(e) => setNeighborhood(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                    required
+                  />
+                )}
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Cidade</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Endereço / Condomínio</label>
               <input
                 type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Endereço Completo</label>
-              <input
-                type="text"
-                placeholder="Rua, Número, Condomínio"
+                placeholder="Rua, Número, Edifício"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 h-10"
               />
             </div>
           </div>
@@ -539,132 +605,153 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
             </div>
           </div>
 
-          {/* Section: Cadastrar Cliente Comprador ou Inquilino */}
-          <div className="bg-rose-50/60 p-4 rounded-2xl border border-rose-200/80 space-y-4">
-            <div className="flex items-center justify-between">
+          {/* Section: Cadastrar Cliente Comprador ou Inquilino (Expandable) */}
+          <div className="bg-rose-50/60 p-4 rounded-2xl border border-rose-200/80 space-y-3">
+            <div
+              onClick={() => setShowClientDetails(!showClientDetails)}
+              className="flex items-center justify-between cursor-pointer select-none"
+            >
               <div>
-                <h3 className="text-xs font-black uppercase text-[#F10F4D] tracking-wider">
-                  Cadastro do Cliente Comprador / Inquilino
+                <h3 className="text-xs font-black uppercase text-[#F10F4D] tracking-wider flex items-center gap-2">
+                  <span>Informações do Cliente / Negócio Fechado</span>
+                  <span className="text-[10px] font-normal text-slate-500 lowercase">(opcional)</span>
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  Preencha os dados do cliente que adquiriu ou alugou este imóvel para constar nos relatórios e planilhas da imobiliária.
+                  {showClientDetails ? 'Clique para ocultar os dados do comprador/inquilino' : 'Clique aqui para preencher dados do cliente comprador/inquilino se o imóvel foi vendido/alugado'}
                 </p>
               </div>
-              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
-                status === 'Vendido' ? 'bg-emerald-100 text-emerald-800' :
-                status === 'Alugado' ? 'bg-sky-100 text-sky-800' :
-                status === 'Reservado' ? 'bg-amber-100 text-amber-800' :
-                'bg-slate-200 text-slate-700'
-              }`}>
-                {status}
-              </span>
+              <button
+                type="button"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-[#F10F4D] border border-rose-200 shadow-xs hover:bg-rose-50"
+              >
+                {showClientDetails || clientName || status === 'Vendido' || status === 'Alugado' ? 'Ocultar' : '+ Adicionar Cliente'}
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo do Cliente</label>
-                <input
-                  type="text"
-                  placeholder="Ex: João da Silva Santos"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                />
-              </div>
+            {(showClientDetails || clientName || status === 'Vendido' || status === 'Alugado') && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-rose-200/60">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo do Cliente</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: João da Silva Santos"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">CPF / CNPJ do Cliente</label>
-                <input
-                  type="text"
-                  placeholder="000.000.000-00"
-                  value={clientCpfCnpj}
-                  onChange={(e) => setClientCpfCnpj(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">CPF / CNPJ do Cliente</label>
+                  <input
+                    type="text"
+                    placeholder="000.000.000-00"
+                    value={clientCpfCnpj}
+                    onChange={(e) => setClientCpfCnpj(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Telefone / WhatsApp do Cliente</label>
-                <input
-                  type="text"
-                  placeholder="(92) 99999-9999"
-                  value={clientPhone}
-                  onChange={(e) => setClientPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Telefone / WhatsApp do Cliente</label>
+                  <input
+                    type="text"
+                    placeholder="(92) 99999-9999"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">E-mail do Cliente</label>
-                <input
-                  type="email"
-                  placeholder="cliente@email.com"
-                  value={clientEmail}
-                  onChange={(e) => setClientEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">E-mail do Cliente</label>
+                  <input
+                    type="email"
+                    placeholder="cliente@email.com"
+                    value={clientEmail}
+                    onChange={(e) => setClientEmail(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tipo de Cliente</label>
-                <select
-                  value={clientType}
-                  onChange={(e) => setClientType(e.target.value as 'COMPRADOR' | 'INQUILINO')}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#F10F4D]"
-                >
-                  <option value="COMPRADOR">Comprador</option>
-                  <option value="INQUILINO">Inquilino / Locatário</option>
-                </select>
-              </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tipo de Cliente</label>
+                  <select
+                    value={clientType}
+                    onChange={(e) => setClientType(e.target.value as 'COMPRADOR' | 'INQUILINO')}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#F10F4D]"
+                  >
+                    <option value="COMPRADOR">Comprador</option>
+                    <option value="INQUILINO">Inquilino / Locatário</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Data do Negócio / Contrato</label>
-                <input
-                  type="date"
-                  value={transactionDate}
-                  onChange={(e) => setTransactionDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Data do Negócio / Contrato</label>
+                  <input
+                    type="date"
+                    value={transactionDate}
+                    onChange={(e) => setTransactionDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Valor Fechado do Negócio (R$)</label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={transactionValue}
-                  onChange={(e) => setTransactionValue(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-emerald-700 focus:outline-none focus:border-[#F10F4D]"
-                />
-              </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Valor Fechado do Negócio (R$)</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={transactionValue}
+                    onChange={(e) => setTransactionValue(e.target.value === '' ? '' : Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-emerald-700 focus:outline-none focus:border-[#F10F4D]"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Observações do Negócio</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Pagamento à vista / Financiamento Caixa..."
-                  value={transactionNotes}
-                  onChange={(e) => setTransactionNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                />
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Observações do Negócio</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Pagamento à vista / Financiamento Caixa..."
+                    value={transactionNotes}
+                    onChange={(e) => setTransactionNotes(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Images Upload / URL Section */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Fotos do Imóvel (Galeria e Upload)</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase">Fotos do Imóvel (Galeria e Upload)</label>
+              <span className="inline-flex items-center space-x-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                <Zap className="w-3 h-3 text-emerald-600 fill-emerald-600" />
+                <span>Otimização Leve Ativa</span>
+              </span>
+            </div>
             
             {/* File Upload Zone */}
             <div className="mb-3">
-              <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-rose-200 hover:border-[#F10F4D] bg-rose-50/50 hover:bg-rose-50 rounded-2xl cursor-pointer transition text-center group">
-                <Upload className="w-6 h-6 text-[#F10F4D] mb-1 group-hover:scale-110 transition-transform" />
-                <span className="text-xs font-bold text-slate-800">Clique para enviar fotos do dispositivo</span>
-                <span className="text-[10px] text-slate-500 mt-0.5">Formatos suportados: PNG, JPG, WEBP (vários arquivos permitidos)</span>
+              <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-rose-200 hover:border-[#F10F4D] bg-rose-50/50 hover:bg-rose-50 rounded-2xl cursor-pointer transition text-center group relative overflow-hidden">
+                {isCompressing ? (
+                  <div className="py-2 flex flex-col items-center space-y-2">
+                    <div className="w-6 h-6 border-2 border-[#F10F4D] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-bold text-[#F10F4D]">Compressão Inteligente em Andamento...</span>
+                    <span className="text-[10px] text-slate-500">Transformando fotos em versões super leves sem perder qualidade</span>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-6 h-6 text-[#F10F4D] mb-1 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-bold text-slate-800">Clique ou arraste para enviar fotos do dispositivo</span>
+                    <span className="text-[10px] text-slate-500 mt-0.5">As imagens serão otimizadas e compactadas automaticamente</span>
+                  </>
+                )}
                 <input
                   type="file"
                   accept="image/*"
                   multiple
+                  disabled={isCompressing}
                   onChange={handleFileUpload}
                   className="hidden"
                 />

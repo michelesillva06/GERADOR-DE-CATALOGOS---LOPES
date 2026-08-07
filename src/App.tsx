@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { MobileBottomNav } from './components/MobileBottomNav';
 import { Login } from './pages/Login';
 import { MasterDashboard } from './pages/MasterDashboard';
 import { CaptadorDashboard } from './pages/CaptadorDashboard';
@@ -37,7 +38,7 @@ import {
 } from './lib/storage';
 
 function MainApp() {
-  const { user, loading } = useAuth();
+  const { user, loading, setUser } = useAuth();
   const [activeView, setActiveView] = useState('dashboard');
   const [properties, setProperties] = useState<Property[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -146,10 +147,10 @@ function MainApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 border-4 border-[#F10F4D] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Carregando Lopes Captação...</p>
+          <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Carregando Lopes Captação...</p>
         </div>
       </div>
     );
@@ -192,8 +193,23 @@ function MainApp() {
     // Local state fallback / synchronization
     const allProps = getStoredProperties();
     let updatedProps: Property[] = [];
+    const targetUserId = propData.user_id || user.id;
+    const captadorUser = users.find(u => u.id === targetUserId) || user;
+
+    const newLog: AuditLog = {
+      id: `log_${Date.now()}`,
+      user_id: targetUserId,
+      user_name: captadorUser.name,
+      action: editingProperty ? 'Edição de Imóvel' : 'Cadastro de Imóvel',
+      description: editingProperty
+        ? `Atualizou o imóvel ${editingProperty.code}`
+        : `Cadastrou o imóvel ${propData.code || 'novo'} (${propData.title || ''})`,
+      ip_address: '127.0.0.1',
+      created_at: new Date().toISOString()
+    };
+
     if (editingProperty) {
-      updatedProps = allProps.map(p => p.id === editingProperty.id ? { ...p, ...propData } as Property : p);
+      updatedProps = allProps.map(p => p.id === editingProperty.id ? { ...p, ...propData, updated_at: new Date().toISOString() } as Property : p);
     } else {
       const newCode = `LOP-${Math.floor(100 + Math.random() * 900)}`;
       const mainImg = propData.images?.[0] || propData.main_image || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
@@ -222,7 +238,7 @@ function MainApp() {
         images: propData.images || [mainImg],
         main_image: mainImg,
         status: propData.status || 'Disponível',
-        user_id: propData.user_id || user.id,
+        user_id: targetUserId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -231,6 +247,10 @@ function MainApp() {
     saveStoredProperties(updatedProps);
     setProperties(updatedProps);
     setStats(calculateStats(updatedProps, users));
+
+    const updatedLogs = [newLog, ...logs];
+    saveStoredLogs(updatedLogs);
+    setLogs(updatedLogs);
   };
 
   const handleDeleteProperty = async (prop: Property) => {
@@ -318,6 +338,7 @@ function MainApp() {
     if (user && user.id === id) {
       const updatedSelf = { ...user, ...userData };
       saveStoredCurrentUser(updatedSelf);
+      setUser(updatedSelf);
     }
   };
 
@@ -451,23 +472,23 @@ function MainApp() {
       return { success: false, error: 'Data bloqueada por feriado oficial!' };
     }
 
-    // Conflict check
-    if (eventData.type === 'VISITA' && eventData.property_id) {
-      const conflict = currentSchedule.find(e => {
-        if (e.type !== 'VISITA' || e.date !== eventData.date || e.property_id !== eventData.property_id) return false;
-        const startA = eventData.start_time || '00:00';
-        const endA = eventData.end_time || startA;
-        const startB = e.start_time;
-        const endB = e.end_time || startB;
-        const overlap = (startA < endB && endA > startB) || (startA === startB);
-        if (!overlap) return false;
-        if (e.exclusive_visit || eventData.exclusive_visit || e.user_id === eventData.user_id) return true;
-        return false;
-      });
+    // Conflict check for date and time slot across all captadores
+    const startA = eventData.start_time || '09:00';
+    const endA = eventData.end_time || startA;
 
-      if (conflict) {
-        return { success: false, error: `Conflito de horário! O captador ${conflict.user_name} já possui uma visita neste imóvel às ${conflict.start_time}.` };
-      }
+    const conflict = currentSchedule.find(e => {
+      if (e.type === 'FERIADO' || e.date !== eventData.date) return false;
+      const startB = e.start_time || '09:00';
+      const endB = e.end_time || startB;
+      const overlap = (startA < endB && endA > startB) || (startA === startB && endA === endB);
+      return overlap;
+    });
+
+    if (conflict) {
+      return {
+        success: false,
+        error: `Horário indisponível! O captador ${conflict.user_name} já possui um agendamento (${conflict.title}) neste dia (${eventData.date}) das ${conflict.start_time} às ${conflict.end_time}.`
+      };
     }
 
     const newEv: ScheduleEvent = {
@@ -513,7 +534,7 @@ function MainApp() {
   const captadorOwner = viewingProperty ? users.find(u => u.id === viewingProperty.user_id) || user : user;
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
       
       <Header
         activeView={activeView}
@@ -527,7 +548,7 @@ function MainApp() {
           onOpenNewPropertyModal={handleOpenNewProperty}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-20 md:pb-8 max-w-7xl mx-auto w-full overflow-x-hidden">
           
           {activeView === 'dashboard' && (
             isMasterOrGestora ? (
@@ -632,7 +653,7 @@ function MainApp() {
             </div>
           )}
 
-          {activeView === 'logs' && isMasterOrGestora && (
+          {activeView === 'logs' && isMaster && (
             <AuditLogsPage logs={logs} />
           )}
 
@@ -677,9 +698,16 @@ function MainApp() {
           captadores={users}
           currentCaptador={user}
           companySettings={companySettings}
+          onSaveSettings={handleSaveSettings}
           onClose={() => setIsPdfModalOpen(false)}
         />
       )}
+
+      <MobileBottomNav
+        activeView={activeView}
+        setActiveView={setActiveView}
+        onOpenNewPropertyModal={handleOpenNewProperty}
+      />
 
     </div>
   );
@@ -694,20 +722,7 @@ export default function App() {
     return (
       <PublicPropertyDetail
         code={code || 'LOP-101'}
-        companySettings={{
-          company_name: 'Lopes Manaus',
-          unit_name: 'Lopes Imobiliária - Shopping Ponta Negra',
-          logo_url: '',
-          primary_color: '#F10F4D',
-          phone: '(92) 3659-1000',
-          whatsapp: '5592981234567',
-          email: 'contato@lopesmanaus.com.br',
-          address: 'Av. Coronel Teixeira, 5705, Loja LUC 15.2 no Shopping Ponta Negra, Bairro Ponta Negra, CEP 69037-000, Manaus - AM',
-          city: 'Manaus',
-          state: 'AM',
-          instagram: '@lopesmanaus',
-          creci_j: '540-J/AM'
-        }}
+        companySettings={getStoredSettings()}
       />
     );
   }
@@ -717,20 +732,7 @@ export default function App() {
     return (
       <PublicCatalog
         slug={slug || 'michelesilva'}
-        companySettings={{
-          company_name: 'Lopes Manaus',
-          unit_name: 'Lopes Imobiliária - Shopping Ponta Negra',
-          logo_url: '',
-          primary_color: '#F10F4D',
-          phone: '(92) 3659-1000',
-          whatsapp: '5592981234567',
-          email: 'contato@lopesmanaus.com.br',
-          address: 'Av. Coronel Teixeira, 5705, Loja LUC 15.2 no Shopping Ponta Negra, Bairro Ponta Negra, CEP 69037-000, Manaus - AM',
-          city: 'Manaus',
-          state: 'AM',
-          instagram: '@lopesmanaus',
-          creci_j: '540-J/AM'
-        }}
+        companySettings={getStoredSettings()}
       />
     );
   }

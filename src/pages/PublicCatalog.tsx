@@ -21,6 +21,7 @@ import { generateQRCodeDataUrl } from '../lib/qrCode';
 import { LopesLogo } from '../components/LopesLogo';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { getStoredUsers, getStoredProperties } from '../lib/storage';
+import { PROPERTY_CATEGORIES } from '../lib/constants';
 
 interface PublicCatalogProps {
   slug: string;
@@ -90,10 +91,10 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white p-4">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-800 p-4">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 border-4 border-[#F10F4D] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Carregando Catálogo Lopes Manaus...</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Carregando Catálogo Lopes Manaus...</p>
         </div>
       </div>
     );
@@ -101,18 +102,18 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
 
   if (notFound || !captador) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white p-4">
-        <div className="max-w-md w-full text-center space-y-4 bg-slate-900 p-8 rounded-3xl border border-slate-800">
-          <div className="w-16 h-16 bg-rose-950 text-[#F10F4D] rounded-2xl flex items-center justify-center text-2xl font-black mx-auto">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-800 p-4">
+        <div className="max-w-md w-full text-center space-y-4 bg-white p-8 rounded-3xl border border-slate-200 shadow-xl">
+          <div className="w-16 h-16 bg-rose-50 text-[#F10F4D] rounded-2xl flex items-center justify-center text-2xl font-black mx-auto">
             !
           </div>
-          <h2 className="text-xl font-bold">Catálogo Não Encontrado</h2>
-          <p className="text-xs text-slate-400">
-            Não encontramos a página pública para o endereço <strong>/catalogo/{slug}</strong>.
+          <h2 className="text-xl font-bold text-slate-900">Catálogo Não Encontrado</h2>
+          <p className="text-xs text-slate-500">
+            Não encontramos a página pública para o endereço <strong className="text-slate-800">/catalogo/{slug}</strong>.
           </p>
           <a
             href="/"
-            className="inline-block px-5 py-2.5 bg-[#F10F4D] text-white font-bold text-xs rounded-xl shadow"
+            className="inline-block px-5 py-2.5 bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md transition"
           >
             Voltar para o Início
           </a>
@@ -170,17 +171,19 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-12">
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-16">
       
-      {/* Top Lopes Bar */}
-      <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-lg">
+      {/* Top Lopes Header */}
+      <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <LopesLogo size="md" variant="white" showBadge badgeText="CAPTAÇÃO" />
+          <a href="/" className="flex items-center space-x-2">
+            <LopesLogo size="sm" variant="color" showBadge badgeText="CAPTAÇÃO" />
+          </a>
 
           <div className="flex items-center space-x-2">
             <button
               onClick={handleShareCatalog}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 border border-slate-700"
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1.5 border border-slate-200/80 transition"
             >
               <Share2 className="w-3.5 h-3.5 text-[#F10F4D]" />
               <span className="hidden sm:inline">Compartilhar</span>
@@ -189,7 +192,7 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
             <button
               onClick={handleDownloadFullCatalogPdf}
               disabled={isGeneratingPdf}
-              className="px-3.5 py-1.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white text-xs font-bold flex items-center space-x-1.5 shadow"
+              className="px-4 py-2 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white text-xs font-bold flex items-center space-x-1.5 shadow-md transition active:scale-95"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>{isGeneratingPdf ? 'Gerando...' : 'Baixar PDF'}</span>
@@ -198,30 +201,30 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
         </div>
       </header>
 
-      {/* Hero Captador Profile Header */}
-      <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-b border-slate-800 py-10 px-4 relative overflow-hidden">
+      {/* Hero Captador Profile Header - Clean Luxury White Design */}
+      <div className="bg-white border-b border-slate-200/80 py-10 px-4 relative overflow-hidden shadow-xs">
         
-        {/* Subtle red ambient glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-48 bg-[#F10F4D]/10 blur-3xl pointer-events-none" />
+        {/* Subtle accent background tint */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-rose-50/60 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
 
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
           
-          <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 text-center sm:text-left">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-br from-[#F10F4D] to-rose-800 flex items-center justify-center text-white shadow-2xl border-2 border-rose-500 shrink-0">
-              <Building2 className="w-10 h-10 sm:w-12 sm:h-12" />
-            </div>
+          <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 text-center sm:text-left">
+            {captador.photo_url ? (
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-slate-900 text-white flex items-center justify-center shadow-xl border-2 border-slate-100 shrink-0 relative overflow-hidden sm:mr-6 mb-4 sm:mb-0">
+                <img src={captador.photo_url} alt={captador.name} className="w-full h-full object-cover" />
+              </div>
+            ) : null}
 
             <div className="space-y-1.5">
-              <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-rose-950/80 text-rose-400 border border-rose-800/80 text-[11px] font-bold">
-                <Award className="w-3.5 h-3.5" />
-                <span>Catálogo Digital Lopes Manaus</span>
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-white">Catálogo Digital - {captador.name}</h1>
-              <p className="text-xs text-rose-400 font-bold">{captador.position}</p>
-              <p className="text-xs text-slate-400">CRECI: {captador.creci || '1234-F/AM'} • Manaus e Região Metropolitana</p>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 flex items-center justify-center sm:justify-start space-x-2.5">
+                <span>{captador.name}</span>
+              </h1>
+              <p className="text-xs text-[#F10F4D] font-bold">{captador.position}</p>
+              <p className="text-xs text-slate-500 font-medium">CRECI: {captador.creci || '540-J/AM'} • Imóveis de Alto Padrão em Manaus</p>
               
               {captador.instagram && (
-                <p className="text-xs text-slate-300 font-medium flex items-center justify-center sm:justify-start space-x-1 pt-1">
+                <p className="text-xs text-slate-600 font-semibold flex items-center justify-center sm:justify-start space-x-1 pt-1">
                   <Instagram className="w-3.5 h-3.5 text-[#F10F4D]" />
                   <span>{captador.instagram}</span>
                 </p>
@@ -229,23 +232,17 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
             </div>
           </div>
 
-          {/* Contact & QR Card */}
-          <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex items-center space-x-4 shrink-0 shadow-xl">
+          {/* Contact Card */}
+          <div className="bg-slate-50 border border-slate-200/80 p-4 rounded-2xl flex items-center space-x-4 shrink-0 shadow-sm">
             <a
               href={mainWhatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-emerald-900/40 transition transform active:scale-95"
+              className="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-2 shadow-md transition transform active:scale-95"
             >
               <MessageCircle className="w-4 h-4" />
               <span>Falar no WhatsApp</span>
             </a>
-
-            {qrDataUrl && (
-              <div className="bg-white p-1.5 rounded-xl shrink-0">
-                <img src={qrDataUrl} alt="QR Code" className="w-16 h-16" />
-              </div>
-            )}
           </div>
 
         </div>
@@ -255,16 +252,16 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
       <main className="max-w-7xl mx-auto px-4 pt-8 space-y-6">
         
         {/* Search & Filter Bar */}
-        <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-md flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
           
           <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
+            <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Buscar por código (ex: LOP-1001), título ou bairro..."
+              placeholder="Buscar por código (ex: LP-1001), título ou bairro..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-medium text-white focus:outline-none focus:border-[#F10F4D]"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#F10F4D] focus:bg-white transition"
             />
           </div>
 
@@ -272,7 +269,7 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
             <select
               value={purposeFilter}
               onChange={(e) => setPurposeFilter(e.target.value)}
-              className="px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 focus:outline-none focus:border-[#F10F4D]"
+              className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#F10F4D]"
             >
               <option value="todos">Todas Finalidades</option>
               <option value="Venda">Venda</option>
@@ -282,26 +279,23 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 focus:outline-none focus:border-[#F10F4D]"
+              className="px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#F10F4D]"
             >
               <option value="todos">Todas Categorias</option>
-              <option value="Apartamento">Apartamento</option>
-              <option value="Casa">Casa</option>
-              <option value="Sala comercial">Sala comercial</option>
-              <option value="Terreno">Terreno</option>
-              <option value="Condomínio">Condomínio</option>
-              <option value="Cobertura">Cobertura</option>
+              {PROPERTY_CATEGORIES.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
             </select>
           </div>
 
         </div>
 
         {/* Properties Grid Header */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">
-            Imóveis em Destaque ({filteredProperties.length})
+        <div className="flex items-center justify-between pt-2">
+          <h2 className="text-lg font-black text-slate-900">
+            Imóveis em Destaque <span className="text-xs font-bold text-[#F10F4D] bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">({filteredProperties.length})</span>
           </h2>
-          <span className="text-xs text-slate-400">Clique no imóvel para ver fotos e agendar visita</span>
+          <span className="text-xs text-slate-500 font-medium hidden sm:inline">Clique no imóvel para ver fotos em HD e agendar visita</span>
         </div>
 
         {/* Properties Grid */}
@@ -314,7 +308,7 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
                 captador={captador}
                 onView={() => setSelectedProperty(prop)}
                 onShareWhatsApp={() => {
-                  const msg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" no seu catálogo: ${window.location.origin}/imovel/${prop.id}`;
+                  const msg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" (Cód: ${prop.code}) no seu catálogo: ${window.location.origin}/imovel/${prop.code}`;
                   const targetWaUrl = buildWhatsAppUrl(captadorPhone, msg);
                   window.open(targetWaUrl, '_blank');
                 }}
@@ -323,10 +317,10 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
             ))}
           </div>
         ) : (
-          <div className="bg-slate-900 rounded-3xl p-12 text-center border border-slate-800 space-y-3">
-            <Building2 className="w-12 h-12 text-slate-600 mx-auto" />
-            <h3 className="text-base font-bold text-white">Nenhum imóvel encontrado</h3>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+          <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80 shadow-xs space-y-3">
+            <Building2 className="w-12 h-12 text-slate-300 mx-auto" />
+            <h3 className="text-base font-bold text-slate-900">Nenhum imóvel encontrado</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
               Tente alterar os termos de busca ou selecionar outra categoria.
             </p>
           </div>
@@ -345,10 +339,10 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
       )}
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-slate-800 pt-8 pb-12 text-center text-xs text-slate-500">
-        <p className="font-bold text-slate-400">{companySettings.company_name} - Manaus / AM</p>
+      <footer className="mt-16 border-t border-slate-200/80 pt-8 pb-12 text-center text-xs text-slate-500">
+        <p className="font-extrabold text-slate-800">{companySettings.company_name} - Manaus / AM</p>
         <p className="mt-1">{companySettings.address} • {companySettings.phone}</p>
-        <p className="text-[10px] text-slate-600 mt-3">Plataforma desenvolvida para geradores de catálogos imobiliários de alto padrão.</p>
+        <p className="text-[10px] text-slate-400 mt-3">Plataforma desenvolvida para geradores de catálogos imobiliários de alto padrão.</p>
       </footer>
 
     </div>

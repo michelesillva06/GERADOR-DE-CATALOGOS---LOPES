@@ -73,23 +73,18 @@ export function getEffectiveWhatsApp(
   companySettings?: { whatsapp?: string; phone?: string } | null
 ): string {
   const capWa = captador?.whatsapp?.trim() || '';
-  const compWa = companySettings?.whatsapp?.trim() || '';
   const capPhone = captador?.phone?.trim() || '';
+  const compWa = companySettings?.whatsapp?.trim() || '';
   const compPhone = companySettings?.phone?.trim() || '';
 
-  // 1. If captador has a custom WhatsApp defined (and not a placeholder/empty), prefer it
-  if (capWa && capWa !== '' && capWa !== '5592984567890' && capWa !== '5592981234567') {
-    return capWa;
-  }
-
-  // 2. If companySettings has a custom WhatsApp, use it
-  if (compWa && compWa !== '') {
-    return compWa;
-  }
-
-  // 3. Fallback to captador WhatsApp or phone
+  // 1. If captador/user has WhatsApp saved in profile, always use it
   if (capWa) return capWa;
+
+  // 2. Fallback to captador/user phone
   if (capPhone) return capPhone;
+
+  // 3. Fallback to company settings WhatsApp or phone
+  if (compWa) return compWa;
   if (compPhone) return compPhone;
 
   return '5592981234567';

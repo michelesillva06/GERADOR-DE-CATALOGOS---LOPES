@@ -781,15 +781,87 @@ export async function renderHorizontalCoverCanvas(
   return canvas.toDataURL('image/jpeg', 0.95);
 }
 
-function loadImageElement(url: string): Promise<HTMLImageElement | null> {
+function extractPropertyImages(prop: Property): string[] {
+  const result: string[] = [];
+
+  // 1. Check main_image
+  if (prop.main_image && typeof prop.main_image === 'string' && prop.main_image.trim()) {
+    result.push(prop.main_image.trim());
+  }
+
+  // 2. Check images array
+  if (Array.isArray(prop.images) && prop.images.length > 0) {
+    for (const item of prop.images) {
+      if (typeof item === 'string' && item.trim()) {
+        if (!result.includes(item.trim())) result.push(item.trim());
+      } else if (item && typeof item === 'object' && (item as any).url) {
+        const u = (item as any).url;
+        if (typeof u === 'string' && u.trim() && !result.includes(u.trim())) result.push(u.trim());
+      }
+    }
+  }
+
+  // 3. Check photos array
+  if (Array.isArray(prop.photos) && prop.photos.length > 0) {
+    for (const item of prop.photos) {
+      if (typeof item === 'string' && item.trim()) {
+        if (!result.includes(item.trim())) result.push(item.trim());
+      } else if (item && typeof item === 'object' && item.url) {
+        const u = item.url;
+        if (typeof u === 'string' && u.trim() && !result.includes(u.trim())) result.push(u.trim());
+      }
+    }
+  }
+
+  // Fallback default high-res real estate photo if empty
+  if (result.length === 0) {
+    result.push('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80');
+  }
+
+  return result;
+}
+
+async function loadImageElement(url: string): Promise<HTMLImageElement | null> {
   if (!url) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
+
+  const loadImgFromSrc = (src: string, useCrossOrigin = true): Promise<HTMLImageElement | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      if (useCrossOrigin && !src.startsWith('data:')) {
+        img.crossOrigin = 'Anonymous';
+      }
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  };
+
+  // 1. Try standard crossOrigin loading
+  let loadedImg = await loadImgFromSrc(url, true);
+  if (loadedImg) return loadedImg;
+
+  // 2. If CORS failed, try fetching as a blob and converting to Data URL
+  try {
+    const response = await fetch(url);
+    if (response.ok) {
+      const blob = await response.blob();
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve((reader.result as string) || '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(blob);
+      });
+      if (dataUrl) {
+        loadedImg = await loadImgFromSrc(dataUrl, false);
+        if (loadedImg) return loadedImg;
+      }
+    }
+  } catch {
+    // Ignore fetch error
+  }
+
+  // 3. Fallback: try loading without crossOrigin
+  return await loadImgFromSrc(url, false);
 }
 
 function drawRoundedImage(
@@ -842,13 +914,15 @@ function drawRoundedImage(
 }
 
 /**
- * Renders a 100% pixel-perfect HORIZONTAL / LANDSCAPE property catalog page (2970px x 2100px)
- * exactly matching the layout in the user's uploaded reference image.
+ * Renders a 100% pixel-perfect A4 HORIZONTAL / LANDSCAPE property catalog page (2970px x 2100px)
+ * exactly matching the Lopes Manaus luxury real estate magazine template.
  */
 export async function renderHorizontalPropertyCanvas(
   prop: Property,
   captador: User,
-  companySettings: CompanySettings
+  companySettings: CompanySettings,
+  pageIndex: number = 0,
+  totalPages: number = 1
 ): Promise<string> {
   const canvas = document.createElement('canvas');
   canvas.width = 2970;
@@ -856,556 +930,472 @@ export async function renderHorizontalPropertyCanvas(
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
-  const LOPES_RED = '#E50938';
-  const LOPES_DARK_RED = '#B91C1C';
+  const LOPES_RED = '#F10F4D';
+  const NAVY_DARK = '#0B192C';
   const TEXT_DARK = '#0F172A';
   const TEXT_MUTED = '#475569';
+  const BG_LIGHT = '#F8FAFC';
+  const BORDER_COLOR = '#E2E8F0';
 
-  // 1. White Background
+  // 1. Fill background pure white
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Load photos asynchronously
-  const allImgs = prop.images && prop.images.length > 0 ? prop.images : [prop.main_image];
-  const mainImgUrl = prop.main_image || allImgs[0] || '';
+  const allImgs = extractPropertyImages(prop);
+  const mainImgUrl = allImgs[0] || '';
   const thumb1Url = allImgs[1] || allImgs[0] || mainImgUrl;
   const thumb2Url = allImgs[2] || allImgs[1] || mainImgUrl;
   const thumb3Url = allImgs[3] || allImgs[0] || mainImgUrl;
+  const thumb4Url = allImgs[4] || allImgs[0] || mainImgUrl;
 
-  const [mainImg, thumb1, thumb2, thumb3] = await Promise.all([
+  const [mainImg, thumb1, thumb2, thumb3, thumb4] = await Promise.all([
     loadImageElement(mainImgUrl),
     loadImageElement(thumb1Url),
     loadImageElement(thumb2Url),
-    loadImageElement(thumb3Url)
+    loadImageElement(thumb3Url),
+    loadImageElement(thumb4Url)
   ]);
 
   // =========================================================================
-  // TOP HEADER (Logo + Slogan Ribbon)
+  // HEADER ZONE
   // =========================================================================
-  // Logo Heart
+  // Top Left: Logo Lopes Manaus
   ctx.save();
-  ctx.translate(110, 85);
+  ctx.translate(90, 80);
+  // Red Heart Emblem
   ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.arc(-16, -12, 22, Math.PI * 0.7, Math.PI * 1.85);
-  ctx.arc(16, -12, 22, Math.PI * 1.15, Math.PI * 0.3);
-  ctx.lineTo(0, 32);
+  ctx.arc(75 - 40, 28 - 20, 18, 0, Math.PI * 2); // Circle head
+  ctx.fill();
+  ctx.beginPath();
+  // Heart body
+  ctx.arc(34 - 40, 30 - 20, 22, Math.PI * 0.7, Math.PI * 1.85);
+  ctx.arc(57 - 40, 14 - 20, 18, Math.PI * 1.15, Math.PI * 0.3);
+  ctx.lineTo(46 - 40, 92 - 20);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 
-  // "LOPES MANAUS" Text
+  // Logo Text
+  ctx.fillStyle = LOPES_RED;
+  ctx.font = '900 68px sans-serif';
+  ctx.fillText('Lopes', 165, 88);
+
   ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 60px sans-serif';
-  ctx.fillText('LOPES', 180, 95);
+  ctx.font = '800 30px sans-serif';
+  ctx.fillText('MANAUS', 167, 126);
 
-  ctx.fillStyle = LOPES_RED;
-  ctx.font = '800 42px sans-serif';
-  ctx.fillText('MANAUS', 182, 140);
-
-  // Header Divider Line
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(450, 55, 3, 95);
-
-  // Slogan subtext left
-  ctx.fillStyle = '#475569';
-  ctx.font = '700 22px sans-serif';
-  ctx.fillText('CONFIANÇA QUE CONECTA', 475, 90);
-  ctx.fillText('VOCÊ AO SEU NOVO IMÓVEL', 475, 122);
-
-  // Top Right Curved Red Banner Ribbon
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.moveTo(1950, 0);
-  ctx.bezierCurveTo(2200, 30, 2500, 110, 2970, 150);
-  ctx.lineTo(2970, 0);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 32px sans-serif';
+  // Top Right: Captador Contact & Brand
+  ctx.fillStyle = TEXT_DARK;
+  ctx.font = '700 28px sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText('Mais que imóveis, realizamos sonhos.', 2920, 68);
-  ctx.fillRect(2400, 85, 520, 4);
+  const captadorPhoneStr = formatPhoneDisplay(getEffectiveWhatsApp(captador, companySettings));
+  ctx.fillText(`CAPTADOR: ${captador.name.toUpperCase()}  •  TEL: ${captadorPhoneStr}  •  CRECI: ${captador.creci || '540-J/AM'}`, 2850, 92);
   ctx.textAlign = 'left';
 
-  // =========================================================================
-  // LEFT COLUMN (Main Photo, 3 Thumbnails, "Sobre o condomínio")
-  // =========================================================================
-  const leftX = 90;
-  const leftW = 1320;
+  // Red Divider Line under header
+  ctx.fillStyle = LOPES_RED;
+  ctx.fillRect(750, 118, 2100, 3.5);
 
-  // Main Image (Large)
-  drawRoundedImage(ctx, mainImg, leftX, 180, leftW, 730, 28, 'Foto Principal do Imóvel');
-
-  // Location Badge Pill on Main Image Top Left
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+  // End dot
   ctx.beginPath();
-  ctx.roundRect(leftX + 35, 215, 300, 64, 32);
+  ctx.arc(2850, 120, 5.5, 0, Math.PI * 2);
   ctx.fill();
 
-  // Map pin icon inside pill
-  ctx.fillStyle = '#FFFFFF';
+  // =========================================================================
+  // MAIN AREA (TOP SECTION)
+  // =========================================================================
+
+  // LEFT SIDE (40% width) - Main Image + Badge
+  const mainImgX = 90;
+  const mainImgY = 160;
+  const mainImgW = 1120;
+  const mainImgH = 1040;
+
+  drawRoundedImage(ctx, mainImg, mainImgX, mainImgY, mainImgW, mainImgH, 16, 'Foto Principal');
+
+  // Red Badge: "VENDA" or "LOCAÇÃO"
+  const badgeW = 220;
+  const badgeH = 72;
+  const badgeText = prop.purpose === 'Locação' ? 'LOCAÇÃO' : 'VENDA';
+
+  ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.arc(leftX + 70, 247, 10, 0, Math.PI * 2);
+  ctx.roundRect(mainImgX, mainImgY, badgeW, badgeH, [16, 0, 16, 0]);
   ctx.fill();
+
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '800 24px sans-serif';
-  ctx.fillText(`${prop.city || 'Manaus'} / ${prop.state || 'AM'}`, leftX + 95, 255);
+  ctx.font = '900 34px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(badgeText, mainImgX + (badgeW / 2), mainImgY + 48);
+  ctx.textAlign = 'left';
 
-  // 3 Thumbnails below Main Image
-  const thumbY = 935;
-  const thumbW = 420;
-  const thumbH = 260;
-  const thumbGap = 30;
+  // RIGHT SIDE (60% width) - Title, Subtitle, 6 Feature Cards
+  const rightX = 1260;
+  const rightW = 1590;
 
-  drawRoundedImage(ctx, thumb1, leftX, thumbY, thumbW, thumbH, 22, 'Foto 2');
-  drawRoundedImage(ctx, thumb2, leftX + thumbW + thumbGap, thumbY, thumbW, thumbH, 22, 'Foto 3');
-  drawRoundedImage(ctx, thumb3, leftX + (thumbW + thumbGap) * 2, thumbY, thumbW, thumbH, 22, 'Foto 4');
-
-  // "Sobre o condomínio" / "Sobre o empreendimento"
-  const condoY = 1225;
+  // Title
   ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 42px sans-serif';
-  ctx.fillText('Sobre o condomínio', leftX, condoY + 40);
+  ctx.font = '900 82px Georgia, "Times New Roman", serif';
+  
+  // Wrap Title if needed
+  const titleWords = prop.title.split(' ');
+  let titleLine1 = '';
+  let titleLine2 = '';
+  let titleY = 235;
 
+  for (let w = 0; w < titleWords.length; w++) {
+    const testLine = titleLine1 + titleWords[w] + ' ';
+    if (ctx.measureText(testLine).width > (rightW - 40) && w > 0) {
+      titleLine2 = titleWords.slice(w).join(' ');
+      break;
+    } else {
+      titleLine1 = testLine;
+    }
+  }
+
+  ctx.fillText(titleLine1.trim(), rightX, titleY);
+  if (titleLine2) {
+    titleY += 90;
+    ctx.fillText(titleLine2.trim(), rightX, titleY);
+  }
+
+  // Subtitle
+  titleY += 55;
   ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 25px sans-serif';
-  ctx.fillText('Infraestrutura completa para o seu bem-estar e o da sua família, com segurança 24 horas.', leftX, condoY + 80);
+  ctx.font = '600 36px sans-serif';
+  const subtitle = `Conforto, localização e qualidade de vida no bairro ${prop.neighborhood || 'Parque 10'} em Manaus.`;
+  
+  // Wrap subtitle into 2 lines if needed
+  const subWords = subtitle.split(' ');
+  let subLine1 = '';
+  let subLine2 = '';
+  for (let w = 0; w < subWords.length; w++) {
+    const testLine = subLine1 + subWords[w] + ' ';
+    if (ctx.measureText(testLine).width > (rightW - 40) && w > 0) {
+      subLine2 = subWords.slice(w).join(' ');
+      break;
+    } else {
+      subLine1 = testLine;
+    }
+  }
 
-  // 5 Outlined Cards with Red Line Art Icons
-  const iconY = condoY + 110;
-  const iconW = 240;
-  const iconH = 155;
-  const iconGap = 30;
+  ctx.fillText(subLine1.trim(), rightX, titleY);
+  if (subLine2) {
+    titleY += 48;
+    ctx.fillText(subLine2.trim(), rightX, titleY);
+  }
 
-  const condoAmenities = [
-    { title: 'Piscina\nadulto e infantil', icon: 'pool' },
-    { title: 'Academia\nequipada', icon: 'gym' },
-    { title: 'Playground', icon: 'play' },
-    { title: 'Espaço\ngourmet', icon: 'gourmet' },
-    { title: 'Salão\nde festas', icon: 'party' }
+  // Red Bar Accent under Subtitle
+  titleY += 30;
+  ctx.fillStyle = LOPES_RED;
+  ctx.fillRect(rightX, titleY, 140, 6);
+
+  // 6 Feature Cards Grid (2 rows x 3 columns)
+  const gridY = titleY + 50;
+  const cardW = 505;
+  const cardH = 225;
+  const gapX = 35;
+  const gapY = 30;
+
+  const priceFormatted = prop.purpose.includes('Locação') && prop.rent_price
+    ? `R$ ${prop.rent_price.toLocaleString('pt-BR')},00`
+    : `R$ ${prop.price.toLocaleString('pt-BR')},00`;
+
+  const cardsData = [
+    {
+      icon: 'house',
+      label: 'TIPO',
+      value: prop.category || 'Casa'
+    },
+    {
+      icon: 'pin',
+      label: 'LOCALIZAÇÃO',
+      value: `${prop.neighborhood || 'Parque 10'} -\nManaus/AM`
+    },
+    {
+      icon: 'grid',
+      label: 'ÁREA',
+      value: `${prop.built_area || prop.total_area || 180} m²`
+    },
+    {
+      icon: 'bed',
+      label: 'QUARTOS',
+      value: `${prop.bedrooms || 3} quartos${prop.suites ? ` (${prop.suites} suíte)` : ''}`
+    },
+    {
+      icon: 'car',
+      label: 'VAGAS',
+      value: `${prop.parking_spaces || 2} vagas`
+    },
+    {
+      icon: 'tag',
+      label: 'VALOR',
+      value: priceFormatted,
+      isPrice: true
+    }
   ];
 
-  condoAmenities.forEach((item, idx) => {
-    const cx = leftX + (idx * (iconW + iconGap));
+  cardsData.forEach((card, idx) => {
+    const col = idx % 3;
+    const row = Math.floor(idx / 3);
+
+    const cx = rightX + (col * (cardW + gapX));
+    const cy = gridY + (row * (cardH + gapY));
+
+    // Card background
     ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#FECDD3';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = BORDER_COLOR;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.roundRect(cx, iconY, iconW, iconH, 22);
+    ctx.roundRect(cx, cy, cardW, cardH, 16);
     ctx.fill();
     ctx.stroke();
 
-    // Red vector icon
-    const icx = cx + (iconW / 2);
-    const icy = iconY + 52;
+    // Red Line Art Icon on left inside card
+    const icx = cx + 50;
+    const icy = cy + (cardH / 2);
 
     ctx.strokeStyle = LOPES_RED;
     ctx.fillStyle = LOPES_RED;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 3.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    if (item.icon === 'pool') {
+    if (card.icon === 'house') {
       ctx.beginPath();
-      ctx.arc(icx - 15, icy - 15, 12, 0, Math.PI * 2);
+      ctx.moveTo(icx - 22, icy + 5);
+      ctx.lineTo(icx, icy - 18);
+      ctx.lineTo(icx + 22, icy + 5);
+      ctx.stroke();
+      ctx.strokeRect(icx - 15, icy + 5, 30, 20);
+    } else if (card.icon === 'pin') {
+      ctx.beginPath();
+      ctx.arc(icx, icy - 8, 14, 0, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(icx - 40, icy + 15);
-      ctx.bezierCurveTo(icx - 20, icy + 5, icx - 10, icy + 25, icx + 10, icy + 15);
-      ctx.bezierCurveTo(icx + 25, icy + 5, icx + 35, icy + 25, icx + 45, icy + 15);
-      ctx.stroke();
-    } else if (item.icon === 'gym') {
-      ctx.beginPath();
-      ctx.strokeRect(icx - 35, icy - 18, 12, 36);
-      ctx.strokeRect(icx + 23, icy - 18, 12, 36);
-      ctx.moveTo(icx - 23, icy);
-      ctx.lineTo(icx + 23, icy);
-      ctx.stroke();
-    } else if (item.icon === 'play') {
-      ctx.beginPath();
-      ctx.moveTo(icx - 30, icy + 20);
-      ctx.lineTo(icx, icy - 25);
-      ctx.lineTo(icx + 30, icy + 20);
+      ctx.moveTo(icx - 10, icy - 2);
+      ctx.lineTo(icx, icy + 18);
+      ctx.lineTo(icx + 10, icy - 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(icx - 15, icy + 20);
-      ctx.lineTo(icx - 15, icy);
-      ctx.lineTo(icx + 15, icy + 20);
-      ctx.stroke();
-    } else if (item.icon === 'gourmet') {
+      ctx.arc(icx, icy - 8, 5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (card.icon === 'grid') {
+      ctx.strokeRect(icx - 18, icy - 18, 36, 36);
       ctx.beginPath();
-      ctx.arc(icx, icy - 5, 20, 0, Math.PI * 2);
+      ctx.moveTo(icx - 18, icy);
+      ctx.lineTo(icx + 18, icy);
+      ctx.moveTo(icx, icy - 18);
+      ctx.lineTo(icx, icy + 18);
       ctx.stroke();
+    } else if (card.icon === 'bed') {
       ctx.beginPath();
-      ctx.moveTo(icx - 18, icy + 15);
-      ctx.lineTo(icx + 18, icy + 15);
+      ctx.strokeRect(icx - 22, icy - 14, 44, 28);
+      ctx.strokeRect(icx - 18, icy - 10, 16, 12);
+      ctx.strokeRect(icx + 2, icy - 10, 16, 12);
+      ctx.moveTo(icx - 22, icy + 2);
+      ctx.lineTo(icx + 22, icy + 2);
+      ctx.stroke();
+    } else if (card.icon === 'car') {
+      ctx.beginPath();
+      ctx.moveTo(icx - 22, icy + 5);
+      ctx.lineTo(icx - 16, icy - 12);
+      ctx.lineTo(icx + 16, icy - 12);
+      ctx.lineTo(icx + 22, icy + 5);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.strokeRect(icx - 24, icy + 5, 48, 12);
+      ctx.beginPath();
+      ctx.arc(icx - 14, icy + 17, 5, 0, Math.PI * 2);
+      ctx.arc(icx + 14, icy + 17, 5, 0, Math.PI * 2);
       ctx.stroke();
     } else {
+      // Tag / Sack / Dollar
       ctx.beginPath();
-      ctx.moveTo(icx - 20, icy - 20);
-      ctx.lineTo(icx, icy + 5);
-      ctx.lineTo(icx - 20, icy + 5);
-      ctx.closePath();
+      ctx.arc(icx, icy, 18, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(icx + 20, icy - 20);
-      ctx.lineTo(icx, icy + 5);
-      ctx.lineTo(icx + 20, icy + 5);
-      ctx.closePath();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(icx, icy + 5);
-      ctx.lineTo(icx, icy + 25);
-      ctx.stroke();
+      ctx.font = '900 22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('$', icx, icy + 8);
+      ctx.textAlign = 'left';
     }
 
-    // Title multiline
-    ctx.fillStyle = TEXT_DARK;
-    ctx.font = '700 21px sans-serif';
-    ctx.textAlign = 'center';
-    const lines = item.title.split('\n');
-    if (lines.length === 1) {
-      ctx.fillText(lines[0], icx, iconY + 118);
+    // Card Label
+    ctx.fillStyle = '#64748B';
+    ctx.font = '800 22px sans-serif';
+    ctx.fillText(card.label, cx + 90, cy + 52);
+
+    // Card Value
+    if (card.isPrice) {
+      ctx.fillStyle = LOPES_RED;
+      ctx.font = '900 40px sans-serif';
+      ctx.fillText(card.value, cx + 90, cy + 115);
     } else {
-      ctx.fillText(lines[0], icx, iconY + 105);
-      ctx.fillText(lines[1], icx, iconY + 130);
+      ctx.fillStyle = TEXT_DARK;
+      ctx.font = '800 30px sans-serif';
+      const lines = card.value.split('\n');
+      if (lines.length === 1) {
+        ctx.fillText(lines[0], cx + 90, cy + 110);
+      } else {
+        ctx.fillText(lines[0], cx + 90, cy + 98);
+        ctx.font = '600 26px sans-serif';
+        ctx.fillText(lines[1], cx + 90, cy + 132);
+      }
     }
+  });
+
+  // =========================================================================
+  // LOWER GALLERY & DESCRIPTION ROW
+  // =========================================================================
+  const lowerY = 1240;
+
+  // Gallery (4 photos on bottom left)
+  const galX = 90;
+  const photoW = 395;
+  const photoH = 410;
+  const photoGap = 30;
+
+  const galleryThumbs = [
+    { img: thumb1, label: 'Sala de Estar' },
+    { img: thumb2, label: 'Cozinha' },
+    { img: thumb3, label: 'Suíte Master' },
+    { img: thumb4, label: 'Área Externa' }
+  ];
+
+  galleryThumbs.forEach((item, i) => {
+    const px = galX + (i * (photoW + photoGap));
+    drawRoundedImage(ctx, item.img, px, lowerY, photoW, photoH, 16, item.label);
+
+    // Caption underneath photo
+    ctx.fillStyle = '#334155';
+    ctx.font = '700 26px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(item.label, px + (photoW / 2), lowerY + photoH + 42);
     ctx.textAlign = 'left';
   });
 
-  // =========================================================================
-  // RIGHT COLUMN (Category, Title, Price Badge, Specs, Destaques, Localização)
-  // =========================================================================
-  const rightX = 1470;
-  const rightW = 1410;
+  // Description Box ("SOBRE O IMÓVEL") on bottom right
+  const descX = 1835;
+  const descW = 1015;
+  const descH = 410;
 
-  // Category (e.g., "Apartamento")
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 64px sans-serif';
-  ctx.fillText(prop.category || 'Apartamento', rightX, 235);
-
-  // Condo / Property Title (e.g., "Condomínio Reserva das Águas")
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '800 44px sans-serif';
-  const titleText = prop.title.startsWith(prop.category) ? prop.title.replace(prop.category, '').trim() : prop.title;
-  const splitTitle = ctx.measureText(titleText).width > 1350 ? titleText.substring(0, 45) + '...' : titleText;
-  ctx.fillText(splitTitle, rightX, 295);
-
-  // Tagline
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 27px sans-serif';
-  ctx.fillText('Conforto, lazer e praticidade em um só lugar. O imóvel ideal para você e sua família!', rightX, 345);
-
-  // Red Underline Accent
-  ctx.fillStyle = LOPES_RED;
-  ctx.fillRect(rightX, 375, 240, 8);
-
-  // Price Section
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 30px sans-serif';
-  const priceLabel = prop.purpose.includes('Locação') ? 'Valor de locação' : 'Valor de venda';
-  ctx.fillText(priceLabel, rightX, 435);
-
-  // Red Price Badge Box
-  const priceFormatted = prop.purpose.includes('Locação') && prop.rent_price
-    ? `R$ ${prop.rent_price.toLocaleString('pt-BR')},00 /mês`
-    : `R$ ${prop.price.toLocaleString('pt-BR')},00`;
-
-  ctx.fillStyle = LOPES_RED;
+  // Box Background
+  ctx.fillStyle = BG_LIGHT;
+  ctx.strokeStyle = BORDER_COLOR;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(rightX, 460, 820, 110, 24);
-  ctx.fill();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 62px sans-serif';
-  ctx.fillText(priceFormatted, rightX + 45, 538);
-
-  // Specs Card Container
-  const specY = 600;
-  const specH = 200;
-  ctx.fillStyle = '#F8FAFC';
-  ctx.strokeStyle = '#E2E8F0';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(rightX, specY, rightW, specH, 26);
+  ctx.roundRect(descX, lowerY, descW, descH, 16);
   ctx.fill();
   ctx.stroke();
 
-  // Specs Vertical Dividers
-  ctx.strokeStyle = '#CBD5E1';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(rightX + 470, specY + 25);
-  ctx.lineTo(rightX + 470, specY + specH - 25);
-  ctx.moveTo(rightX + 940, specY + 25);
-  ctx.lineTo(rightX + 940, specY + specH - 25);
-  ctx.stroke();
-
-  // Col 1: Dormitórios
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 56px sans-serif';
-  ctx.fillText(`${prop.bedrooms || 3}`, rightX + 60, specY + 105);
-
-  ctx.font = '700 26px sans-serif';
-  ctx.fillText('Dormitórios', rightX + 125, specY + 85);
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 24px sans-serif';
-  ctx.fillText(`(${prop.suites || 1} suíte)`, rightX + 125, specY + 120);
-
-  // Col 2: Vagas
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 56px sans-serif';
-  ctx.fillText(`${prop.parking_spaces || 2}`, rightX + 530, specY + 105);
-
-  ctx.font = '700 26px sans-serif';
-  ctx.fillText('Vagas', rightX + 595, specY + 85);
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 24px sans-serif';
-  ctx.fillText('de garagem', rightX + 595, specY + 120);
-
-  // Col 3: Área Privativa
-  const areaVal = prop.built_area || prop.total_area || 78;
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 56px sans-serif';
-  ctx.fillText(`${areaVal} m²`, rightX + 1000, specY + 105);
-
-  ctx.font = '700 26px sans-serif';
-  ctx.fillText('Área privativa', rightX + 1000 + (ctx.measureText(`${areaVal} m²`).width > 160 ? 190 : 180), specY + 105);
-
-  // "Destaques do imóvel" Card
-  const destY = 830;
-  const destH = 340;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = '#E2E8F0';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(rightX, destY, rightW, destH, 26);
-  ctx.fill();
-  ctx.stroke();
-
-  // Star Icon
+  // Red Left Border Accent
   ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.arc(rightX + 60, destY + 55, 22, 0, Math.PI * 2);
+  ctx.roundRect(descX, lowerY, 8, descH, [16, 0, 0, 16]);
   ctx.fill();
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('★', rightX + 60, destY + 63);
-  ctx.textAlign = 'left';
+  // Header inside Box: House icon + "SOBRE O IMÓVEL"
+  const descHeaderX = descX + 45;
+  const descHeaderY = lowerY + 60;
 
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 38px sans-serif';
-  ctx.fillText('Destaques do imóvel', rightX + 100, destY + 68);
-
-  // 4 Checkmark Items
-  const defaultHighlights = [
-    'Ambientes bem iluminados e ventilados',
-    'Acabamento moderno e de qualidade',
-    'Varanda com vista privilegiada',
-    'Pronto para morar'
-  ];
-
-  const highlightsToUse = prop.features && prop.features.length >= 4
-    ? prop.features.slice(0, 4)
-    : [...(prop.features || []), ...defaultHighlights].slice(0, 4);
-
-  highlightsToUse.forEach((hl, i) => {
-    const itemY = destY + 130 + (i * 52);
-
-    // Red Checkmark Circle
-    ctx.fillStyle = LOPES_RED;
-    ctx.beginPath();
-    ctx.arc(rightX + 60, itemY - 8, 14, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(rightX + 53, itemY - 8);
-    ctx.lineTo(rightX + 58, itemY - 3);
-    ctx.lineTo(rightX + 67, itemY - 12);
-    ctx.stroke();
-
-    ctx.fillStyle = TEXT_DARK;
-    ctx.font = '700 27px sans-serif';
-    ctx.fillText(hl, rightX + 90, itemY);
-  });
-
-  // "Localização privilegiada" Card
-  const locY = 1200;
-  const locH = 260;
-  ctx.fillStyle = '#FFF1F2';
-  ctx.strokeStyle = '#FFE4E6';
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = LOPES_RED;
+  ctx.lineWidth = 3.5;
   ctx.beginPath();
-  ctx.roundRect(rightX, locY, rightW, locH, 26);
-  ctx.fill();
+  ctx.moveTo(descHeaderX, descHeaderY - 5);
+  ctx.lineTo(descHeaderX + 16, descHeaderY - 22);
+  ctx.lineTo(descHeaderX + 32, descHeaderY - 5);
   ctx.stroke();
-
-  // Map Pin Icon
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.arc(rightX + 60, locY + 55, 22, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('📍', rightX + 60, locY + 63);
-  ctx.textAlign = 'left';
+  ctx.strokeRect(descHeaderX + 5, descHeaderY - 5, 22, 18);
 
   ctx.fillStyle = TEXT_DARK;
   ctx.font = '900 36px sans-serif';
-  ctx.fillText('Localização privilegiada', rightX + 100, locY + 68);
+  ctx.fillText('SOBRE O IMÓVEL', descHeaderX + 48, descHeaderY + 8);
 
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 25px sans-serif';
-  const locText = `Em uma das regiões mais valorizadas de ${prop.city || 'Manaus'}, no bairro ${prop.neighborhood}, com fácil acesso a shoppings, escolas, supermercados, farmácias e principais vias da cidade.`;
-
-  // Multiline location paragraph
-  const words = locText.split(' ');
+  // Description Paragraph Text
+  const defaultDesc = `Imóvel de alto padrão com excelente projeto arquitetônico e acabamento impecável. Projetado para oferecer conforto, segurança e funcionalidade para toda a família. Ambientes amplos e integrados, excelente iluminação natural e localização privilegiada no bairro ${prop.neighborhood || 'Parque 10'}, próximo a escolas, supermercados, serviços e vias principais de Manaus.`;
+  
+  const rawDesc = prop.description && prop.description.trim().length > 30 ? prop.description : defaultDesc;
+  
+  ctx.fillStyle = '#334155';
+  ctx.font = '600 30px sans-serif';
+  
+  const descWords = rawDesc.split(' ');
   let line = '';
-  let lineY = locY + 125;
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + ' ';
-    if (ctx.measureText(testLine).width > 1280 && n > 0) {
-      ctx.fillText(line, rightX + 45, lineY);
-      line = words[n] + ' ';
-      lineY += 40;
+  let lineY = descHeaderY + 68;
+  let lineCount = 0;
+
+  for (let n = 0; n < descWords.length; n++) {
+    const testLine = line + descWords[n] + ' ';
+    if (ctx.measureText(testLine).width > (descW - 90) && n > 0) {
+      ctx.fillText(line.trim(), descHeaderX, lineY);
+      line = descWords[n] + ' ';
+      lineY += 46;
+      lineCount++;
+      if (lineCount >= 7) {
+        ctx.fillText(line.trim() + '...', descHeaderX, lineY);
+        break;
+      }
     } else {
       line = testLine;
     }
   }
-  ctx.fillText(line, rightX + 45, lineY);
+  if (lineCount < 7 && line.trim()) {
+    ctx.fillText(line.trim(), descHeaderX, lineY);
+  }
 
   // =========================================================================
-  // BOTTOM BANNER & FOOTER (Red CTA shape + Lopes Manaus Logo + Contacts bar)
+  // FOOTER ZONE (Dark Navy Bar across bottom)
   // =========================================================================
-  const footerTopY = 1510;
+  const footerY = 1910;
+  const footerH = 190;
 
-  // Red CTA Curved Box (Bottom Left)
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.moveTo(0, footerTopY + 40);
-  ctx.lineTo(1350, footerTopY + 40);
-  ctx.bezierCurveTo(1550, footerTopY + 40, 1650, footerTopY + 240, 1420, footerTopY + 280);
-  ctx.lineTo(0, footerTopY + 280);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillStyle = NAVY_DARK;
+  ctx.fillRect(0, footerY, canvas.width, footerH);
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 52px sans-serif';
-  ctx.fillText('Agende uma visita', 90, footerTopY + 115);
-
-  ctx.font = '500 27px sans-serif';
-  ctx.fillText('Conheça de perto o seu próximo imóvel', 90, footerTopY + 165);
-  ctx.fillText('e viva essa nova conquista.', 90, footerTopY + 202);
-
-  // Center Right Lopes Logo
+  // Footer Logo Left
   ctx.save();
-  ctx.translate(1760, footerTopY + 105);
+  ctx.translate(90, footerY + 50);
   ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.arc(-16, -12, 22, Math.PI * 0.7, Math.PI * 1.85);
-  ctx.arc(16, -12, 22, Math.PI * 1.15, Math.PI * 0.3);
-  ctx.lineTo(0, 32);
+  ctx.arc(75 - 40, 28 - 20, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(34 - 40, 30 - 20, 18, Math.PI * 0.7, Math.PI * 1.85);
+  ctx.arc(57 - 40, 14 - 20, 15, Math.PI * 1.15, Math.PI * 0.3);
+  ctx.lineTo(46 - 40, 92 - 20);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 64px sans-serif';
-  ctx.fillText('LOPES', 1830, footerTopY + 115);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 48px sans-serif';
+  ctx.fillText('Lopes', 155, footerY + 95);
 
   ctx.fillStyle = LOPES_RED;
-  ctx.font = '800 44px sans-serif';
-  ctx.fillText('MANAUS', 1832, footerTopY + 162);
-
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(2120, footerTopY + 70, 4, 110);
-
-  ctx.fillStyle = '#475569';
   ctx.font = '800 24px sans-serif';
-  ctx.fillText('A IMOBILIÁRIA', 2150, footerTopY + 100);
-  ctx.fillText('QUE É REFERÊNCIA', 2150, footerTopY + 132);
-  ctx.fillText('EM TODO O BRASIL', 2150, footerTopY + 164);
+  ctx.fillText('MANAUS', 157, footerY + 128);
 
-  // Bottom 3 Contact Pills Bar
-  const contactY = 1810;
+  // Footer Center Slogan Text
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, contactY, canvas.width, 290);
-
-  ctx.fillStyle = '#E2E8F0';
-  ctx.fillRect(0, contactY, canvas.width, 3);
-
-  const effectivePhone = captador.whatsapp || companySettings.whatsapp || '(92) 3182-5500';
-  const displayPhone = effectivePhone.startsWith('55') ? effectivePhone.substring(2) : effectivePhone;
-  const formattedPhone = displayPhone.length >= 10 ? `(${displayPhone.substring(0,2)}) ${displayPhone.substring(2,7)}-${displayPhone.substring(7)}` : displayPhone;
-
-  // Contact 1: WhatsApp
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.arc(200, contactY + 130, 42, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 36px sans-serif';
+  ctx.font = '800 24px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('📞', 200, contactY + 142);
 
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 36px sans-serif';
+  const footerSlogan = 'LOPES MANAUS   •   ATENDIMENTO PERSONALIZADO   •   SEGURANÇA   •   EXPERIÊNCIA IMOBILIÁRIA';
+  ctx.fillText(footerSlogan, 1580, footerY + 105);
   ctx.textAlign = 'left';
-  ctx.fillText(formattedPhone || '(92) 3182-5500', 260, contactY + 125);
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 25px sans-serif';
-  ctx.fillText('Telefone / WhatsApp', 260, contactY + 160);
 
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(940, contactY + 60, 3, 150);
+  // Footer Right Divider & Page Number
+  ctx.fillStyle = '#334155';
+  ctx.fillRect(2720, footerY + 35, 2, 120);
 
-  // Contact 2: Website
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.arc(1040, contactY + 130, 42, 0, Math.PI * 2);
-  ctx.fill();
+  const pageNumStr = (pageIndex + 2).toString().padStart(2, '0');
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 36px sans-serif';
+  ctx.font = '900 44px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('🌐', 1040, contactY + 142);
-
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 36px sans-serif';
+  ctx.fillText(pageNumStr, 2810, footerY + 110);
   ctx.textAlign = 'left';
-  ctx.fillText('www.lopesmanaus.com.br', 1100, contactY + 125);
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 25px sans-serif';
-  ctx.fillText('Acesse nosso site', 1100, contactY + 160);
-
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(1950, contactY + 60, 3, 150);
-
-  // Contact 3: Instagram
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.arc(2050, contactY + 130, 42, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 36px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('📷', 2050, contactY + 142);
-
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 36px sans-serif';
-  ctx.textAlign = 'left';
-  const instaHandle = captador.instagram || companySettings.instagram || '@lopesmanaus';
-  ctx.fillText(instaHandle.startsWith('@') ? instaHandle : `@${instaHandle}`, 2110, contactY + 125);
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 25px sans-serif';
-  ctx.fillText('Siga nossas redes sociais', 2110, contactY + 160);
 
   return canvas.toDataURL('image/jpeg', 0.95);
 }
@@ -1420,15 +1410,16 @@ export async function generateCatalogPDF(options: {
   coverType?: 'VENDA' | 'LOCACAO' | 'GERAL';
   orientation?: 'portrait' | 'landscape';
 }): Promise<jsPDF> {
-  const { properties, captador, companySettings, customCoverImage, orientation = 'portrait' } = options;
+  const { properties, captador, companySettings, customCoverImage } = options;
   const baseUrl = options.appUrl || window.location.origin;
   const effectivePhone = getEffectiveWhatsApp(captador, companySettings);
 
-  const isLandscape = orientation === 'landscape';
+  // All catalogs are strictly A4 Landscape (Horizontal 297mm x 210mm)
+  const isLandscape = true;
 
-  // Create PDF Document with chosen orientation
+  // Create PDF Document in Landscape A4 mode
   const doc = new jsPDF({
-    orientation: isLandscape ? 'landscape' : 'portrait',
+    orientation: 'landscape',
     unit: 'mm',
     format: 'a4'
   });
@@ -1447,17 +1438,17 @@ export async function generateCatalogPDF(options: {
   }
 
   // ==========================================
-  // PÁGINA 1: CAPA OFICIAL DO CATÁLOGO
+  // PÁGINA 1: CAPA OFICIAL DO CATÁLOGO (Horizontal)
   // ==========================================
   let selectedCoverUrl = customCoverImage;
 
   if (!selectedCoverUrl) {
     if (coverType === 'LOCACAO') {
-      selectedCoverUrl = companySettings?.cover_locacao_url || companySettings?.cover_geral_url;
+      selectedCoverUrl = companySettings?.cover_locacao_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
     } else if (coverType === 'VENDA') {
-      selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_geral_url;
+      selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
     } else {
-      selectedCoverUrl = companySettings?.cover_geral_url || companySettings?.cover_venda_url || companySettings?.cover_locacao_url;
+      selectedCoverUrl = companySettings?.cover_geral_url || companySettings?.cover_horizontal_url || companySettings?.cover_venda_url || companySettings?.cover_locacao_url;
     }
   }
 
@@ -1467,36 +1458,21 @@ export async function generateCatalogPDF(options: {
   }
 
   if (!coverDataUrl) {
-    if (isLandscape) {
-      coverDataUrl = await renderHorizontalCoverCanvas(coverType, companySettings);
-    } else {
-      coverDataUrl = await renderCoverCanvas(coverType, companySettings);
-    }
+    coverDataUrl = await renderHorizontalCoverCanvas(coverType, companySettings);
   }
 
   if (coverDataUrl) {
     try {
-      if (isLandscape) {
-        doc.addImage(coverDataUrl, 'JPEG', 0, 0, 297, 210);
-      } else {
-        doc.addImage(coverDataUrl, 'JPEG', 0, 0, 210, 297);
-      }
+      doc.addImage(coverDataUrl, 'JPEG', 0, 0, 297, 210);
     } catch (err) {
       console.warn('Error applying cover image to PDF:', err);
-      const defaultCanvas = isLandscape
-        ? await renderHorizontalCoverCanvas(coverType, companySettings)
-        : await renderCoverCanvas(coverType, companySettings);
-      
-      if (isLandscape) {
-        doc.addImage(defaultCanvas, 'JPEG', 0, 0, 297, 210);
-      } else {
-        doc.addImage(defaultCanvas, 'JPEG', 0, 0, 210, 297);
-      }
+      const defaultCanvas = await renderHorizontalCoverCanvas(coverType, companySettings);
+      doc.addImage(defaultCanvas, 'JPEG', 0, 0, 297, 210);
     }
   }
 
   // ==========================================
-  // PÁGINA 2 EM DIANTE: FICHAS DOS IMÓVEIS (1 imóvel por página)
+  // PÁGINA 2 EM DIANTE: FICHAS DOS IMÓVEIS (1 imóvel por página A4 Horizontal)
   // ==========================================
   const totalPages = properties.length + 1;
 
@@ -1504,187 +1480,18 @@ export async function generateCatalogPDF(options: {
     const prop = properties[i];
     doc.addPage();
 
-    if (isLandscape) {
-      // LANDSCAPE MODE: Use pixel-perfect Horizontal Property Canvas matching user image design
-      const horizontalCanvasDataUrl = await renderHorizontalPropertyCanvas(prop, captador, companySettings);
-      doc.addImage(horizontalCanvasDataUrl, 'JPEG', 0, 0, 297, 210);
-    } else {
-      // PORTRAIT MODE: Standard vertical page
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, 210, 12, 'F');
-      doc.setFillColor(229, 9, 56);
-      doc.rect(0, 11.5, 210, 0.5, 'F');
+    // Use pixel-perfect Horizontal Property Canvas matching luxury magazine layout
+    const horizontalCanvasDataUrl = await renderHorizontalPropertyCanvas(prop, captador, companySettings, i, totalPages);
+    doc.addImage(horizontalCanvasDataUrl, 'JPEG', 0, 0, 297, 210);
 
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`LOPES MANAUS • ${companySettings.company_name || 'Lopes Manaus'}`, 15, 8);
+    // Active interactive PDF link overlay for WhatsApp
+    const propertyPublicUrl = `${baseUrl}/imovel/${prop.code}`;
+    const waMsg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" (Cód: ${prop.code}) no seu catálogo Lopes e gostaria de mais informações.`;
+    const whatsappDirectUrl = buildWhatsAppUrl(effectivePhone, waMsg);
 
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(226, 232, 240);
-      doc.text(`PÁGINA ${i + 2} DE ${totalPages}`, 195, 8, { align: 'right' });
-
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(15);
-      doc.setFont('helvetica', 'bold');
-      const titleLines = doc.splitTextToSize(prop.title, 180);
-      doc.text(titleLines[0], 15, 21);
-
-      doc.setFontSize(9.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(229, 9, 56);
-      doc.text(`${prop.category} em ${prop.purpose} • Bairro: ${prop.neighborhood}, ${prop.city}-${prop.state} • Cód: ${prop.code}`, 15, 27);
-
-      let currentY = 31;
-      const mainImgBase64 = prop.main_image ? await urlToBase64(prop.main_image) : '';
-      if (mainImgBase64) {
-        try {
-          doc.addImage(mainImgBase64, 'JPEG', 15, currentY, 180, 75);
-          currentY += 79;
-        } catch {
-          // Fallback
-        }
-      }
-
-      doc.setFillColor(248, 250, 252);
-      doc.setDrawColor(226, 232, 240);
-      const boxHeight = mainImgBase64 ? 32 : 52;
-      doc.roundedRect(15, currentY, 180, boxHeight, 3, 3, 'FD');
-
-      doc.setTextColor(229, 9, 56);
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      const priceFormatted = prop.purpose.includes('Locação') && prop.rent_price
-        ? formatCurrency(prop.rent_price) + ' /mês'
-        : formatCurrency(prop.price);
-      doc.text(priceFormatted, 22, currentY + 12);
-
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      doc.text(`Condomínio: ${formatCurrency(prop.condo_fee)} | IPTU: ${formatCurrency(prop.iptu)}`, 22, currentY + 20);
-
-      if (!mainImgBase64) {
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Finalidade: ${prop.purpose} • Categoria: ${prop.category}`, 22, currentY + 28);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Localização: ${prop.address ? prop.address + ' - ' : ''}${prop.neighborhood}, ${prop.city}-${prop.state}`, 22, currentY + 35);
-        doc.text(`Status do Imóvel: ${prop.status} • Código: ${prop.code}`, 22, currentY + 42);
-      }
-
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(9.5);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Área Total: ${prop.total_area || prop.built_area || 0} m²`, 110, currentY + 10);
-      if (prop.built_area && prop.built_area !== prop.total_area) {
-        doc.text(`Área Útil: ${prop.built_area} m²`, 110, currentY + 16);
-      } else {
-        doc.text(`Dormitórios: ${prop.bedrooms} (${prop.suites} suítes)`, 110, currentY + 16);
-      }
-      doc.text(`Banheiros: ${prop.bathrooms}  |  Vagas: ${prop.parking_spaces}`, 110, currentY + 23);
-
-      currentY += boxHeight + 6;
-
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(10.5);
-      doc.setFont('helvetica', 'bold');
-      doc.text('CARACTERÍSTICAS E DESCRIÇÃO DO IMÓVEL', 15, currentY);
-      currentY += 6;
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(51, 65, 85);
-      const maxDescLines = mainImgBase64 ? 5 : 12;
-      const descLines = doc.splitTextToSize(prop.description || 'Imóvel de alto padrão com excelente infraestrutura e localização privilegiada.', 180);
-      const descText = descLines.slice(0, maxDescLines).join('\n');
-      doc.text(descText, 15, currentY);
-      currentY += (Math.min(descLines.length, maxDescLines) * 4.2) + 6;
-
-      if (prop.features && prop.features.length > 0) {
-        doc.setTextColor(15, 23, 42);
-        doc.setFontSize(9.5);
-        doc.setFont('helvetica', 'bold');
-        doc.text('DIFERENCIAIS DO IMÓVEL:', 15, currentY);
-        currentY += 5;
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(71, 85, 105);
-        const featText = prop.features.join(' • ');
-        const featLines = doc.splitTextToSize(featText, 180);
-        const maxFeatLines = mainImgBase64 ? 3 : 6;
-        doc.text(featLines.slice(0, maxFeatLines), 15, currentY);
-      }
-
-      const propertyPublicUrl = `${baseUrl}/imovel/${prop.code}`;
-      const waMsg = `Olá ${captador.name}! Gostaria de mais informações e agendar uma visita para o imóvel "${prop.title}" (Cód: ${prop.code}).`;
-      const whatsappDirectUrl = buildWhatsAppUrl(effectivePhone, waMsg);
-
-      doc.setFillColor(15, 23, 42);
-      doc.roundedRect(15, 242, 180, 48, 4, 4, 'F');
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`GOSTOU DESTE IMÓVEL? FALE COM ${captador.name.toUpperCase()}`, 22, 252);
-
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(203, 213, 225);
-      doc.text(`WhatsApp: ${formatPhoneDisplay(effectivePhone)}`, 22, 258);
-
-      const btn1X = 22;
-      const btn1Y = 264;
-      const btn1W = 60;
-      const btn1H = 18;
-
-      doc.setFillColor(255, 255, 255);
-      doc.roundedRect(btn1X, btn1Y, btn1W, btn1H, 3, 3, 'F');
-
-      doc.setTextColor(15, 23, 42);
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Ver detalhes completos', btn1X + (btn1W / 2), btn1Y + 10, { align: 'center' });
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      doc.text('Catálogo Digital do Captador', btn1X + (btn1W / 2), btn1Y + 14, { align: 'center' });
-
-      doc.link(btn1X, btn1Y, btn1W, btn1H, { url: propertyPublicUrl });
-
-      const btn2X = 86;
-      const btn2Y = 264;
-      const btn2W = 58;
-      const btn2H = 18;
-
-      doc.setFillColor(229, 9, 56);
-      doc.roundedRect(btn2X, btn2Y, btn2W, btn2H, 3, 3, 'F');
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(8.5);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Solicitar Visita via WhatsApp', btn2X + (btn2W / 2), btn2Y + 10, { align: 'center' });
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(254, 242, 242);
-      doc.text('Falar direto com Captador', btn2X + (btn2W / 2), btn2Y + 14, { align: 'center' });
-
-      doc.link(btn2X, btn2Y, btn2W, btn2H, { url: whatsappDirectUrl });
-
-      const propertyQrCode = await generateQRCodeDataUrl(propertyPublicUrl, '#E50938');
-      if (propertyQrCode) {
-        try {
-          doc.setFillColor(255, 255, 255);
-          doc.rect(148, 246, 40, 40, 'F');
-          doc.addImage(propertyQrCode, 'PNG', 150, 248, 36, 36);
-        } catch {
-          // ignore
-        }
-      }
-    }
+    // Clickable link on the footer logo area for website/WhatsApp
+    doc.link(10, 190, 80, 20, { url: whatsappDirectUrl });
+    doc.link(120, 190, 160, 20, { url: propertyPublicUrl });
   }
 
   return doc;

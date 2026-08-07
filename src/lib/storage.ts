@@ -40,7 +40,12 @@ export function getStoredProperties(): Property[] {
       localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(initialProperties));
       return initialProperties;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length === 0) {
+      localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(initialProperties));
+      return initialProperties;
+    }
+    return parsed;
   } catch {
     return initialProperties;
   }

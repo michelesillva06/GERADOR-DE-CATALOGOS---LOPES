@@ -1,6 +1,7 @@
 import React from 'react';
 import { Property, User } from '../types';
-import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2, MessageCircleCode } from 'lucide-react';
+import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2 } from 'lucide-react';
+import { getPropertyMainImage, handleImageError } from '../lib/imageUtils';
 
 interface PropertyCardProps {
   property: Property;
@@ -30,7 +31,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
     'Disponível': 'bg-emerald-600 text-white font-black shadow-md border-emerald-700',
     'Reservado': 'bg-amber-500 text-slate-950 font-black shadow-md border-amber-600',
     'Vendido': 'bg-rose-600 text-white font-black shadow-md border-rose-700',
-    'Alugado': 'bg-sky-600 text-white font-black shadow-md border-sky-700'
+    'Alugado': 'bg-zinc-800 text-white font-black shadow-md border-zinc-900'
   };
 
   const defaultImage = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80';
@@ -41,8 +42,9 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
       {/* Property Image Container */}
       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden cursor-pointer" onClick={() => onView(property)}>
         <img
-          src={property.main_image || property.images[0] || defaultImage}
+          src={getPropertyMainImage(property)}
           alt={property.title}
+          onError={handleImageError}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
         />
@@ -164,7 +166,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
             {canEdit && onEdit && (
               <button
                 onClick={() => onEdit(property)}
-                className="p-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-600 transition"
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 transition"
                 title="Editar Imóvel"
               >
                 <Edit3 className="w-4 h-4" />

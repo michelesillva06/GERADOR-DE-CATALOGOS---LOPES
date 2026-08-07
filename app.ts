@@ -1,15 +1,85 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
 import { initialUsers, initialProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData.ts';
 import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
 
-// In-Memory Database (In production, connects to PostgreSQL database)
-let users: User[] = [...initialUsers];
-let properties: Property[] = [...initialProperties];
-let companySettings: CompanySettings = { ...initialCompanySettings };
+// Persistent storage file path for company settings, users, and properties
+const SETTINGS_FILE_PATH = path.join(process.cwd(), 'company_settings_store.json');
+const USERS_FILE_PATH = path.join(process.cwd(), 'users_store.json');
+const PROPERTIES_FILE_PATH = path.join(process.cwd(), 'properties_store.json');
+
+function loadPersistedSettings(): CompanySettings {
+  try {
+    if (fs.existsSync(SETTINGS_FILE_PATH)) {
+      const content = fs.readFileSync(SETTINGS_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(content);
+      return { ...initialCompanySettings, ...parsed };
+    }
+  } catch (err) {
+    console.warn('Could not read persisted settings file:', err);
+  }
+  return { ...initialCompanySettings };
+}
+
+function savePersistedSettings(settings: CompanySettings) {
+  try {
+    fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(settings, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not save settings file:', err);
+  }
+}
+
+function loadPersistedUsers(): User[] {
+  try {
+    if (fs.existsSync(USERS_FILE_PATH)) {
+      const content = fs.readFileSync(USERS_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {
+    console.warn('Could not read persisted users file:', err);
+  }
+  return [...initialUsers];
+}
+
+function savePersistedUsers(uList: User[]) {
+  try {
+    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(uList, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not save users file:', err);
+  }
+}
+
+function loadPersistedProperties(): Property[] {
+  try {
+    if (fs.existsSync(PROPERTIES_FILE_PATH)) {
+      const content = fs.readFileSync(PROPERTIES_FILE_PATH, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (err) {
+    console.warn('Could not read persisted properties file:', err);
+  }
+  return [...initialProperties];
+}
+
+function savePersistedProperties(pList: Property[]) {
+  try {
+    fs.writeFileSync(PROPERTIES_FILE_PATH, JSON.stringify(pList, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Could not save properties file:', err);
+  }
+}
+
+// In-Memory Database initialized with persistence
+let users: User[] = loadPersistedUsers();
+let properties: Property[] = loadPersistedProperties();
+let companySettings: CompanySettings = loadPersistedSettings();
 let auditLogs: AuditLog[] = [...initialAuditLogs];
 let journalEntries: JournalEntry[] = [...initialJournalEntries] as JournalEntry[];
 let scheduleEvents: ScheduleEvent[] = [...initialScheduleEvents] as ScheduleEvent[];
@@ -173,6 +243,7 @@ app.post('/api/users', async (req, res) => {
 
   passwordHashes[newUser.id] = await bcrypt.hash(password, 10);
   users.push(newUser);
+  savePersistedUsers(users);
 
   addAuditLog('usr_admin', 'Administrador Master', 'Criação de Usuário', `Cadastrou o usuário ${newUser.name} (${newUser.username})`, req);
 
@@ -213,6 +284,7 @@ app.put('/api/users/:id', async (req, res) => {
   }
 
   users[index] = updatedUser;
+  savePersistedUsers(users);
   addAuditLog('usr_admin', 'Administrador Master', 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name}`, req);
 
   res.json({ user: updatedUser });
@@ -225,6 +297,7 @@ app.patch('/api/users/:id/block', (req, res) => {
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   user.status = user.status === 'active' ? 'blocked' : 'active';
+  savePersistedUsers(users);
   addAuditLog('usr_admin', 'Administrador Master', 'Alteração de Status', `Alterou o status do usuário ${user.name} para ${user.status}`, req);
 
   res.json({ user });
@@ -237,6 +310,7 @@ app.delete('/api/users/:id', (req, res) => {
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   users = users.filter(u => u.id !== id);
+  savePersistedUsers(users);
   delete passwordHashes[id];
 
   addAuditLog('usr_admin', 'Administrador Master', 'Exclusão de Usuário', `Excluiu o usuário ${user.name}`, req);
@@ -403,6 +477,7 @@ app.post('/api/properties', (req, res) => {
   };
 
   properties.unshift(newProperty);
+  savePersistedProperties(properties);
 
   const owner = users.find(u => u.id === newProperty.user_id);
   addAuditLog(newProperty.user_id, owner?.name || 'Captador', 'Cadastro de Imóvel', `Cadastrou o imóvel ${newProperty.code} (${newProperty.title})`, req);
@@ -428,6 +503,7 @@ app.put('/api/properties/:id', (req, res) => {
   };
 
   properties[index] = updatedProperty;
+  savePersistedProperties(properties);
 
   const owner = users.find(u => u.id === updatedProperty.user_id);
   addAuditLog(updatedProperty.user_id, owner?.name || 'Captador', 'Edição de Imóvel', `Atualizou o imóvel ${updatedProperty.code}`, req);
@@ -442,6 +518,7 @@ app.delete('/api/properties/:id', (req, res) => {
   if (!prop) return res.status(404).json({ error: 'Imóvel não encontrado.' });
 
   properties = properties.filter(p => p.id !== id);
+  savePersistedProperties(properties);
 
   addAuditLog('usr_admin', 'Sistema', 'Exclusão de Imóvel', `Excluiu o imóvel ${prop.code}`, req);
 
@@ -505,7 +582,8 @@ app.get('/api/settings', (req, res) => {
 
 app.put('/api/settings', (req, res) => {
   companySettings = { ...companySettings, ...req.body };
-  addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária', req);
+  savePersistedSettings(companySettings);
+  addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária e capas dos catálogos', req);
   res.json({ settings: companySettings });
 });
 
@@ -581,36 +659,24 @@ app.post('/api/schedule', (req, res) => {
     });
   }
 
-  // CONFLICT CHECK FOR VISITS:
-  // Cannot schedule visit on same property at same overlapping time if either is exclusive / "Ir Só"
-  if (eventData.type === 'VISITA' && eventData.property_id) {
-    const conflictingEvent = scheduleEvents.find(e => {
-      if (e.type !== 'VISITA' || e.date !== eventData.date || e.property_id !== eventData.property_id) {
-        return false;
-      }
-      // Check time overlap
-      const startA = eventData.start_time;
-      const endA = eventData.end_time || eventData.start_time;
-      const startB = e.start_time;
-      const endB = e.end_time || e.start_time;
+  // CONFLICT CHECK FOR ALL VISITS & EVENTS ON SAME DATE AND OVERLAPPING TIME:
+  const startA = eventData.start_time || '09:00';
+  const endA = eventData.end_time || startA;
 
-      const overlap = (startA < endB && endA > startB) || (startA === startB);
+  const conflictingEvent = scheduleEvents.find(e => {
+    if (e.type === 'FERIADO' || e.date !== eventData.date) return false;
 
-      if (!overlap) return false;
+    const startB = e.start_time || '09:00';
+    const endB = e.end_time || e.start_time;
 
-      // If either is exclusive (Ir Só), or same captador, it conflicts
-      if (e.exclusive_visit || eventData.exclusive_visit || e.user_id === eventData.user_id) {
-        return true;
-      }
+    const overlap = (startA < endB && endA > startB) || (startA === startB && endA === endB);
+    return overlap;
+  });
 
-      return false;
+  if (conflictingEvent) {
+    return res.status(400).json({
+      error: `Horário indisponível! O captador(a) ${conflictingEvent.user_name} já possui um agendamento ("${conflictingEvent.title}") neste dia (${eventData.date}) das ${conflictingEvent.start_time} às ${conflictingEvent.end_time}.`
     });
-
-    if (conflictingEvent) {
-      return res.status(400).json({
-        error: `Conflito de Horário! O captador(a) ${conflictingEvent.user_name} já possui uma visita agendada neste imóvel (${conflictingEvent.property_code || ''}) às ${conflictingEvent.start_time}.`
-      });
-    }
   }
 
   const newEvent: ScheduleEvent = {

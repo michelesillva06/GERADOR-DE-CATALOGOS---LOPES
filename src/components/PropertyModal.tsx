@@ -16,11 +16,13 @@ import {
   ChevronRight,
   Phone,
   Building,
-  DollarSign
+  DollarSign,
+  User as UserIcon
 } from 'lucide-react';
 import { generateQRCodeDataUrl } from '../lib/qrCode';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
+import { getPropertyImages, handleImageError } from '../lib/imageUtils';
 
 interface PropertyModalProps {
   property: Property | null;
@@ -54,7 +56,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(val);
   };
 
-  const images = property.images && property.images.length > 0 ? property.images : [property.main_image];
+  const images = getPropertyImages(property);
 
   const handleNextImage = () => {
     setActiveImageIndex((prev) => (prev + 1) % images.length);
@@ -101,7 +103,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 relative flex flex-col">
         
         {/* Close Button */}
@@ -113,36 +115,41 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
         </button>
 
         {/* Image Gallery Slideshow */}
-        <div className="relative aspect-[16/9] sm:aspect-[21/9] bg-slate-900 overflow-hidden shrink-0">
+        <div className="relative aspect-[16/9] sm:aspect-[21/9] bg-slate-950 overflow-hidden shrink-0 flex items-center justify-center">
           <img
             src={images[activeImageIndex]}
             alt={property.title}
+            onError={handleImageError}
             className="w-full h-full object-cover"
           />
 
           {images.length > 1 && (
             <>
               <button
+                type="button"
                 onClick={handlePrevImage}
-                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white transition"
+                className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white transition shadow-lg border border-white/20 backdrop-blur-md"
+                title="Foto anterior"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
               <button
+                type="button"
                 onClick={handleNextImage}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white transition"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-slate-950/70 hover:bg-slate-900 text-white transition shadow-lg border border-white/20 backdrop-blur-md"
+                title="Próxima foto"
               >
                 <ChevronRight className="w-6 h-6" />
               </button>
-              <div className="absolute bottom-3 right-3 bg-slate-900/80 text-white text-xs font-semibold px-2.5 py-1 rounded-lg backdrop-blur">
-                {activeImageIndex + 1} / {images.length}
+              <div className="absolute bottom-3 right-3 bg-slate-950/80 text-white text-xs font-bold px-3 py-1 rounded-full backdrop-blur-md border border-white/20 shadow">
+                {activeImageIndex + 1} de {images.length}
               </div>
             </>
           )}
 
           {/* Badges Overlay */}
           <div className="absolute bottom-3 left-3 flex items-center space-x-2">
-            <span className="bg-[#F10F4D] text-white text-xs font-bold px-3 py-1 rounded-lg shadow">
+            <span className="bg-[#F10F4D] text-white text-xs font-extrabold px-3 py-1 rounded-lg shadow">
               {property.purpose}
             </span>
             <span className="bg-slate-900/90 text-white text-xs font-semibold px-3 py-1 rounded-lg border border-slate-700">
@@ -154,20 +161,25 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
           </div>
         </div>
 
-        {/* Thumbnails row if multiple images */}
+        {/* Thumbnails Row below main image */}
         {images.length > 1 && (
-          <div className="flex space-x-2 p-3 bg-slate-100 overflow-x-auto border-b border-slate-200">
-            {images.map((img, idx) => (
-              <button
-                key={idx}
-                onClick={() => setActiveImageIndex(idx)}
-                className={`w-16 h-12 rounded-lg overflow-hidden shrink-0 border-2 transition ${
-                  activeImageIndex === idx ? 'border-[#F10F4D] scale-105' : 'border-transparent opacity-70 hover:opacity-100'
-                }`}
-              >
-                <img src={img} alt="Thumb" className="w-full h-full object-cover" />
-              </button>
-            ))}
+          <div className="p-3 bg-slate-900 border-b border-slate-800">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {images.map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActiveImageIndex(idx)}
+                  className={`relative w-20 h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all duration-200 ${
+                    activeImageIndex === idx
+                      ? 'border-[#F10F4D] ring-2 ring-[#F10F4D]/40 scale-105'
+                      : 'border-slate-800 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img src={img} alt={`Thumb ${idx + 1}`} onError={handleImageError} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -304,34 +316,70 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
           )}
 
           {/* Captador Contact Card & QR Code */}
-          <div className="bg-slate-900 text-white rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-            {captador && (
-              <div className="flex items-center space-x-4">
+          <div className="bg-slate-900 text-white rounded-3xl p-5 flex flex-col md:flex-row items-center justify-between gap-5 shadow-2xl border border-slate-800">
+            {captador ? (
+              <div className="flex items-center space-x-4 w-full md:w-auto">
                 {captador.photo_url ? (
                   <img
                     src={captador.photo_url}
                     alt={captador.name}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-[#F10F4D] shadow"
+                    className="w-16 h-16 rounded-full object-cover border-2 border-[#F10F4D] shadow-lg shrink-0"
                   />
                 ) : (
-                  <div className="w-14 h-14 rounded-full bg-slate-800 border-2 border-[#F10F4D] flex items-center justify-center text-white font-extrabold text-lg shadow shrink-0">
-                    {captador.name ? captador.name.charAt(0).toUpperCase() : 'C'}
+                  <div className="w-16 h-16 rounded-full bg-slate-800 border-2 border-[#F10F4D] flex items-center justify-center shrink-0">
+                    <UserIcon className="w-8 h-8 text-rose-400" />
                   </div>
                 )}
-                <div>
-                  <p className="text-xs text-slate-400 uppercase font-bold">Captador Responsável</p>
+                <div className="space-y-0.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-extrabold text-[#F10F4D] uppercase tracking-wider bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800">
+                      Captador Responsável
+                    </span>
+                    {captador.creci && (
+                      <span className="text-[10px] font-mono text-slate-400">CRECI: {captador.creci}</span>
+                    )}
+                  </div>
                   <h4 className="text-base font-extrabold text-white">{captador.name}</h4>
-                  <p className="text-xs text-rose-400 font-semibold">{captador.position}</p>
-                  <p className="text-xs text-slate-300 mt-1">{formatPhoneDisplay(effectivePhone)}</p>
+                  <p className="text-xs text-rose-300 font-semibold">{captador.position || 'Consultor Imobiliário'}</p>
+                  
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-300 pt-1 font-medium">
+                    <div className="flex items-center space-x-1 text-emerald-400 font-bold">
+                      <Phone className="w-3.5 h-3.5 shrink-0" />
+                      <span>{formatPhoneDisplay(effectivePhone)}</span>
+                    </div>
+                    {captador.instagram && (
+                      <span className="text-slate-400 text-[11px] font-mono">@{captador.instagram.replace(/^@/, '')}</span>
+                    )}
+                    {captador.email && (
+                      <span className="text-slate-400 text-[11px] truncate max-w-[180px]">{captador.email}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-full bg-rose-500/20 text-[#F10F4D] flex items-center justify-center font-bold">
+                  L
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Lopes Captação</h4>
+                  <p className="text-xs text-emerald-400 font-bold">{formatPhoneDisplay(effectivePhone)}</p>
                 </div>
               </div>
             )}
 
-            {/* QR Code */}
+            {/* QR Code & Phone Card */}
             {qrCodeUrl && (
-              <div className="flex flex-col items-center bg-white p-2 rounded-xl text-slate-900 shrink-0">
-                <img src={qrCodeUrl} alt="QR Code Imóvel" className="w-20 h-20" />
-                <span className="text-[9px] font-bold text-slate-500 mt-1">Escaneie para acessar</span>
+              <div className="flex items-center space-x-3 bg-white p-2.5 rounded-2xl text-slate-900 shrink-0 shadow-lg border border-slate-200">
+                <img src={qrCodeUrl} alt="QR Code Imóvel" className="w-16 h-16 rounded-lg object-contain" />
+                <div className="text-left space-y-0.5">
+                  <div className="flex items-center space-x-1 text-[10px] font-extrabold text-[#F10F4D] uppercase">
+                    <QrIcon className="w-3.5 h-3.5" />
+                    <span>QR Code do Imóvel</span>
+                  </div>
+                  <p className="text-[11px] font-black text-slate-900">{formatPhoneDisplay(effectivePhone)}</p>
+                  <p className="text-[9px] text-slate-500 font-medium">Acesse a ficha completa</p>
+                </div>
               </div>
             )}
           </div>

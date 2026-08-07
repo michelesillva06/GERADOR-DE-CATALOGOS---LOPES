@@ -58,7 +58,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
     start_time: '09:00',
     end_time: '10:00',
     user_id: currentUser.id,
-    property_id: '',
+    property_code: '',
     client_name: '',
     client_phone: '',
     location: '',
@@ -121,6 +121,28 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
     return h ? h.title : '';
   }, [scheduleEvents, formData.date]);
 
+  // Events on selected date (for showing occupied slots)
+  const occupiedEventsOnDate = useMemo(() => {
+    if (!formData.date) return [];
+    return scheduleEvents.filter(
+      e => e.date === formData.date && e.type !== 'FERIADO'
+    );
+  }, [scheduleEvents, formData.date]);
+
+  // Check if current formData time conflicts with any existing event on that date
+  const timeSlotConflict = useMemo(() => {
+    if (!formData.date || !formData.start_time) return null;
+    const startA = formData.start_time;
+    const endA = formData.end_time || startA;
+
+    return occupiedEventsOnDate.find(e => {
+      const startB = e.start_time;
+      const endB = e.end_time || startB;
+      const overlap = (startA < endB && endA > startB) || (startA === startB && endA === endB);
+      return overlap;
+    }) || null;
+  }, [occupiedEventsOnDate, formData.date, formData.start_time, formData.end_time]);
+
   // Open modal handler
   const handleOpenModal = () => {
     setFormError(null);
@@ -131,7 +153,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
       start_time: '09:00',
       end_time: '10:00',
       user_id: currentUser.id,
-      property_id: properties[0]?.id || '',
+      property_code: '',
       client_name: '',
       client_phone: '',
       location: '',
@@ -139,21 +161,6 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
       exclusive_visit: true
     });
     setIsModalOpen(true);
-  };
-
-  // Property Selection helper
-  const handlePropertySelect = (propId: string) => {
-    const selectedProp = properties.find(p => p.id === propId);
-    if (selectedProp) {
-      setFormData(prev => ({
-        ...prev,
-        property_id: selectedProp.id,
-        title: `Visita ao Imóvel ${selectedProp.code} - ${selectedProp.neighborhood}`,
-        location: `${selectedProp.address}, ${selectedProp.neighborhood}`
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, property_id: propId }));
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -166,12 +173,17 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
       return;
     }
 
+    // Conflict check block
+    if (timeSlotConflict) {
+      setFormError(`Horário indisponível! O captador(a) ${timeSlotConflict.user_name} já possui uma visita/compromisso agendado neste dia (${formData.date}) das ${timeSlotConflict.start_time} às ${timeSlotConflict.end_time} ("${timeSlotConflict.title}"). Por favor, escolha outro horário.`);
+      return;
+    }
+
     if (!formData.title || !formData.date || !formData.start_time) {
       setFormError('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
 
-    const selectedProp = properties.find(p => p.id === formData.property_id);
     const selectedCaptador = users.find(u => u.id === formData.user_id) || currentUser;
 
     setIsSubmitting(true);
@@ -180,7 +192,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
       ...formData,
       user_id: selectedCaptador.id,
       user_name: selectedCaptador.name,
-      property_code: selectedProp ? selectedProp.code : undefined
+      property_code: formData.property_code.trim() || undefined
     });
 
     setIsSubmitting(false);
@@ -199,7 +211,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
       case 'TREINAMENTO':
         return 'bg-amber-50 text-amber-700 border-amber-200';
       case 'EVENTO':
-        return 'bg-sky-50 text-sky-700 border-sky-200';
+        return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'FERIADO':
         return 'bg-slate-900 text-white border-slate-900';
       default:
@@ -440,7 +452,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
 
       {/* SCHEDULING MODAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 sm:p-8 space-y-6 relative my-8">
             
             <button
@@ -533,24 +545,22 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                 />
               </div>
 
-              {/* Property Selector (If Visit) */}
+              {/* Novo Imóvel (Ainda não cadastrado no sistema) */}
               {formData.type === 'VISITA' && (
                 <div className="space-y-1">
                   <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
-                    Selecione o Imóvel da Carteira
+                    Código / Identificação do Novo Imóvel (Ainda não no sistema)
                   </label>
-                  <select
-                    value={formData.property_id}
-                    onChange={(e) => handlePropertySelect(e.target.value)}
+                  <input
+                    type="text"
+                    value={formData.property_code}
+                    onChange={(e) => setFormData(prev => ({ ...prev, property_code: e.target.value }))}
+                    placeholder="Ex: NOVO-01, Captação Ed. Reserva, etc."
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                  >
-                    <option value="">Selecione um imóvel...</option>
-                    {properties.map(p => (
-                      <option key={p.id} value={p.id}>
-                        {p.code} - {p.title} ({p.neighborhood})
-                      </option>
-                    ))}
-                  </select>
+                  />
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    Obs: Os agendamentos na agenda são sempre para imóveis novos que ainda não foram cadastrados no sistema.
+                  </p>
                 </div>
               )}
 
@@ -578,7 +588,9 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                     required
                     value={formData.start_time}
                     onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                    className={`w-full px-3 py-2 border rounded-xl text-xs font-bold text-slate-900 focus:outline-none ${
+                      timeSlotConflict ? 'bg-rose-50 border-rose-500 text-rose-900 ring-2 ring-rose-500/20' : 'bg-slate-50 border-slate-200 focus:border-[#F10F4D]'
+                    }`}
                   />
                 </div>
 
@@ -591,10 +603,60 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                     required
                     value={formData.end_time}
                     onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                    className={`w-full px-3 py-2 border rounded-xl text-xs font-bold text-slate-900 focus:outline-none ${
+                      timeSlotConflict ? 'bg-rose-50 border-rose-500 text-rose-900 ring-2 ring-rose-500/20' : 'bg-slate-50 border-slate-200 focus:border-[#F10F4D]'
+                    }`}
                   />
                 </div>
               </div>
+
+              {/* Real-time Conflict Warning */}
+              {timeSlotConflict && (
+                <div className="p-3.5 bg-rose-500 text-white rounded-2xl shadow-sm space-y-1">
+                  <div className="flex items-center space-x-2 font-black text-xs uppercase">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
+                    <span>Horário Indisponível (Já Reservado)</span>
+                  </div>
+                  <p className="text-[11px] font-medium leading-relaxed opacity-95">
+                    O captador(a) <strong>{timeSlotConflict.user_name}</strong> já possui um agendamento ("{timeSlotConflict.title}") neste dia das <strong>{timeSlotConflict.start_time}</strong> às <strong>{timeSlotConflict.end_time}</strong>. Escolha outro horário para evitar choque na agenda.
+                  </p>
+                </div>
+              )}
+
+              {/* Occupied slots panel on selected date */}
+              {formData.date && (
+                <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
+                    <span>Horários de Outros Agendamentos ({new Date(formData.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
+                    <span className="text-[10px] text-slate-500 font-bold">
+                      {occupiedEventsOnDate.length > 0 ? `${occupiedEventsOnDate.length} ocupado(s)` : 'Livre'}
+                    </span>
+                  </div>
+
+                  {occupiedEventsOnDate.length > 0 ? (
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                      {occupiedEventsOnDate.map(ev => (
+                        <div key={ev.id} className="p-2 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between text-xs font-semibold">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <span className="px-2 py-0.5 bg-rose-100 text-[#F10F4D] text-[10px] font-black rounded-md shrink-0">
+                              {ev.start_time} - {ev.end_time}
+                            </span>
+                            <span className="truncate text-slate-800 font-bold">{ev.title}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-bold shrink-0 ml-2">
+                            👤 {ev.user_name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-emerald-600 font-bold flex items-center space-x-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Nenhum outro compromisso agendado para esta data. Todos os horários livres!</span>
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Exclusive Visit Checkbox / Toggle */}
               {formData.type === 'VISITA' && (
@@ -729,7 +791,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || isSelectedDateHoliday}
+                  disabled={isSubmitting || isSelectedDateHoliday || Boolean(timeSlotConflict)}
                   className="px-6 py-2.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-40 text-white font-extrabold text-xs rounded-xl shadow-md shadow-rose-950/30 transition flex items-center space-x-2 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />

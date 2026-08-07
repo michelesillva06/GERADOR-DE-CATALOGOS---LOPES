@@ -206,7 +206,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
     <div className="space-y-8">
       
       {/* 1. HEADER BANNER & EXPORT BUTTONS */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+      <div className="bg-[#333333] rounded-3xl p-6 sm:p-8 text-white border border-[#444444] shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div className="space-y-2 max-w-2xl">
           <div className="inline-flex items-center space-x-2 bg-[#F10F4D]/15 text-[#F10F4D] border border-[#F10F4D]/30 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
             <Target className="w-3.5 h-3.5" />
@@ -336,7 +336,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
               <div className="flex items-center space-x-2 text-[10px] font-extrabold">
                 <span className="text-emerald-600">{availableCount} disponíveis</span>
                 <span className="text-slate-300">•</span>
-                <span className="text-sky-600">{soldCount + rentedCount} concluídos</span>
+                <span className="text-zinc-700">{soldCount + rentedCount} concluídos</span>
               </div>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-rose-50 text-[#F10F4D] flex items-center justify-center shrink-0">
@@ -363,11 +363,11 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
             <div className="space-y-1">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Captadores Ativos</span>
               <p className="text-2xl font-black text-slate-900">{activeCaptadores.length}</p>
-              <p className="text-[10px] text-indigo-600 font-bold">
+              <p className="text-[10px] text-slate-600 font-bold">
                 Média: {(totalPropertiesCount / Math.max(activeCaptadores.length, 1)).toFixed(1)} imóveis / captador
               </p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-800 flex items-center justify-center shrink-0">
               <Users className="w-6 h-6" />
             </div>
           </div>
@@ -375,12 +375,12 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
           <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">VGV Locação Mensal</span>
-              <p className="text-xl font-black text-sky-600">
+              <p className="text-xl font-black text-zinc-900">
                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(totalVgvLocacao)}
               </p>
               <p className="text-[10px] text-slate-400 font-bold">Soma de aluguéis mensais</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-100 text-zinc-800 flex items-center justify-center shrink-0">
               <ShoppingBag className="w-6 h-6" />
             </div>
           </div>
@@ -458,7 +458,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                     </td>
                     <td className="p-3.5 text-center text-emerald-600 font-bold">{item.available}</td>
                     <td className="p-3.5 text-center text-rose-600 font-bold">{item.sold}</td>
-                    <td className="p-3.5 text-center text-sky-600 font-bold">{item.rented}</td>
+                    <td className="p-3.5 text-center text-zinc-800 font-bold">{item.rented}</td>
                     <td className="p-3.5 text-right font-extrabold text-slate-900">
                       {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(item.vgvVenda)}
                     </td>
@@ -545,7 +545,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                       </td>
                       <td className="p-3.5 text-center">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                          p.client_type === 'INQUILINO' || p.status === 'Alugado' ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'
+                          p.client_type === 'INQUILINO' || p.status === 'Alugado' ? 'bg-zinc-200 text-zinc-900' : 'bg-emerald-100 text-emerald-800'
                         }`}>
                           {p.client_type || (p.status === 'Alugado' ? 'INQUILINO' : 'COMPRADOR')}
                         </span>
@@ -553,7 +553,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                       <td className="p-3.5 text-center">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                           p.status === 'Vendido' ? 'bg-emerald-600 text-white' :
-                          p.status === 'Alugado' ? 'bg-sky-600 text-white' :
+                          p.status === 'Alugado' ? 'bg-zinc-800 text-white' :
                           p.status === 'Reservado' ? 'bg-amber-500 text-white' :
                           'bg-slate-200 text-slate-700'
                         }`}>
@@ -709,7 +709,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                           isCreation
                             ? 'bg-emerald-100 text-emerald-700'
                             : isStatusChange
-                            ? 'bg-sky-100 text-sky-700'
+                            ? 'bg-zinc-200 text-zinc-900'
                             : isDeletion
                             ? 'bg-rose-100 text-rose-700'
                             : 'bg-slate-200 text-slate-700'

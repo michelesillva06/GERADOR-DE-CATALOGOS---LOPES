@@ -18,12 +18,12 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
   const publicUrl = user ? `${window.location.origin}/catalogo/${user.url_slug || user.username}` : '#';
 
   return (
-    <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="bg-white/95 backdrop-blur-md text-slate-900 border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
+      <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         {/* Brand Logo */}
         <div className="flex items-center cursor-pointer" onClick={() => setActiveView('dashboard')}>
-          <LopesLogo size="md" variant="white" showBadge badgeText="CAPTAÇÃO" />
+          <LopesLogo size="md" variant="color" showBadge badgeText="CAPTAÇÃO" />
         </div>
 
         {/* Header Right Actions */}
@@ -35,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
               href={`/catalogo/${user.url_slug || user.username}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+              className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/80 transition"
               title="Abrir meu catálogo público em nova guia"
             >
               <ExternalLink className="w-3.5 h-3.5 text-[#F10F4D]" />
@@ -48,82 +48,82 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
             <div className="relative">
               <button
                 onClick={() => setShowUserSwitcher(!showUserSwitcher)}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center space-x-1.5"
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200/80 flex items-center space-x-1.5 transition"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span className="hidden lg:inline">Alternar Perfil</span>
                 <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
 
               {showUserSwitcher && (
-                <div className="absolute right-0 mt-2 w-72 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-2 z-50">
-                  <div className="px-3 py-1.5 border-b border-slate-700">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Demonstração de Perfis Reais</p>
+                <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200/90 rounded-2xl shadow-xl py-2 z-50">
+                  <div className="px-3.5 py-2 border-b border-slate-100">
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Demonstração de Perfis Reais</p>
                   </div>
                   <button
                     onClick={() => {
                       switchUserSimulated('usr_admin');
                       setShowUserSwitcher(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-700 flex items-center justify-between text-slate-200"
+                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
                   >
                     <div>
-                      <p className="font-semibold text-rose-400">Administrador (Master Admin)</p>
+                      <p className="font-bold text-[#F10F4D]">Administrador (Master Admin)</p>
                       <p className="text-[10px] text-slate-400">admin@lopesmanaus.com.br</p>
                     </div>
-                    {user?.role === 'MASTER_ADMIN' && <span className="w-2 h-2 rounded-full bg-emerald-400"></span>}
+                    {user?.role === 'MASTER_ADMIN' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
                   </button>
                   <button
                     onClick={() => {
                       switchUserSimulated('usr_larissa');
                       setShowUserSwitcher(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-700 flex items-center justify-between text-slate-200"
+                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
                   >
                     <div>
-                      <p className="font-semibold text-purple-400">Larissa Maia (Gestora)</p>
+                      <p className="font-bold text-purple-600">Larissa Maia (Gestora)</p>
                       <p className="text-[10px] text-slate-400">larissamaia (Gestão e Catálogos)</p>
                     </div>
-                    {user?.username === 'larissamaia' && <span className="w-2 h-2 rounded-full bg-emerald-400"></span>}
+                    {user?.username === 'larissamaia' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
                   </button>
                   <button
                     onClick={() => {
                       switchUserSimulated('usr_michele');
                       setShowUserSwitcher(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-700 flex items-center justify-between text-slate-200"
+                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
                   >
                     <div>
-                      <p className="font-semibold text-sky-400">Michele Silva (Corretora / Captadora)</p>
+                      <p className="font-bold text-[#F10F4D]">Michele Silva (Corretora / Captadora)</p>
                       <p className="text-[10px] text-slate-400">michelesilva</p>
                     </div>
-                    {user?.username === 'michelesilva' && <span className="w-2 h-2 rounded-full bg-emerald-400"></span>}
+                    {user?.username === 'michelesilva' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
                   </button>
                   <button
                     onClick={() => {
                       switchUserSimulated('usr_moacir');
                       setShowUserSwitcher(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-700 flex items-center justify-between text-slate-200"
+                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
                   >
                     <div>
-                      <p className="font-semibold text-amber-400">Moacir Martins (Consultor / Captador)</p>
+                      <p className="font-bold text-amber-600">Moacir Martins (Consultor / Captador)</p>
                       <p className="text-[10px] text-slate-400">moacirmartins</p>
                     </div>
-                    {user?.username === 'moacirmartins' && <span className="w-2 h-2 rounded-full bg-emerald-400"></span>}
+                    {user?.username === 'moacirmartins' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
                   </button>
                   <button
                     onClick={() => {
                       switchUserSimulated('usr_karine');
                       setShowUserSwitcher(false);
                     }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-700 flex items-center justify-between text-slate-200"
+                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
                   >
                     <div>
-                      <p className="font-semibold text-emerald-400">Karine Corrêa (Captadora Executiva)</p>
+                      <p className="font-bold text-emerald-600">Karine Corrêa (Captadora Executiva)</p>
                       <p className="text-[10px] text-slate-400">karinecorrea</p>
                     </div>
-                    {user?.username === 'karinecorrea' && <span className="w-2 h-2 rounded-full bg-emerald-400"></span>}
+                    {user?.username === 'karinecorrea' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
                   </button>
                 </div>
               )}
@@ -135,7 +135,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
             <div className="relative">
               <button
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center space-x-2 p-1 rounded-full hover:bg-slate-800 transition"
+                className="flex items-center space-x-2 p-1 rounded-full hover:bg-slate-100 transition"
               >
                 {user.photo_url ? (
                   <img
@@ -144,24 +144,24 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
                     className="w-9 h-9 rounded-full object-cover border-2 border-[#F10F4D]"
                   />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-slate-800 border-2 border-[#F10F4D] flex items-center justify-center text-white font-extrabold text-xs">
+                  <div className="w-9 h-9 rounded-full bg-slate-900 border-2 border-[#F10F4D] flex items-center justify-center text-white font-black text-xs shadow-xs">
                     {user.name ? user.name.charAt(0).toUpperCase() : <UserIcon className="w-4 h-4 text-slate-300" />}
                   </div>
                 )}
                 <div className="text-left hidden sm:block pr-1">
-                  <p className="text-xs font-semibold text-slate-100 leading-tight">{user.name}</p>
-                  <p className="text-[10px] font-bold text-[#F10F4D]">
+                  <p className="text-xs font-bold text-slate-900 leading-tight">{user.name}</p>
+                  <p className="text-[10px] font-extrabold text-[#F10F4D]">
                     {user.role === 'MASTER_ADMIN' ? 'Master Admin' : user.role === 'GESTORA' ? 'Gestora' : 'Captador'}
                   </p>
                 </div>
               </button>
 
               {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-2 z-50">
-                  <div className="px-4 py-2 border-b border-slate-700">
-                    <p className="text-xs font-bold text-white">{user.name}</p>
-                    <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
-                    <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800">
+                <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200/90 rounded-2xl shadow-xl py-2 z-50">
+                  <div className="px-4 py-2 border-b border-slate-100">
+                    <p className="text-xs font-extrabold text-slate-900">{user.name}</p>
+                    <p className="text-[11px] font-medium text-slate-500 truncate">{user.email}</p>
+                    <span className="inline-block mt-1 text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-rose-50 text-[#F10F4D] border border-rose-100">
                       {user.role === 'MASTER_ADMIN' ? 'Acesso Total Master' : 'Painel de Captador'}
                     </span>
                   </div>
@@ -169,7 +169,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
                   <a
                     href={`/catalogo/${user.url_slug || user.username}`}
                     target="_blank"
-                    className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-slate-700 flex items-center space-x-2"
+                    className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center space-x-2"
                   >
                     <ExternalLink className="w-4 h-4 text-[#F10F4D]" />
                     <span>Ver Minha Página Pública</span>
@@ -180,17 +180,17 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
                       setActiveView('settings');
                       setShowProfileMenu(false);
                     }}
-                    className="w-full text-left px-4 py-2 text-xs text-slate-300 hover:bg-slate-700 flex items-center space-x-2"
+                    className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center space-x-2"
                   >
                     <UserIcon className="w-4 h-4 text-slate-400" />
                     <span>Configurações</span>
                   </button>
 
-                  <div className="border-t border-slate-700 my-1"></div>
+                  <div className="border-t border-slate-100 my-1"></div>
 
                   <button
                     onClick={logout}
-                    className="w-full text-left px-4 py-2 text-xs text-rose-400 hover:bg-rose-950/40 flex items-center space-x-2 font-medium"
+                    className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center space-x-2"
                   >
                     <LogOut className="w-4 h-4" />
                     <span>Sair da Conta</span>

@@ -74,40 +74,61 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
   // Compute Auto Metrics for selected user & selected date
   const autoMetrics = useMemo(() => {
     const userLogs = logs.filter(l => {
-      if (l.user_id !== selectedUserId && l.user_name?.toLowerCase() !== selectedUser.name.toLowerCase()) {
-        return false;
-      }
-      const logDate = l.created_at.split('T')[0];
+      if (!l) return false;
+      const isUser = l.user_id === selectedUserId || (l.user_name && l.user_name.toLowerCase() === selectedUser.name.toLowerCase());
+      if (!isUser) return false;
+
+      const logDate = l.created_at ? l.created_at.split('T')[0].split(' ')[0] : '';
       return logDate === selectedDate;
     });
 
-    const createdCount = userLogs.filter(l =>
-      l.action.toLowerCase().includes('cadastr') || l.description.toLowerCase().includes('cadastrou')
+    const createdLogsCount = userLogs.filter(l =>
+      l.action?.toLowerCase().includes('cadastr') || l.description?.toLowerCase().includes('cadastrou') || l.action?.toLowerCase().includes('criação')
     ).length;
 
-    const updatedCount = userLogs.filter(l =>
-      l.action.toLowerCase().includes('edição') || l.description.toLowerCase().includes('editou')
+    const updatedLogsCount = userLogs.filter(l =>
+      l.action?.toLowerCase().includes('edição') || l.description?.toLowerCase().includes('editou') || l.action?.toLowerCase().includes('atualização')
     ).length;
 
     const statusChanges = userLogs.filter(l =>
-      l.action.toLowerCase().includes('status') || l.description.toLowerCase().includes('status')
+      l.action?.toLowerCase().includes('status') || l.description?.toLowerCase().includes('status')
     ).length;
 
+    // Direct property counting from properties array (combines with logs for 100% accuracy)
+    const createdPropsCount = properties.filter(p => {
+      if (!p) return false;
+      const isOwner = p.user_id === selectedUserId;
+      if (!isOwner) return false;
+      const createdDate = p.created_at ? p.created_at.split('T')[0].split(' ')[0] : '';
+      return createdDate === selectedDate;
+    }).length;
+
+    const updatedPropsCount = properties.filter(p => {
+      if (!p) return false;
+      const isOwner = p.user_id === selectedUserId;
+      if (!isOwner) return false;
+      const updatedDate = p.updated_at ? p.updated_at.split('T')[0].split(' ')[0] : '';
+      const createdDate = p.created_at ? p.created_at.split('T')[0].split(' ')[0] : '';
+      return updatedDate === selectedDate && updatedDate !== createdDate;
+    }).length;
+
     const visitsCount = scheduleEvents.filter(e => {
+      if (!e) return false;
+      const isUser = e.user_id === selectedUserId || (e.user_name && e.user_name.toLowerCase() === selectedUser.name.toLowerCase());
       return (
-        e.user_id === selectedUserId &&
+        isUser &&
         e.date === selectedDate &&
-        e.type === 'VISITA'
+        (e.type === 'VISITA' || !e.type)
       );
     }).length;
 
     return {
-      properties_created: createdCount,
-      properties_updated: updatedCount,
+      properties_created: Math.max(createdLogsCount, createdPropsCount),
+      properties_updated: Math.max(updatedLogsCount, updatedPropsCount),
       status_changes: statusChanges,
       visits_count: visitsCount
     };
-  }, [logs, scheduleEvents, selectedUserId, selectedUser, selectedDate]);
+  }, [logs, properties, scheduleEvents, selectedUserId, selectedUser, selectedDate]);
 
   // Populate form when selected Date / User / Entry changes
   useEffect(() => {
@@ -314,7 +335,7 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
                 </div>
 
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-center">
-                  <span className="text-xl font-black text-sky-600">{autoMetrics.status_changes}</span>
+                  <span className="text-xl font-black text-zinc-900">{autoMetrics.status_changes}</span>
                   <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Status Alterados</p>
                 </div>
 
