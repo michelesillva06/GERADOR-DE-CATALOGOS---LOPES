@@ -76,14 +76,14 @@ function MainApp() {
 
       if (propsRes && propsRes.ok && (propsRes.headers.get('content-type') || '').includes('json')) {
         const d = await propsRes.json();
-        if (d.properties) {
+        if (Array.isArray(d.properties)) {
           currentProps = d.properties;
           saveStoredProperties(currentProps);
         }
       }
       if (usersRes && usersRes.ok && (usersRes.headers.get('content-type') || '').includes('json')) {
         const d = await usersRes.json();
-        if (d.users) {
+        if (Array.isArray(d.users)) {
           currentUsers = d.users;
           saveStoredUsers(currentUsers);
         }
@@ -142,6 +142,21 @@ function MainApp() {
     if (user) {
       setActiveView('dashboard');
       fetchData();
+
+      const handleFocus = () => {
+        fetchData();
+      };
+      window.addEventListener('focus', handleFocus);
+
+      // Periodic sync every 10 seconds to detect server changes
+      const interval = setInterval(() => {
+        fetchData();
+      }, 10000);
+
+      return () => {
+        window.removeEventListener('focus', handleFocus);
+        clearInterval(interval);
+      };
     }
   }, [user]);
 
@@ -287,34 +302,49 @@ function MainApp() {
   };
 
   const handleAddUser = async (userData: any) => {
+    let createdFromBackend: User | null = null;
     try {
-      await fetch('/api/users', {
+      const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)
       });
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('json')) {
+        const data = await res.json();
+        if (data.user) createdFromBackend = data.user;
+      }
     } catch (e) {
       console.warn('Backend API unavailable, adding user locally:', e);
     }
 
     const allUsers = getStoredUsers();
-    const newUser: User = {
+    const newUser: User = createdFromBackend || {
       id: `usr_${Date.now()}`,
       name: userData.name || 'Novo Usuário',
       email: userData.email || '',
-      username: userData.username || `user_${Date.now()}`,
+      username: (userData.username || `user_${Date.now()}`).toLowerCase(),
       phone: userData.phone || '',
       whatsapp: userData.whatsapp || userData.phone || '',
       role: userData.role || 'CAPTADOR',
       position: userData.position || 'Corretor',
-      url_slug: userData.url_slug || userData.username || `user_${Date.now()}`,
+      url_slug: (userData.url_slug || userData.username || `user_${Date.now()}`).toLowerCase(),
       status: 'active',
-      photo_url: userData.photo_url || '',
+      photo_url: userData.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
       creci: userData.creci || '',
       instagram: userData.instagram || '',
       created_at: new Date().toISOString()
     };
-    const updatedUsers = [...allUsers, newUser];
+
+    const existingIdx = allUsers.findIndex(u => u.id === newUser.id || u.username.toLowerCase() === newUser.username.toLowerCase());
+    let updatedUsers: User[];
+    if (existingIdx >= 0) {
+      updatedUsers = [...allUsers];
+      updatedUsers[existingIdx] = { ...updatedUsers[existingIdx], ...newUser };
+    } else {
+      updatedUsers = [...allUsers, newUser];
+    }
+
     saveStoredUsers(updatedUsers);
     setUsers(updatedUsers);
     setStats(calculateStats(properties, updatedUsers));

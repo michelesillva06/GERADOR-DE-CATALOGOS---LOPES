@@ -332,7 +332,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                       </button>
 
                       <button
-                        onClick={() => onToggleBlock(u.id)}
+                        onClick={async () => {
+                          await onToggleBlock(u.id);
+                          if (onRefreshUsers) await onRefreshUsers();
+                        }}
                         className={`p-1.5 rounded-lg ${
                           u.status === 'active' ? 'bg-amber-50 text-amber-600 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
                         }`}
@@ -343,7 +346,10 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
                       {u.role !== 'MASTER_ADMIN' && (
                         <button
-                          onClick={() => onDeleteUser(u.id)}
+                          onClick={async () => {
+                            await onDeleteUser(u.id);
+                            if (onRefreshUsers) await onRefreshUsers();
+                          }}
                           className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100"
                           title="Excluir usuário"
                         >

@@ -3,95 +3,112 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { initialUsers, initialProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData.ts';
 import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
 
-// Persistent storage file path for company settings, users, and properties
-const SETTINGS_FILE_PATH = path.join(process.cwd(), 'company_settings_store.json');
-const USERS_FILE_PATH = path.join(process.cwd(), 'users_store.json');
-const PROPERTIES_FILE_PATH = path.join(process.cwd(), 'properties_store.json');
+// File names for persistent storage
+const SETTINGS_FILE_NAME = 'company_settings_store.json';
+const USERS_FILE_NAME = 'users_store.json';
+const PROPERTIES_FILE_NAME = 'properties_store.json';
+const PASSWORDS_FILE_NAME = 'passwords_store.json';
 
-function loadPersistedSettings(): CompanySettings {
+function readJsonStore<T>(filename: string, fallback: T): T {
+  const cwdPath = path.join(process.cwd(), filename);
+  const tmpPath = path.join(os.tmpdir(), filename);
+
   try {
-    if (fs.existsSync(SETTINGS_FILE_PATH)) {
-      const content = fs.readFileSync(SETTINGS_FILE_PATH, 'utf-8');
+    if (fs.existsSync(tmpPath)) {
+      const content = fs.readFileSync(tmpPath, 'utf-8');
       const parsed = JSON.parse(content);
-      return { ...initialCompanySettings, ...parsed };
+      if (parsed) return parsed;
     }
   } catch (err) {
-    console.warn('Could not read persisted settings file:', err);
+    console.warn(`Could not read ${filename} from tmp:`, err);
   }
-  return { ...initialCompanySettings };
+
+  try {
+    if (fs.existsSync(cwdPath)) {
+      const content = fs.readFileSync(cwdPath, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (parsed) return parsed;
+    }
+  } catch (err) {
+    console.warn(`Could not read ${filename} from cwd:`, err);
+  }
+
+  return fallback;
+}
+
+function writeJsonStore(filename: string, data: any) {
+  const cwdPath = path.join(process.cwd(), filename);
+  const tmpPath = path.join(os.tmpdir(), filename);
+
+  try {
+    fs.writeFileSync(cwdPath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch {
+    // process.cwd() is read-only (e.g. Vercel serverless)
+  }
+
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn(`Could not write ${filename} to tmp:`, err);
+  }
+}
+
+function loadPersistedSettings(): CompanySettings {
+  const loaded = readJsonStore<CompanySettings>(SETTINGS_FILE_NAME, initialCompanySettings);
+  return { ...initialCompanySettings, ...loaded };
 }
 
 function savePersistedSettings(settings: CompanySettings) {
-  try {
-    fs.writeFileSync(SETTINGS_FILE_PATH, JSON.stringify(settings, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Could not save settings file:', err);
-  }
+  writeJsonStore(SETTINGS_FILE_NAME, settings);
 }
 
 function loadPersistedUsers(): User[] {
-  try {
-    if (fs.existsSync(USERS_FILE_PATH)) {
-      const content = fs.readFileSync(USERS_FILE_PATH, 'utf-8');
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (err) {
-    console.warn('Could not read persisted users file:', err);
-  }
-  return [...initialUsers];
+  const loaded = readJsonStore<User[]>(USERS_FILE_NAME, initialUsers);
+  return (Array.isArray(loaded) && loaded.length > 0) ? loaded : [...initialUsers];
 }
 
 function savePersistedUsers(uList: User[]) {
-  try {
-    fs.writeFileSync(USERS_FILE_PATH, JSON.stringify(uList, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Could not save users file:', err);
-  }
+  writeJsonStore(USERS_FILE_NAME, uList);
 }
 
 function loadPersistedProperties(): Property[] {
-  try {
-    if (fs.existsSync(PROPERTIES_FILE_PATH)) {
-      const content = fs.readFileSync(PROPERTIES_FILE_PATH, 'utf-8');
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (err) {
-    console.warn('Could not read persisted properties file:', err);
-  }
-  return [...initialProperties];
+  const loaded = readJsonStore<Property[]>(PROPERTIES_FILE_NAME, initialProperties);
+  return (Array.isArray(loaded) && loaded.length > 0) ? loaded : [...initialProperties];
 }
 
 function savePersistedProperties(pList: Property[]) {
-  try {
-    fs.writeFileSync(PROPERTIES_FILE_PATH, JSON.stringify(pList, null, 2), 'utf-8');
-  } catch (err) {
-    console.warn('Could not save properties file:', err);
-  }
+  writeJsonStore(PROPERTIES_FILE_NAME, pList);
+}
+
+function loadPasswordHashes(): Record<string, string> {
+  const defaultHashes: Record<string, string> = {
+    usr_admin: bcrypt.hashSync('mudar123', 10),
+    usr_larissa: bcrypt.hashSync('mudar123', 10),
+    usr_michele: bcrypt.hashSync('mudar123', 10),
+    usr_moacir: bcrypt.hashSync('mudar123', 10),
+    usr_karine: bcrypt.hashSync('mudar123', 10)
+  };
+  return readJsonStore<Record<string, string>>(PASSWORDS_FILE_NAME, defaultHashes);
+}
+
+function savePasswordHashes(hashes: Record<string, string>) {
+  writeJsonStore(PASSWORDS_FILE_NAME, hashes);
 }
 
 // In-Memory Database initialized with persistence
 let users: User[] = loadPersistedUsers();
 let properties: Property[] = loadPersistedProperties();
 let companySettings: CompanySettings = loadPersistedSettings();
+let passwordHashes: Record<string, string> = loadPasswordHashes();
 let auditLogs: AuditLog[] = [...initialAuditLogs];
 let journalEntries: JournalEntry[] = [...initialJournalEntries] as JournalEntry[];
 let scheduleEvents: ScheduleEvent[] = [...initialScheduleEvents] as ScheduleEvent[];
-
-// Default password for all pre-seeded users is "mudar123"
-const passwordHashes: Record<string, string> = {
-  usr_admin: bcrypt.hashSync('mudar123', 10),
-  usr_larissa: bcrypt.hashSync('mudar123', 10),
-  usr_michele: bcrypt.hashSync('mudar123', 10),
-  usr_moacir: bcrypt.hashSync('mudar123', 10),
-  usr_karine: bcrypt.hashSync('mudar123', 10)
-};
 
 function addAuditLog(userId: string, userName: string, action: string, description: string, req?: express.Request) {
   const newLog: AuditLog = {
@@ -242,6 +259,7 @@ app.post('/api/users', async (req, res) => {
   };
 
   passwordHashes[newUser.id] = await bcrypt.hash(password, 10);
+  savePasswordHashes(passwordHashes);
   users.push(newUser);
   savePersistedUsers(users);
 
@@ -281,6 +299,7 @@ app.put('/api/users/:id', async (req, res) => {
 
   if (password) {
     passwordHashes[id] = await bcrypt.hash(password, 10);
+    savePasswordHashes(passwordHashes);
   }
 
   users[index] = updatedUser;
@@ -312,6 +331,7 @@ app.delete('/api/users/:id', (req, res) => {
   users = users.filter(u => u.id !== id);
   savePersistedUsers(users);
   delete passwordHashes[id];
+  savePasswordHashes(passwordHashes);
 
   addAuditLog('usr_admin', 'Administrador Master', 'Exclusão de Usuário', `Excluiu o usuário ${user.name}`, req);
 
