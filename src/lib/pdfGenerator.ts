@@ -36,6 +36,42 @@ function formatCurrency(val: number): string {
 }
 
 /**
+ * Draws the official pixel-perfect Lopes heart emblem on any HTML5 Canvas context.
+ */
+function drawLopesHeart(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  color: string = '#E50938'
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  const scale = size / 100;
+  ctx.scale(scale, scale);
+  ctx.fillStyle = color;
+
+  // 1. Circle dot top-right
+  ctx.beginPath();
+  ctx.arc(75, 28, 18, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Heart body shape
+  ctx.beginPath();
+  ctx.moveTo(46, 92);
+  ctx.bezierCurveTo(25, 74, 2, 52, 2, 30);
+  ctx.bezierCurveTo(2, 12, 16, 0, 34, 0);
+  ctx.bezierCurveTo(44, 0, 52, 5, 57, 14);
+  ctx.bezierCurveTo(52, 23, 50, 33, 53, 43);
+  ctx.bezierCurveTo(57, 55, 67, 62, 76, 62);
+  ctx.bezierCurveTo(68, 76, 57, 86, 46, 92);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
  * Generates an ultra high-resolution, pixel-perfect 1-piece cover page using HTML Canvas
  * that fills 100% of Page 1 in the PDF (210mm x 297mm full-bleed).
  * Matches the exact visual identity and layout of LOPES MANAUS catalog cover.
@@ -80,33 +116,21 @@ export async function renderCoverCanvas(
   ctx.textAlign = 'left';
 
   // Logo (Top-Left)
-  // Lopes Red Heart Symbol
-  ctx.save();
-  ctx.translate(170, 160);
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  // Left heart lobe
-  ctx.arc(-22, -18, 32, Math.PI * 0.7, Math.PI * 1.85);
-  // Right heart lobe
-  ctx.arc(22, -18, 32, Math.PI * 1.15, Math.PI * 0.3);
-  ctx.lineTo(0, 48);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  drawLopesHeart(ctx, 110, 110, 130, LOPES_RED);
 
   // "LOPES" Text
   ctx.fillStyle = TEXT_DARK;
   ctx.font = '900 128px sans-serif';
-  ctx.fillText('LOPES', 270, 185);
+  ctx.fillText('LOPES', 260, 185);
 
   // "MANAUS" Text
   ctx.fillStyle = LOPES_RED;
   ctx.font = '800 82px sans-serif';
-  ctx.fillText('MANAUS', 272, 270);
+  ctx.fillText('MANAUS', 262, 270);
 
   // Red accent line under "MANAUS"
   ctx.fillStyle = LOPES_RED;
-  ctx.fillRect(120, 310, 240, 10);
+  ctx.fillRect(110, 310, 250, 10);
 
   // ------------------------------------------------------------------------
   // 3. RIGHT SIDE PHOTO FRAME & BADGE (Manaus Skyline Sunset River)
@@ -652,27 +676,18 @@ export async function renderHorizontalCoverCanvas(
   ctx.textAlign = 'left';
 
   // Logo (Top Left)
-  ctx.save();
-  ctx.translate(140, 140);
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.arc(-20, -16, 28, Math.PI * 0.7, Math.PI * 1.85);
-  ctx.arc(20, -16, 28, Math.PI * 1.15, Math.PI * 0.3);
-  ctx.lineTo(0, 42);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  drawLopesHeart(ctx, 90, 90, 110, LOPES_RED);
 
   ctx.fillStyle = TEXT_DARK;
   ctx.font = '900 96px sans-serif';
-  ctx.fillText('LOPES', 230, 160);
+  ctx.fillText('LOPES', 220, 160);
 
   ctx.fillStyle = LOPES_RED;
   ctx.font = '800 64px sans-serif';
-  ctx.fillText('MANAUS', 232, 230);
+  ctx.fillText('MANAUS', 222, 230);
 
   ctx.fillStyle = LOPES_RED;
-  ctx.fillRect(100, 265, 200, 8);
+  ctx.fillRect(90, 265, 210, 8);
 
   // 3. Right Side Photo Area
   ctx.save();
@@ -961,30 +976,16 @@ export async function renderHorizontalPropertyCanvas(
   // HEADER ZONE
   // =========================================================================
   // Top Left: Logo Lopes Manaus
-  ctx.save();
-  ctx.translate(90, 80);
-  // Red Heart Emblem
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.arc(75 - 40, 28 - 20, 18, 0, Math.PI * 2); // Circle head
-  ctx.fill();
-  ctx.beginPath();
-  // Heart body
-  ctx.arc(34 - 40, 30 - 20, 22, Math.PI * 0.7, Math.PI * 1.85);
-  ctx.arc(57 - 40, 14 - 20, 18, Math.PI * 1.15, Math.PI * 0.3);
-  ctx.lineTo(46 - 40, 92 - 20);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  drawLopesHeart(ctx, 80, 50, 75, LOPES_RED);
 
   // Logo Text
   ctx.fillStyle = LOPES_RED;
   ctx.font = '900 68px sans-serif';
-  ctx.fillText('Lopes', 165, 88);
+  ctx.fillText('Lopes', 170, 88);
 
   ctx.fillStyle = TEXT_DARK;
   ctx.font = '800 30px sans-serif';
-  ctx.fillText('MANAUS', 167, 126);
+  ctx.fillText('MANAUS', 172, 126);
 
   // Top Right: Captador Contact & Brand
   ctx.fillStyle = TEXT_DARK;
@@ -1355,27 +1356,15 @@ export async function renderHorizontalPropertyCanvas(
   ctx.fillRect(0, footerY, canvas.width, footerH);
 
   // Footer Logo Left
-  ctx.save();
-  ctx.translate(90, footerY + 50);
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.arc(75 - 40, 28 - 20, 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(34 - 40, 30 - 20, 18, Math.PI * 0.7, Math.PI * 1.85);
-  ctx.arc(57 - 40, 14 - 20, 15, Math.PI * 1.15, Math.PI * 0.3);
-  ctx.lineTo(46 - 40, 92 - 20);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+  drawLopesHeart(ctx, 80, footerY + 38, 65, LOPES_RED);
 
   ctx.fillStyle = '#FFFFFF';
   ctx.font = '900 48px sans-serif';
-  ctx.fillText('Lopes', 155, footerY + 95);
+  ctx.fillText('Lopes', 160, footerY + 95);
 
   ctx.fillStyle = LOPES_RED;
   ctx.font = '800 24px sans-serif';
-  ctx.fillText('MANAUS', 157, footerY + 128);
+  ctx.fillText('MANAUS', 162, footerY + 128);
 
   // Footer Center Slogan Text
   ctx.fillStyle = '#FFFFFF';
