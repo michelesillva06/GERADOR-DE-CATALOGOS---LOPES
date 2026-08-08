@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Property, User, CompanySettings } from '../types';
-import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2, Upload, Image as ImageIcon, User as UserIcon, ShieldCheck } from 'lucide-react';
+import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2, Upload, Image as ImageIcon, User as UserIcon, ShieldCheck, Trash2 } from 'lucide-react';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 import { PROPERTY_CATEGORIES } from '../lib/constants';
 import { compressImage } from '../utils/imageCompressor';
@@ -61,7 +61,12 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   }, [isOpen, selectedCaptadorId]);
 
   // Handle scope base properties
-  const myProperties = properties.filter(p => p.user_id === currentCaptador.id);
+  const myProperties = properties.filter(p =>
+    p.user_id === currentCaptador.id ||
+    p.user_id?.toLowerCase() === currentCaptador.id?.toLowerCase() ||
+    p.user_id?.toLowerCase() === currentCaptador.username?.toLowerCase() ||
+    p.user_id?.toLowerCase() === currentCaptador.email?.toLowerCase()
+  );
   const scopeProperties = scope === 'meus' ? myProperties : properties;
 
   // Filtered properties based on purpose & category
@@ -107,7 +112,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
       return;
     }
 
-    const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.8 });
+    const compressed = await compressImage(file, { maxWidth: 1200, maxHeight: 800, quality: 0.75 });
     if (compressed) {
       setCustomCoverImage(compressed);
 
@@ -304,6 +309,58 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
               </select>
             </div>
           )}
+
+          {/* Cover Image Selection */}
+          <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center space-x-1.5">
+                <ImageIcon className="w-4 h-4 text-[#F10F4D]" />
+                <span>Imagem de Capa do Catálogo PDF</span>
+              </label>
+              {customCoverImage && (
+                <button
+                  type="button"
+                  onClick={() => setCustomCoverImage('')}
+                  className="text-[10px] font-bold text-rose-600 hover:underline flex items-center space-x-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Restaurar Capa Padrão</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <div className="w-24 h-14 bg-slate-200 rounded-xl overflow-hidden border border-slate-300 relative shrink-0 flex items-center justify-center">
+                {activeCoverImage ? (
+                  <img src={activeCoverImage} alt="Capa" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-[9px] font-extrabold text-slate-500 text-center leading-tight px-1">
+                    Capa Padrão Lopes (Canvas)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-1">
+                <p className="text-[11px] font-semibold text-slate-700">
+                  {customCoverImage
+                    ? 'Imagem customizada para este PDF.'
+                    : officialCoverUrl
+                    ? 'Usando capa padrão das configurações da imobiliária.'
+                    : 'Usando o modelo oficial automático Lopes Manaus (Canvas HD).'}
+                </p>
+                <label className="inline-flex items-center space-x-1 text-[11px] font-bold text-[#F10F4D] hover:underline cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{activeCoverImage ? 'Alterar Imagem da Capa' : 'Fazer Upload de Imagem de Capa'}</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCoverUpload}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
 
 
 

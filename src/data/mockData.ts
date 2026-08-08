@@ -13,10 +13,10 @@ export const initialCompanySettings: CompanySettings = {
   state: 'AM',
   instagram: '@lopesmanaus',
   creci_j: '540-J/AM',
-  cover_horizontal_url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=2000&q=80',
-  cover_geral_url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=2000&q=80',
-  cover_venda_url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=2000&q=80',
-  cover_locacao_url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=2000&q=80'
+  cover_horizontal_url: '',
+  cover_geral_url: '',
+  cover_venda_url: '',
+  cover_locacao_url: ''
 };
 
 export const initialUsers: User[] = [

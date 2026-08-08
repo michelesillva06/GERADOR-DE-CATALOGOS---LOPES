@@ -34,11 +34,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Keep state synced when props change or component re-renders
-  React.useEffect(() => {
-    setCompanyForm(settings);
-  }, [settings]);
-
+  // Re-sync form state ONLY when user ID changes (account switch)
+  const currentUserId = currentUser?.id;
   React.useEffect(() => {
     setName(currentUser.name || '');
     setPosition(currentUser.position || 'Corretora de Alto Padrão');
@@ -48,7 +45,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     setWhatsapp(currentUser.whatsapp || '');
     setPhotoUrl(currentUser.photo_url || '');
     setInstagram(currentUser.instagram || '');
-  }, [currentUser]);
+  }, [currentUserId]);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -58,7 +55,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       return;
     }
 
-    const compressed = await compressImage(file, { maxWidth: 1000, maxHeight: 1000, quality: 0.8 });
+    const compressed = await compressImage(file, { maxWidth: 1200, maxHeight: 1200, quality: 0.82 });
     if (compressed) {
       setPhotoUrl(compressed);
     }
@@ -67,10 +64,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const handleCoverFileUpload = async (field: keyof CompanySettings, file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione um arquivo de imagem válido.');
+      alert('Por favor, selecione um arquivo de imagem válido (PNG, JPG, WEBP).');
       return;
     }
-    const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.8 });
+    const compressed = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.82 });
     if (compressed) {
       setCompanyForm(prev => {
         const next = { ...prev, [field]: compressed };
@@ -411,6 +408,70 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
               />
             </div>
+
+            {/* Logo / Cabeçalho da Imobiliária */}
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-800 uppercase">🏷️ Logo / Cabeçalho da Imobiliária (Quadrada ou Retangular)</span>
+                {companyForm.logo_url && (
+                  <button
+                    type="button"
+                    onClick={() => setCompanyForm({ ...companyForm, logo_url: '' })}
+                    className="text-[10px] font-bold text-rose-600 hover:underline flex items-center space-x-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remover Logo</span>
+                  </button>
+                )}
+              </div>
+              
+              <div className="flex flex-col sm:flex-row items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                <div className="w-36 h-20 bg-white rounded-xl border border-slate-300 p-2 overflow-hidden flex items-center justify-center relative shrink-0 shadow-inner">
+                  {companyForm.logo_url ? (
+                    <img src={companyForm.logo_url} alt="Logo Imobiliária" className="max-w-full max-h-full object-contain" />
+                  ) : (
+                    <span className="text-[10px] text-slate-400 text-center font-semibold">Sem Logo Personalizada</span>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-2 text-center sm:text-left">
+                  <p className="text-[11px] text-slate-500">
+                    Envie a logo ou marca d'água da sua imobiliária (suporta formatos quadrados ou retangulares).
+                  </p>
+                  <label className="px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-100 rounded-xl text-xs font-bold text-slate-700 cursor-pointer inline-flex items-center space-x-1.5 transition">
+                    <Upload className="w-3.5 h-3.5 text-[#F10F4D]" />
+                    <span>{companyForm.logo_url ? 'Substituir Logo/Cabeçalho' : 'Upload da Logo (Quadrada ou Retangular)'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleCoverFileUpload('logo_url', file);
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                  {companyForm.logo_url && (
+                    <div className="flex items-center justify-center sm:justify-start space-x-1.5 text-xs text-emerald-700 font-bold pt-0.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Logo carregada! Clique em "Salvar Configurações" para gravar.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">ou Cole a URL da Logo</label>
+                <input
+                  type="text"
+                  placeholder="https://exemplo.com/logo-imobiliaria.png"
+                  value={companyForm.logo_url || ''}
+                  onChange={(e) => setCompanyForm({ ...companyForm, logo_url: e.target.value })}
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -432,15 +493,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             {/* CAPA PRINCIPAL / GERAL (HORIZONTAL PAISAGEM) */}
             <div className="p-4 bg-rose-50/50 rounded-2xl border border-rose-200 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-[#F10F4D] uppercase">🖼️ Capa Horizontal Principal / Geral (Paisagem)</span>
-                {companyForm.cover_horizontal_url && (
+                <span className="text-xs font-black text-[#F10F4D] uppercase">🖼️ Capa Horizontal Principal / Geral (Paisagem ou Quadrada)</span>
+                {(companyForm.cover_horizontal_url || companyForm.cover_geral_url) && (
                   <button
                     type="button"
-                    onClick={() => setCompanyForm({ ...companyForm, cover_horizontal_url: '', cover_geral_url: '' })}
-                    className="text-[10px] font-bold text-rose-600 hover:underline flex items-center space-x-1"
+                    onClick={() => setCompanyForm(prev => ({ ...prev, cover_horizontal_url: '', cover_geral_url: '' }))}
+                    className="text-[10px] font-bold text-rose-600 hover:underline flex items-center space-x-1 cursor-pointer"
                   >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Remover</span>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Remover Capa Principal</span>
                   </button>
                 )}
               </div>
@@ -448,7 +509,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 Esta capa principal será utilizada como padrão para catálogos gerais com todos os imóveis do sistema.
               </p>
               
-              <div className="aspect-[1.8/1] max-h-60 w-full rounded-xl border-2 border-dashed border-rose-300 bg-white overflow-hidden flex flex-col items-center justify-center relative group shadow-inner">
+              <div className="aspect-[1.8/1] max-h-64 w-full rounded-xl border-2 border-dashed border-rose-300 bg-slate-900/5 overflow-hidden flex flex-col items-center justify-center relative group shadow-inner">
                 {companyForm.cover_horizontal_url ? (
                   <img src={companyForm.cover_horizontal_url} alt="Capa Horizontal" className="w-full h-full object-cover" />
                 ) : (
@@ -459,7 +520,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 )}
                 <label className="absolute inset-0 bg-slate-900/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center text-white text-xs font-bold cursor-pointer p-4 text-center">
                   <Upload className="w-6 h-6 mb-1 text-rose-400" />
-                  <span>{companyForm.cover_horizontal_url ? 'Substituir Capa Horizontal' : 'Upload Capa Horizontal'}</span>
+                  <span>{companyForm.cover_horizontal_url ? 'Substituir Capa Principal' : 'Upload Capa Principal'}</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -472,6 +533,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   />
                 </label>
               </div>
+
+              {companyForm.cover_horizontal_url && (
+                <div className="flex items-center space-x-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>✓ Imagem de Capa Principal pronta no formulário! Clique em "Salvar Alterações" para gravar.</span>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">ou Cole a URL da Imagem</label>
@@ -519,7 +587,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   </div>
 
                   {/* Thumbnail / Upload Box */}
-                  <div className="aspect-[1.8/1] w-full rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden flex flex-col items-center justify-center relative group shadow-xs">
+                  <div className="aspect-[1.8/1] w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-900/5 overflow-hidden flex flex-col items-center justify-center relative group shadow-xs">
                     {companyForm.cover_locacao_url ? (
                       <img src={companyForm.cover_locacao_url} alt="Capa Locação" className="w-full h-full object-cover" />
                     ) : (
@@ -543,6 +611,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       />
                     </label>
                   </div>
+
+                  {companyForm.cover_locacao_url && (
+                    <div className="flex items-center space-x-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Capa de Locação carregada!</span>
+                    </div>
+                  )}
 
                   <input
                     type="text"
@@ -570,7 +645,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   </div>
 
                   {/* Thumbnail / Upload Box */}
-                  <div className="aspect-[1.8/1] w-full rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden flex flex-col items-center justify-center relative group shadow-xs">
+                  <div className="aspect-[1.8/1] w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-900/5 overflow-hidden flex flex-col items-center justify-center relative group shadow-xs">
                     {companyForm.cover_venda_url ? (
                       <img src={companyForm.cover_venda_url} alt="Capa Venda" className="w-full h-full object-cover" />
                     ) : (
@@ -594,6 +669,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       />
                     </label>
                   </div>
+
+                  {companyForm.cover_venda_url && (
+                    <div className="flex items-center space-x-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>Capa de Venda carregada!</span>
+                    </div>
+                  )}
 
                   <input
                     type="text"

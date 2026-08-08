@@ -27,16 +27,13 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
   onDeleteProperty,
   onShareWhatsApp
 }) => {
-  let myProperties = properties.filter(p =>
+  const isOwnedByCurrentUser = (p: Property) =>
     p.user_id === user.id ||
     p.user_id?.toLowerCase() === user.id?.toLowerCase() ||
     p.user_id?.toLowerCase() === user.username?.toLowerCase() ||
-    p.user_id?.toLowerCase() === user.email?.toLowerCase()
-  );
+    p.user_id?.toLowerCase() === user.email?.toLowerCase();
 
-  if (myProperties.length === 0 && properties.length > 0) {
-    myProperties = properties;
-  }
+  const myProperties = properties.filter(isOwnedByCurrentUser);
 
   const availableCount = myProperties.filter(p => p.status === 'Disponível').length;
   const soldCount = myProperties.filter(p => p.status === 'Vendido' || p.status === 'Alugado').length;

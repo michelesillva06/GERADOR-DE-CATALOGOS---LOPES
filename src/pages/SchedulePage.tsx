@@ -33,6 +33,53 @@ interface SchedulePageProps {
   onDeleteEvent: (id: string) => Promise<void>;
 }
 
+// Helper to add minutes to time
+function calcEndTime(startTimeStr: string, durationMins: number = 90): string {
+  if (!startTimeStr || !startTimeStr.includes(':')) return '11:30';
+  const [hStr, mStr] = startTimeStr.split(':');
+  let h = parseInt(hStr, 10);
+  let m = parseInt(mStr, 10);
+  if (isNaN(h)) h = 9;
+  if (isNaN(m)) m = 0;
+
+  const totalMins = h * 60 + m + durationMins;
+  const newH = Math.floor(totalMins / 60) % 24;
+  const newM = totalMins % 60;
+  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+}
+
+// Helper to check standard national & Manaus municipal holidays
+function getOfficialHolidayName(dateStr: string): string | null {
+  if (!dateStr) return null;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return null;
+  const monthDay = `${parts[1]}-${parts[2]}`;
+
+  const holidaysMap: Record<string, string> = {
+    '01-01': 'Confraternização Universal (Ano Novo)',
+    '04-21': 'Tiradentes',
+    '05-01': 'Dia Mundial do Trabalho',
+    '09-07': 'Independência do Brasil',
+    '10-12': 'Nossa Senhora Aparecida (Padroeira do Brasil)',
+    '10-24': 'Aniversário de Manaus (Feriado Municipal)',
+    '11-02': 'Finados',
+    '11-15': 'Proclamação da República',
+    '11-20': 'Dia Nacional da Consciência Negra',
+    '12-08': 'Nossa Senhora da Conceição (Padroeira de Manaus)',
+    '12-25': 'Natal'
+  };
+
+  return holidaysMap[monthDay] || null;
+}
+
+// Helper to check if weekend (Saturday=6, Sunday=0)
+function isWeekendDay(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr + 'T12:00:00');
+  const day = d.getDay();
+  return day === 0 || day === 6;
+}
+
 export const SchedulePage: React.FC<SchedulePageProps> = ({
   currentUser,
   users,
@@ -51,41 +98,42 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [holidayOverride, setHolidayOverride] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     type: 'VISITA' as ScheduleEventType,
     date: new Date().toISOString().split('T')[0],
-    start_time: '09:00',
-    end_time: '10:00',
+    start_time: '09:30',
+    end_time: '11:00',
     user_id: currentUser.id,
     property_code: '',
     client_name: '',
     client_phone: '',
     location: '',
     notes: '',
-    exclusive_visit: true // Default: Ir Só / Exclusive Visit
+    exclusive_visit: true
   });
 
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Auto-update end_time when start_time changes (1h30 duration)
+  const handleStartTimeChange = (newStartTime: string) => {
+    const computedEnd = calcEndTime(newStartTime, 90);
+    setFormData(prev => ({
+      ...prev,
+      start_time: newStartTime,
+      end_time: computedEnd
+    }));
+  };
+
   // Filtered Events
   const filteredEvents = useMemo(() => {
     return scheduleEvents
       .filter(e => {
-        // Month filter
-        if (selectedMonth && !e.date.startsWith(selectedMonth)) {
-          return false;
-        }
-        // Type filter
-        if (filterType !== 'todos' && e.type !== filterType) {
-          return false;
-        }
-        // User filter
-        if (filterUserId !== 'todos' && e.user_id !== filterUserId && e.type !== 'FERIADO') {
-          return false;
-        }
-        // Search query
+        if (selectedMonth && !e.date.startsWith(selectedMonth)) return false;
+        if (filterType !== 'todos' && e.type !== filterType) return false;
+        if (filterUserId !== 'todos' && e.user_id !== filterUserId && e.type !== 'FERIADO') return false;
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchTitle = e.title.toLowerCase().includes(q);
@@ -106,22 +154,17 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
       });
   }, [scheduleEvents, selectedMonth, filterType, filterUserId, searchQuery]);
 
-  // Check if selected date in form is a Holiday
-  const isSelectedDateHoliday = useMemo(() => {
-    if (!formData.date) return false;
-    return scheduleEvents.some(
-      e => e.type === 'FERIADO' && e.date === formData.date
-    );
+  // Check if date is an official holiday (from scheduleEvents or fixed list)
+  const officialHolidayName = useMemo(() => {
+    if (!formData.date) return null;
+    const fromEvents = scheduleEvents.find(e => e.type === 'FERIADO' && e.date === formData.date);
+    if (fromEvents) return fromEvents.title;
+    return getOfficialHolidayName(formData.date);
   }, [scheduleEvents, formData.date]);
 
-  // Holiday Name if matches
-  const holidayName = useMemo(() => {
-    if (!formData.date) return '';
-    const h = scheduleEvents.find(e => e.type === 'FERIADO' && e.date === formData.date);
-    return h ? h.title : '';
-  }, [scheduleEvents, formData.date]);
+  const isWeekend = useMemo(() => isWeekendDay(formData.date), [formData.date]);
 
-  // Events on selected date (for showing occupied slots)
+  // Occupied events on date
   const occupiedEventsOnDate = useMemo(() => {
     if (!formData.date) return [];
     return scheduleEvents.filter(
@@ -129,16 +172,16 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
     );
   }, [scheduleEvents, formData.date]);
 
-  // Check if current formData time conflicts with any existing event on that date
+  // Time slot conflict check
   const timeSlotConflict = useMemo(() => {
     if (!formData.date || !formData.start_time) return null;
     const startA = formData.start_time;
-    const endA = formData.end_time || startA;
+    const endA = formData.end_time || calcEndTime(startA, 90);
 
     return occupiedEventsOnDate.find(e => {
       const startB = e.start_time;
-      const endB = e.end_time || startB;
-      const overlap = (startA < endB && endA > startB) || (startA === startB && endA === endB);
+      const endB = e.end_time || calcEndTime(startB, 90);
+      const overlap = startA < endB && endA > startB;
       return overlap;
     }) || null;
   }, [occupiedEventsOnDate, formData.date, formData.start_time, formData.end_time]);
@@ -146,12 +189,15 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
   // Open modal handler
   const handleOpenModal = () => {
     setFormError(null);
+    setHolidayOverride(false);
+    const today = new Date().toISOString().split('T')[0];
+    const initialStart = '09:30';
     setFormData({
       title: '',
       type: 'VISITA',
-      date: new Date().toISOString().split('T')[0],
-      start_time: '09:00',
-      end_time: '10:00',
+      date: today,
+      start_time: initialStart,
+      end_time: calcEndTime(initialStart, 90),
       user_id: currentUser.id,
       property_code: '',
       client_name: '',
@@ -167,15 +213,15 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
     e.preventDefault();
     setFormError(null);
 
-    // Holiday validation block
-    if (isSelectedDateHoliday && formData.type !== 'FERIADO') {
-      setFormError(`Data Bloqueada! Em feriados (${holidayName}) não é possível agendar compromissos ou visitas.`);
+    if (officialHolidayName && !holidayOverride && formData.type !== 'FERIADO') {
+      setFormError(`Data Bloqueada! Em feriados oficiais (${officialHolidayName}) não é permitido agendar sem autorização prévia da Gestora Larissa Maia. Confirme a caixa de autorização especial para prosseguir.`);
       return;
     }
 
-    // Conflict check block
     if (timeSlotConflict) {
-      setFormError(`Horário indisponível! O captador(a) ${timeSlotConflict.user_name} já possui uma visita/compromisso agendado neste dia (${formData.date}) das ${timeSlotConflict.start_time} às ${timeSlotConflict.end_time} ("${timeSlotConflict.title}"). Por favor, escolha outro horário.`);
+      const startB = timeSlotConflict.start_time;
+      const endB = timeSlotConflict.end_time || calcEndTime(startB, 90);
+      setFormError(`Horário indisponível! O captador(a) ${timeSlotConflict.user_name} já possui uma visita/compromisso agendado neste dia (${formData.date}) das ${startB} às ${endB} ("${timeSlotConflict.title}"). O próximo horário livre é a partir de ${endB}.`);
       return;
     }
 
@@ -188,12 +234,16 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
 
     setIsSubmitting(true);
 
+    const computedEnd = calcEndTime(formData.start_time, 90);
+
     const res = await onAddEvent({
       ...formData,
+      end_time: computedEnd,
       user_id: selectedCaptador.id,
       user_name: selectedCaptador.name,
-      property_code: formData.property_code.trim() || undefined
-    });
+      property_code: formData.property_code.trim() || undefined,
+      override_holiday: holidayOverride
+    } as any);
 
     setIsSubmitting(false);
 
@@ -420,6 +470,13 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                         "{event.notes}"
                       </p>
                     )}
+
+                    {!isHoliday && (
+                      <div className="pt-1.5 flex items-center space-x-2 text-[11px] font-bold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60 w-fit">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                        <span>Acompanhamento: <strong>Gestora Larissa Maia</strong></span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -465,11 +522,11 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
             <div className="space-y-1">
               <div className="inline-flex items-center space-x-2 bg-rose-50 text-[#F10F4D] px-3 py-1 rounded-full text-[10px] font-black uppercase">
                 <CalendarIcon className="w-3.5 h-3.5" />
-                <span>Novo Agendamento</span>
+                <span>Novo Agendamento Simplificado</span>
               </div>
-              <h2 className="text-xl font-black text-slate-900">Agendar Visita ou Evento</h2>
+              <h2 className="text-xl font-black text-slate-900">Agendar Visita com Proprietário</h2>
               <p className="text-xs text-slate-500">
-                Preencha os dados do agendamento. O sistema fará verificação de feriados e conflitos de horários.
+                Cadastre o horário da visita. Duração padrão de <strong>1 hora e 30 minutos</strong> (deslocamento + atendimento) com acompanhamento da <strong>Gestora Larissa Maia</strong>.
               </p>
             </div>
 
@@ -483,15 +540,37 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
               </div>
             )}
 
-            {/* HOLIDAY BLOCK WARNING IF SELECTED DATE IS HOLIDAY */}
-            {isSelectedDateHoliday && (
-              <div className="p-4 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-1.5">
+            {/* HOLIDAY BANNER */}
+            {officialHolidayName && (
+              <div className="p-4 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-2">
                 <div className="flex items-center space-x-2 text-rose-400 font-extrabold text-xs uppercase">
                   <ShieldAlert className="w-4 h-4" />
-                  <span>Feriado Oficial Bloqueado: {holidayName}</span>
+                  <span>Feriado Oficial: {officialHolidayName}</span>
                 </div>
                 <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Por política da empresa, **feriados não aceitam agendamentos de visitas ou reuniões**. Selecione outra data útil para prosseguir.
+                  Dias de feriado são de folga da equipe. Para agendar neste dia, certifique-se da autorização prévia da Gestora Larissa Maia.
+                </p>
+                <label className="flex items-center space-x-2 pt-1 text-xs font-bold text-rose-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={holidayOverride}
+                    onChange={(e) => setHolidayOverride(e.target.checked)}
+                    className="w-4 h-4 accent-[#F10F4D] rounded"
+                  />
+                  <span>Confirmo autorização especial da Gestora Larissa Maia para agendar neste feriado</span>
+                </label>
+              </div>
+            )}
+
+            {/* WEEKEND WARNING */}
+            {isWeekend && !officialHolidayName && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl space-y-1">
+                <div className="flex items-center space-x-2 font-extrabold text-xs uppercase text-amber-900">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <span>Final de Semana (Sábado / Domingo)</span>
+                </div>
+                <p className="text-[11px] font-medium leading-relaxed">
+                  Agendamento em dia não útil sob consulta de disponibilidade do proprietário e acompanhamento da Gestora Larissa Maia.
                 </p>
               </div>
             )}
@@ -540,16 +619,16 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                   required
                   value={formData.title}
                   onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Ex: Visita ao Apto Reserva das Águas com Cliente João"
+                  placeholder="Ex: Visita ao Apto Reserva das Águas com Proprietário Carlos"
                   className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
                 />
               </div>
 
-              {/* Novo Imóvel (Ainda não cadastrado no sistema) */}
+              {/* Novo Imóvel */}
               {formData.type === 'VISITA' && (
                 <div className="space-y-1">
                   <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
-                    Código / Identificação do Novo Imóvel (Ainda não no sistema)
+                    Código / Identificação do Novo Imóvel
                   </label>
                   <input
                     type="text"
@@ -558,17 +637,14 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                     placeholder="Ex: NOVO-01, Captação Ed. Reserva, etc."
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
                   />
-                  <p className="text-[10px] text-slate-500 font-medium">
-                    Obs: Os agendamentos na agenda são sempre para imóveis novos que ainda não foram cadastrados no sistema.
-                  </p>
                 </div>
               )}
 
-              {/* Date & Hours */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Date & Start Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                    Data *
+                    Data da Visita *
                   </label>
                   <input
                     type="date"
@@ -581,32 +657,63 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                    Início *
+                    Horário de Início * (Duração 1h30)
                   </label>
                   <input
                     type="time"
                     required
                     value={formData.start_time}
-                    onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                    onChange={(e) => handleStartTimeChange(e.target.value)}
                     className={`w-full px-3 py-2 border rounded-xl text-xs font-bold text-slate-900 focus:outline-none ${
                       timeSlotConflict ? 'bg-rose-50 border-rose-500 text-rose-900 ring-2 ring-rose-500/20' : 'bg-slate-50 border-slate-200 focus:border-[#F10F4D]'
                     }`}
                   />
+                  <p className="text-[10px] text-[#F10F4D] font-extrabold mt-1">
+                    ⏱️ Término estimado: {calcEndTime(formData.start_time, 90)} (1h30m)
+                  </p>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                    Término *
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={formData.end_time}
-                    onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-                    className={`w-full px-3 py-2 border rounded-xl text-xs font-bold text-slate-900 focus:outline-none ${
-                      timeSlotConflict ? 'bg-rose-50 border-rose-500 text-rose-900 ring-2 ring-rose-500/20' : 'bg-slate-50 border-slate-200 focus:border-[#F10F4D]'
-                    }`}
-                  />
+              {/* Quick 1h30 Slot Picker */}
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                  Horários Padrão Sugeridos (1h30 cada):
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  {[
+                    '08:00',
+                    '09:30',
+                    '11:00',
+                    '13:30',
+                    '15:00',
+                    '16:30'
+                  ].map(slotStart => {
+                    const slotEnd = calcEndTime(slotStart, 90);
+                    const isOccupied = occupiedEventsOnDate.some(ev => {
+                      const evEnd = ev.end_time || calcEndTime(ev.start_time, 90);
+                      return slotStart < evEnd && slotEnd > ev.start_time;
+                    });
+                    const isSelected = formData.start_time === slotStart;
+
+                    return (
+                      <button
+                        key={slotStart}
+                        type="button"
+                        onClick={() => handleStartTimeChange(slotStart)}
+                        disabled={isOccupied}
+                        className={`p-2 rounded-xl border text-[10px] font-extrabold transition flex flex-col items-center justify-center cursor-pointer ${
+                          isOccupied
+                            ? 'bg-slate-100 text-slate-400 border-slate-200 line-through opacity-60 cursor-not-allowed'
+                            : isSelected
+                            ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow-xs'
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                      >
+                        <span>{slotStart}</span>
+                        <span className="text-[9px] opacity-80">{isOccupied ? 'Ocupado' : 'Livre'}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -618,7 +725,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                     <span>Horário Indisponível (Já Reservado)</span>
                   </div>
                   <p className="text-[11px] font-medium leading-relaxed opacity-95">
-                    O captador(a) <strong>{timeSlotConflict.user_name}</strong> já possui um agendamento ("{timeSlotConflict.title}") neste dia das <strong>{timeSlotConflict.start_time}</strong> às <strong>{timeSlotConflict.end_time}</strong>. Escolha outro horário para evitar choque na agenda.
+                    O captador(a) <strong>{timeSlotConflict.user_name}</strong> já possui um agendamento ("{timeSlotConflict.title}") neste dia das <strong>{timeSlotConflict.start_time}</strong> às <strong>{timeSlotConflict.end_time || calcEndTime(timeSlotConflict.start_time, 90)}</strong>. Escolha outro horário para evitar choque.
                   </p>
                 </div>
               )}
@@ -627,19 +734,21 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
               {formData.date && (
                 <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2">
                   <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
-                    <span>Horários de Outros Agendamentos ({new Date(formData.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
-                    <span className="text-[10px] text-slate-500 font-bold">
-                      {occupiedEventsOnDate.length > 0 ? `${occupiedEventsOnDate.length} ocupado(s)` : 'Livre'}
+                    <span>Status do Dia ({new Date(formData.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                      occupiedEventsOnDate.length >= 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {occupiedEventsOnDate.length} / 5 visitas agendadas
                     </span>
                   </div>
 
                   {occupiedEventsOnDate.length > 0 ? (
-                    <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+                    <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
                       {occupiedEventsOnDate.map(ev => (
                         <div key={ev.id} className="p-2 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between text-xs font-semibold">
                           <div className="flex items-center space-x-2 min-w-0">
                             <span className="px-2 py-0.5 bg-rose-100 text-[#F10F4D] text-[10px] font-black rounded-md shrink-0">
-                              {ev.start_time} - {ev.end_time}
+                              {ev.start_time} - {ev.end_time || calcEndTime(ev.start_time, 90)}
                             </span>
                             <span className="truncate text-slate-800 font-bold">{ev.title}</span>
                           </div>
@@ -791,11 +900,11 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || isSelectedDateHoliday || Boolean(timeSlotConflict)}
+                  disabled={isSubmitting || (Boolean(officialHolidayName) && !holidayOverride) || Boolean(timeSlotConflict)}
                   className="px-6 py-2.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-40 text-white font-extrabold text-xs rounded-xl shadow-md shadow-rose-950/30 transition flex items-center space-x-2 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Verificando e Agendando...' : 'Confirmar Agendamento'}</span>
+                  <span>{isSubmitting ? 'Agendando...' : 'Confirmar Agendamento (1h30)'}</span>
                 </button>
               </div>
 

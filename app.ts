@@ -110,23 +110,43 @@ let auditLogs: AuditLog[] = [...initialAuditLogs];
 let journalEntries: JournalEntry[] = [...initialJournalEntries] as JournalEntry[];
 let scheduleEvents: ScheduleEvent[] = [...initialScheduleEvents] as ScheduleEvent[];
 
-function sanitizePropertyOwners() {
+function normalizePropertyOwners() {
   if (!users || users.length === 0 || !properties || properties.length === 0) return;
-  const activeMaster = users.find(u => u.role === 'MASTER_ADMIN' && u.status === 'active') || users.find(u => u.status === 'active') || users[0];
-  if (!activeMaster) return;
+  const activeCaptador = users.find(u => u.role === 'CAPTADOR' && u.status === 'active') || users.find(u => u.status === 'active') || users[0];
+  if (!activeCaptador) return;
 
   let changed = false;
   properties = properties.map(p => {
-    const ownerExists = users.some(u =>
-      u.id === p.user_id ||
-      u.id.toLowerCase() === p.user_id?.toLowerCase() ||
-      u.username.toLowerCase() === p.user_id?.toLowerCase() ||
-      u.email.toLowerCase() === p.user_id?.toLowerCase()
-    );
-    if (!ownerExists) {
-      changed = true;
-      return { ...p, user_id: activeMaster.id };
+    // 1. Direct match with user ID
+    const directUser = users.find(u => u.id === p.user_id || u.id?.toLowerCase() === p.user_id?.toLowerCase());
+    if (directUser) {
+      if (p.user_id !== directUser.id) {
+        changed = true;
+        return { ...p, user_id: directUser.id };
+      }
+      return p;
     }
+
+    // 2. Soft match with username, email, name, or url_slug
+    const softUser = users.find(u =>
+      (p.user_id && u.username?.toLowerCase() === p.user_id.toLowerCase()) ||
+      (p.user_id && u.email?.toLowerCase() === p.user_id.toLowerCase()) ||
+      (p.user_id && u.url_slug?.toLowerCase() === p.user_id.toLowerCase()) ||
+      (p.user_id && u.name?.toLowerCase() === p.user_id.toLowerCase()) ||
+      (p.user_id && u.name?.toLowerCase().replace(/\s+/g, '') === p.user_id.toLowerCase())
+    );
+
+    if (softUser) {
+      changed = true;
+      return { ...p, user_id: softUser.id };
+    }
+
+    // 3. Unmatched property owner - attribute to active Captador if available
+    if (activeCaptador) {
+      changed = true;
+      return { ...p, user_id: activeCaptador.id };
+    }
+
     return p;
   });
 
@@ -135,8 +155,12 @@ function sanitizePropertyOwners() {
   }
 }
 
-// Initial sanitization
-sanitizePropertyOwners();
+// Initial normalization & persistence ensure
+normalizePropertyOwners();
+savePersistedProperties(properties);
+savePersistedUsers(users);
+savePersistedSettings(companySettings);
+savePasswordHashes(passwordHashes);
 
 function addAuditLog(userId: string, userName: string, action: string, description: string, req?: express.Request) {
   const newLog: AuditLog = {
@@ -606,6 +630,27 @@ app.delete('/api/properties/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Properties: Bulk Sync
+app.post('/api/properties/sync', (req, res) => {
+  const { properties: clientProps } = req.body;
+  if (Array.isArray(clientProps)) {
+    let changed = false;
+    const existingIds = new Set(properties.map(p => p.id));
+    clientProps.forEach((cp: Property) => {
+      if (cp.id && !existingIds.has(cp.id)) {
+        properties.unshift(cp);
+        existingIds.add(cp.id);
+        changed = true;
+      }
+    });
+    if (changed) {
+      normalizePropertyOwners();
+      savePersistedProperties(properties);
+    }
+  }
+  res.json({ success: true, properties });
+});
+
 // Dashboard Stats
 app.get('/api/stats', (req, res) => {
   const totalUsers = users.length;
@@ -723,6 +768,20 @@ app.post('/api/journal', (req, res) => {
   res.json({ journal: entry });
 });
 
+function addMinutesToTime(timeStr: string, minsToAdd: number = 90): string {
+  if (!timeStr || !timeStr.includes(':')) return '11:30';
+  const [hStr, mStr] = timeStr.split(':');
+  let h = parseInt(hStr, 10);
+  let m = parseInt(mStr, 10);
+  if (isNaN(h)) h = 9;
+  if (isNaN(m)) m = 0;
+
+  const totalMins = h * 60 + m + minsToAdd;
+  const newH = Math.floor(totalMins / 60) % 24;
+  const newM = totalMins % 60;
+  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
+}
+
 // --- SCHEDULE / AGENDA ENDPOINTS ---
 app.get('/api/schedule', (req, res) => {
   res.json({ events: scheduleEvents });
@@ -735,34 +794,38 @@ app.post('/api/schedule', (req, res) => {
     return res.status(400).json({ error: 'Preencha título, data, horário e tipo de agendamento.' });
   }
 
-  // HOLIDAY CHECK CONSTRAINT: Feriados não será possível agendar nada!
+  const startA = eventData.start_time || '09:00';
+  const endA = eventData.end_time && eventData.end_time !== eventData.start_time
+    ? eventData.end_time
+    : addMinutesToTime(startA, 90);
+
+  // HOLIDAY CHECK CONSTRAINT
   const isHoliday = scheduleEvents.some(
     e => e.type === 'FERIADO' && e.date === eventData.date
   );
 
-  if (isHoliday && eventData.type !== 'FERIADO') {
+  if (isHoliday && eventData.type !== 'FERIADO' && !req.body.override_holiday) {
     return res.status(400).json({
-      error: 'Data bloqueada! Não é possível agendar compromissos em feriados ou datas de folga oficial.'
+      error: 'Data bloqueada! Dia de feriado oficial. Caso tenha autorização da Gestora Larissa Maia, marque a confirmação especial para agendar.'
     });
   }
 
   // CONFLICT CHECK FOR ALL VISITS & EVENTS ON SAME DATE AND OVERLAPPING TIME:
-  const startA = eventData.start_time || '09:00';
-  const endA = eventData.end_time || startA;
-
   const conflictingEvent = scheduleEvents.find(e => {
     if (e.type === 'FERIADO' || e.date !== eventData.date) return false;
 
     const startB = e.start_time || '09:00';
-    const endB = e.end_time || e.start_time;
+    const endB = e.end_time || addMinutesToTime(startB, 90);
 
-    const overlap = (startA < endB && endA > startB) || (startA === startB && endA === endB);
+    const overlap = startA < endB && endA > startB;
     return overlap;
   });
 
   if (conflictingEvent) {
+    const startB = conflictingEvent.start_time;
+    const endB = conflictingEvent.end_time || addMinutesToTime(startB, 90);
     return res.status(400).json({
-      error: `Horário indisponível! O captador(a) ${conflictingEvent.user_name} já possui um agendamento ("${conflictingEvent.title}") neste dia (${eventData.date}) das ${conflictingEvent.start_time} às ${conflictingEvent.end_time}.`
+      error: `Horário indisponível! O captador(a) ${conflictingEvent.user_name} já possui um agendamento ("${conflictingEvent.title}") neste dia (${eventData.date}) das ${startB} às ${endB}. O próximo horário livre é a partir de ${endB}.`
     });
   }
 
@@ -771,8 +834,8 @@ app.post('/api/schedule', (req, res) => {
     title: eventData.title,
     type: eventData.type,
     date: eventData.date,
-    start_time: eventData.start_time,
-    end_time: eventData.end_time || eventData.start_time,
+    start_time: startA,
+    end_time: endA,
     user_id: eventData.user_id || 'usr_admin',
     user_name: eventData.user_name || 'Sistema',
     property_id: eventData.property_id,
@@ -791,7 +854,7 @@ app.post('/api/schedule', (req, res) => {
     newEvent.user_id,
     newEvent.user_name,
     'Agendamento',
-    `Agendou ${newEvent.type}: "${newEvent.title}" para ${newEvent.date} às ${newEvent.start_time}`,
+    `Agendou ${newEvent.type}: "${newEvent.title}" para ${newEvent.date} às ${newEvent.start_time} (Duração: 1h30 - até ${newEvent.end_time})`,
     req
   );
 

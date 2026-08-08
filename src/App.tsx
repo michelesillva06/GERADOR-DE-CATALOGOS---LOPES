@@ -34,7 +34,8 @@ import {
   getStoredSchedule,
   saveStoredSchedule,
   saveStoredCurrentUser,
-  calculateStats
+  calculateStats,
+  normalizePropertyOwners
 } from './lib/storage';
 
 function MainApp() {
@@ -87,11 +88,11 @@ function MainApp() {
           saveStoredProperties(currentProps);
 
           // If there are local-only properties, sync them up to backend in background
-          for (const lp of localOnly) {
-            fetch('/api/properties', {
+          if (localOnly.length > 0) {
+            fetch('/api/properties/sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(lp)
+              body: JSON.stringify({ properties: localOnly })
             }).catch(() => null);
           }
         }
@@ -110,7 +111,7 @@ function MainApp() {
         const d = await settingsRes.json();
         if (d.settings) {
           const localSettings = getStoredSettings();
-          const mergedSettings = { ...localSettings, ...d.settings };
+          const mergedSettings = { ...d.settings, ...localSettings };
           currentSettings = mergedSettings;
           saveStoredSettings(currentSettings);
         }
@@ -147,24 +148,11 @@ function MainApp() {
       setStats(calculateStats(currentProps, currentUsers));
     }
 
-    // Ensure properties belong to a valid active user so they are always visible under "Meus Imóveis"
+    // Normalize property owners accurately without destroying active captador ownership
     if (currentUsers.length > 0 && currentProps.length > 0) {
-      const activeUser = currentUsers.find(u => u.status === 'active') || currentUsers[0];
-      let sanitized = false;
-      currentProps = currentProps.map(p => {
-        const hasValidOwner = currentUsers.some(u =>
-          u.id === p.user_id ||
-          u.id.toLowerCase() === p.user_id?.toLowerCase() ||
-          u.username.toLowerCase() === p.user_id?.toLowerCase() ||
-          u.email.toLowerCase() === p.user_id?.toLowerCase()
-        );
-        if (!hasValidOwner) {
-          sanitized = true;
-          return { ...p, user_id: activeUser.id };
-        }
-        return p;
-      });
-      if (sanitized) {
+      const { properties: normalizedProps, changed } = normalizePropertyOwners(currentProps, currentUsers);
+      if (changed) {
+        currentProps = normalizedProps;
         saveStoredProperties(currentProps);
       }
     }
@@ -188,15 +176,21 @@ function MainApp() {
       const handleFocus = () => {
         fetchData();
       };
-      window.addEventListener('focus', handleFocus);
+      const handleCustomUpdate = () => {
+        fetchData();
+      };
 
-      // Periodic sync every 10 seconds to detect server changes
+      window.addEventListener('focus', handleFocus);
+      window.addEventListener('lopes_properties_updated', handleCustomUpdate);
+
+      // Fast periodic sync every 3 seconds to detect server changes in real time
       const interval = setInterval(() => {
         fetchData();
-      }, 10000);
+      }, 3000);
 
       return () => {
         window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('lopes_properties_updated', handleCustomUpdate);
         clearInterval(interval);
       };
     }
@@ -319,13 +313,17 @@ function MainApp() {
       };
       updatedProps = [newProp, ...allProps];
     }
-    saveStoredProperties(updatedProps);
-    setProperties(updatedProps);
-    setStats(calculateStats(updatedProps, users));
+
+    const { properties: normalizedProps } = normalizePropertyOwners(updatedProps, users.length > 0 ? users : [user]);
+    saveStoredProperties(normalizedProps);
+    setProperties(normalizedProps);
+    setStats(calculateStats(normalizedProps, users));
 
     const updatedLogs = [newLog, ...logs];
     saveStoredLogs(updatedLogs);
     setLogs(updatedLogs);
+
+    window.dispatchEvent(new Event('lopes_properties_updated'));
   };
 
   const handleDeleteProperty = async (prop: Property) => {

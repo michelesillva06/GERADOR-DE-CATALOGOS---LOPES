@@ -56,6 +56,51 @@ export function saveStoredProperties(properties: Property[]) {
   }
 }
 
+export function normalizePropertyOwners(properties: Property[], users: User[]): { properties: Property[]; changed: boolean } {
+  if (!properties || properties.length === 0 || !users || users.length === 0) {
+    return { properties: properties || [], changed: false };
+  }
+
+  const activeCaptador = users.find(u => u.role === 'CAPTADOR' && u.status === 'active') || users.find(u => u.status === 'active') || users[0];
+  let changed = false;
+
+  const normalized = properties.map(p => {
+    // 1. Direct match with user ID
+    const directUser = users.find(u => u.id === p.user_id || u.id?.toLowerCase() === p.user_id?.toLowerCase());
+    if (directUser) {
+      if (p.user_id !== directUser.id) {
+        changed = true;
+        return { ...p, user_id: directUser.id };
+      }
+      return p;
+    }
+
+    // 2. Soft match with username, email, name, or url_slug
+    const softUser = users.find(u =>
+      (p.user_id && u.username.toLowerCase() === p.user_id.toLowerCase()) ||
+      (p.user_id && u.email.toLowerCase() === p.user_id.toLowerCase()) ||
+      (p.user_id && u.url_slug.toLowerCase() === p.user_id.toLowerCase()) ||
+      (p.user_id && u.name.toLowerCase() === p.user_id.toLowerCase()) ||
+      (p.user_id && u.name.toLowerCase().replace(/\s+/g, '') === p.user_id.toLowerCase())
+    );
+
+    if (softUser) {
+      changed = true;
+      return { ...p, user_id: softUser.id };
+    }
+
+    // 3. Unmatched property owner - attribute to active Captador if available, or active user
+    if (activeCaptador) {
+      changed = true;
+      return { ...p, user_id: activeCaptador.id };
+    }
+
+    return p;
+  });
+
+  return { properties: normalized, changed };
+}
+
 export function getStoredSettings(): CompanySettings {
   try {
     const raw = localStorage.getItem(KEYS.SETTINGS);

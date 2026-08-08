@@ -1429,20 +1429,21 @@ export async function generateCatalogPDF(options: {
 
   if (!selectedCoverUrl) {
     if (coverType === 'LOCACAO') {
-      selectedCoverUrl = companySettings?.cover_locacao_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url || companySettings?.cover_venda_url;
+      selectedCoverUrl = companySettings?.cover_locacao_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
     } else if (coverType === 'VENDA') {
-      selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url || companySettings?.cover_locacao_url;
+      selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
     } else {
-      selectedCoverUrl = companySettings?.cover_horizontal_url || companySettings?.cover_geral_url || companySettings?.cover_venda_url || companySettings?.cover_locacao_url;
-    }
-    if (!selectedCoverUrl) {
-      selectedCoverUrl = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=2000&q=80';
+      selectedCoverUrl = companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
     }
   }
 
   let coverDataUrl = '';
-  if (selectedCoverUrl) {
-    coverDataUrl = await urlToBase64(selectedCoverUrl);
+  if (selectedCoverUrl && selectedCoverUrl.trim()) {
+    try {
+      coverDataUrl = await urlToBase64(selectedCoverUrl);
+    } catch (err) {
+      console.warn('Could not load custom cover image URL:', err);
+    }
   }
 
   if (!coverDataUrl) {

@@ -27,6 +27,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   onDeleteProperty,
   onShareWhatsApp
 }) => {
+  const [scopeTab, setScopeTab] = useState<'meus' | 'geral'>('meus');
   const [search, setSearch] = useState('');
   const [filterCaptador, setFilterCaptador] = useState('todos');
   const [filterCategory, setFilterCategory] = useState('todos');
@@ -36,20 +37,21 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
 
   const isMaster = currentUser.role === 'MASTER_ADMIN';
   const isGestora = currentUser.role === 'GESTORA';
+  const isCaptador = currentUser.role === 'CAPTADOR';
   const isMasterOrGestora = isMaster || isGestora;
 
-  // Base properties scoping
-  let baseProperties = currentUser.role === 'CAPTADOR'
-    ? properties.filter(p =>
-        p.user_id === currentUser.id ||
-        p.user_id?.toLowerCase() === currentUser.id?.toLowerCase() ||
-        p.user_id?.toLowerCase() === currentUser.username?.toLowerCase() ||
-        p.user_id?.toLowerCase() === currentUser.email?.toLowerCase()
-      )
-    : properties;
+  const isOwnedByCurrentUser = (p: Property) =>
+    p.user_id === currentUser.id ||
+    p.user_id?.toLowerCase() === currentUser.id?.toLowerCase() ||
+    p.user_id?.toLowerCase() === currentUser.username?.toLowerCase() ||
+    p.user_id?.toLowerCase() === currentUser.email?.toLowerCase();
 
-  if (currentUser.role === 'CAPTADOR' && baseProperties.length === 0 && properties.length > 0) {
-    baseProperties = properties;
+  const myProperties = properties.filter(isOwnedByCurrentUser);
+
+  // Base properties scoping
+  let baseProperties = properties;
+  if (isCaptador) {
+    baseProperties = scopeTab === 'meus' ? myProperties : properties;
   }
 
   // Get list of unique neighborhoods
@@ -84,7 +86,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">
-            {isMaster ? 'Gestão de Imóveis do Sistema' : isGestora ? 'Visualização Geral de Imóveis (Gestora)' : 'Meus Imóveis Captados'}
+            {isMaster ? 'Gestão de Imóveis do Sistema' : isGestora ? 'Visualização Geral de Imóveis (Gestora)' : 'Gestão e Catálogo de Imóveis'}
           </h1>
           <p className="text-xs text-slate-500">
             Exibindo {filteredProperties.length} de {baseProperties.length} imóveis cadastrados em Manaus
@@ -111,6 +113,45 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
           )}
         </div>
       </div>
+
+      {/* Scope Selector Tabs for Captadores */}
+      {isCaptador && (
+        <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center space-x-2 max-w-md">
+          <button
+            type="button"
+            onClick={() => setScopeTab('meus')}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 ${
+              scopeTab === 'meus'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>Meus Imóveis Captados</span>
+            <span className={`px-2 py-0.5 text-[10px] rounded-full font-extrabold ${
+              scopeTab === 'meus' ? 'bg-rose-100 text-[#F10F4D]' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {myProperties.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setScopeTab('geral')}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 ${
+              scopeTab === 'geral'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>Catálogo Geral</span>
+            <span className={`px-2 py-0.5 text-[10px] rounded-full font-extrabold ${
+              scopeTab === 'geral' ? 'bg-rose-100 text-[#F10F4D]' : 'bg-slate-200 text-slate-700'
+            }`}>
+              {properties.length}
+            </span>
+          </button>
+        </div>
+      )}
 
       {/* Filter Toolbar */}
       <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm space-y-3">
@@ -211,7 +252,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProperties.map(prop => {
             const owner = users.find(u => u.id === prop.user_id);
-            const canEdit = isMaster || (!isGestora && currentUser.id === prop.user_id);
+            const canEdit = isMaster || (!isGestora && isOwnedByCurrentUser(prop));
             return (
               <PropertyCard
                 key={prop.id}
