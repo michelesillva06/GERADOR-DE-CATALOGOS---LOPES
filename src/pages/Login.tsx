@@ -9,7 +9,6 @@ export const Login: React.FC = () => {
   const [passwordInput, setPasswordInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showForgotMsg, setShowForgotMsg] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,18 +72,9 @@ export const Login: React.FC = () => {
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[10px] font-extrabold text-slate-600 uppercase tracking-widest">
-                Senha de Acesso
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowForgotMsg(true)}
-                className="text-[11px] text-[#F10F4D] hover:underline font-semibold"
-              >
-                Esqueceu a senha?
-              </button>
-            </div>
+            <label className="block text-[10px] font-extrabold text-slate-600 uppercase tracking-widest mb-1.5">
+              Senha de Acesso
+            </label>
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input
@@ -106,22 +96,6 @@ export const Login: React.FC = () => {
             {loading ? 'Acessando Sistema...' : 'Entrar no Sistema'}
           </button>
         </form>
-
-        {/* Recovery Dialog */}
-        {showForgotMsg && (
-          <div className="mt-5 p-4 bg-slate-50 border border-slate-200/90 rounded-2xl text-xs text-slate-700 space-y-2">
-            <p className="font-bold text-slate-900">Recuperação de Senha:</p>
-            <p className="text-slate-600 leading-relaxed">
-              Entre em contato com o <strong>Administrador Master (admin@lopesmanaus.com.br)</strong> para redefinir a sua senha de acesso.
-            </p>
-            <button
-              onClick={() => setShowForgotMsg(false)}
-              className="text-[10px] text-[#F10F4D] font-bold uppercase hover:underline pt-1 block"
-            >
-              Fechar aviso
-            </button>
-          </div>
-        )}
 
         {/* Brand Footer */}
         <div className="mt-8 pt-5 border-t border-slate-100 text-center text-[11px] text-slate-400">

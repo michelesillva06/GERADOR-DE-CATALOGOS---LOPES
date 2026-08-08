@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { getStoredCurrentUser, saveStoredCurrentUser, findUserByLogin, getStoredUsers } from '../lib/storage';
+import { getStoredCurrentUser, saveStoredCurrentUser, findUserByLogin, getStoredUsers, validateUserPassword } from '../lib/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -85,20 +85,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         saveStoredCurrentUser(data.user);
         return { success: true };
-      } else if (contentType.includes('application/json')) {
-        const data = await res.json();
-        return { success: false, error: data.error || 'Falha na autenticação' };
+      } else {
+        // Handle server non-200 responses strictly without falling through
+        let errorMsg = 'Senha incorreta ou usuário não encontrado.';
+        if (contentType.includes('application/json')) {
+          try {
+            const data = await res.json();
+            if (data && data.error) errorMsg = data.error;
+          } catch {}
+        }
+        return { success: false, error: errorMsg };
       }
     } catch (e) {
       console.warn('Backend API connection failed, switching to client auth mode:', e);
     }
 
-    // Client-side fallback for static servers (like Netlify)
+    // Client-side fallback for static servers or offline mode
     const localUser = findUserByLogin(loginText);
     if (localUser) {
       if (localUser.status === 'blocked') {
         return { success: false, error: 'Usuário bloqueado pelo administrador.' };
       }
+
+      const isValid = validateUserPassword(localUser.id, passText);
+      if (!isValid) {
+        return { success: false, error: 'Senha incorreta.' };
+      }
+
       saveStoredCurrentUser(localUser);
       setToken(`lopes_token_${localUser.id}`);
       setUser(localUser);

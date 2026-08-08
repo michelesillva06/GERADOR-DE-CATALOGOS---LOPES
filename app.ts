@@ -245,6 +245,59 @@ app.get('/api/auth/me', (req, res) => {
   }
 });
 
+// Auth: Change Password
+app.post('/api/auth/change-password', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Não autorizado. Faça login novamente.' });
+  }
+
+  const token = authHeader.substring(7);
+  let userId = '';
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
+    userId = decoded.id;
+  } catch {
+    if (token.startsWith('lopes_token_')) {
+      userId = token.replace('lopes_token_', '');
+    }
+  }
+
+  const user = users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: 'Usuário não encontrado.' });
+  }
+
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });
+  }
+
+  const hash = passwordHashes[user.id];
+  let validCurrent = false;
+  if (hash) {
+    validCurrent = await bcrypt.compare(currentPassword, hash);
+  } else {
+    validCurrent = currentPassword === 'mudar123';
+  }
+
+  if (!validCurrent) {
+    return res.status(400).json({ error: 'A senha atual informada está incorreta.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'A nova senha precisa ter no mínimo 6 caracteres.' });
+  }
+
+  const newHash = await bcrypt.hash(newPassword, 10);
+  passwordHashes[user.id] = newHash;
+  savePasswordHashes(passwordHashes);
+
+  addAuditLog(user.id, user.name, 'Alteração de Senha', 'Redefiniu sua senha de acesso no sistema', req);
+
+  res.json({ message: 'Sua senha foi alterada e salva com sucesso!' });
+});
+
 // Public: Get captador profile by url_slug or username
 app.get('/api/users/public/:slug', (req, res) => {
   const slug = req.params.slug.toLowerCase();

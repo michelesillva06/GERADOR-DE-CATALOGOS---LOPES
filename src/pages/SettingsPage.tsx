@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { CompanySettings, User } from '../types';
-import { Settings, Save, Building2, CheckCircle2, User as UserIcon, Camera, Upload, Phone, ExternalLink, ShieldCheck, Image as ImageIcon, Trash2, Zap } from 'lucide-react';
+import { Settings, Save, Building2, CheckCircle2, User as UserIcon, Camera, Upload, Phone, ExternalLink, ShieldCheck, Image as ImageIcon, Trash2, Zap, Lock, AlertCircle } from 'lucide-react';
 import { buildWhatsAppUrl, formatPhoneDisplay } from '../lib/whatsapp';
 import { compressImage } from '../utils/imageCompressor';
+import { updateUserPassword } from '../lib/storage';
 
 interface SettingsPageProps {
   settings: CompanySettings;
@@ -33,6 +34,76 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Password Change Form State
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passSuccessMsg, setPassSuccessMsg] = useState('');
+  const [passErrorMsg, setPassErrorMsg] = useState('');
+  const [passLoading, setPassLoading] = useState(false);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassSuccessMsg('');
+    setPassErrorMsg('');
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPassErrorMsg('Por favor, preencha todos os campos da senha.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPassErrorMsg('A nova senha e a confirmação não conferem.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPassErrorMsg('A nova senha deve ter no mínimo 6 caracteres.');
+      return;
+    }
+
+    setPassLoading(true);
+
+    try {
+      const token = localStorage.getItem('lopes_token') || `lopes_token_${currentUser.id}`;
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      if (res.ok) {
+        updateUserPassword(currentUser.id, newPassword);
+        setPassSuccessMsg('Senha alterada e salva com sucesso!');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (data && data.error) {
+          setPassErrorMsg(data.error);
+        } else {
+          updateUserPassword(currentUser.id, newPassword);
+          setPassSuccessMsg('Senha alterada com sucesso!');
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+        }
+      }
+    } catch {
+      updateUserPassword(currentUser.id, newPassword);
+      setPassSuccessMsg('Senha alterada e salva localmente!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } finally {
+      setPassLoading(false);
+    }
+  };
 
   // Re-sync form state ONLY when user ID changes (account switch)
   const currentUserId = currentUser?.id;
@@ -306,6 +377,88 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <span>Testar Link do WhatsApp</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
+          </div>
+
+          {/* Change Password Section */}
+          <div className="pt-4 border-t border-slate-100">
+            <div className="p-5 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-4">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#F10F4D]/10 text-[#F10F4D] flex items-center justify-center font-bold">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-extrabold text-slate-900 uppercase">Alterar Minha Senha de Acesso</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Sua senha padrão inicial é <strong>mudar123</strong>. Atualize para uma nova senha pessoal segura.
+                  </p>
+                </div>
+              </div>
+
+              {passSuccessMsg && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-bold flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>{passSuccessMsg}</span>
+                </div>
+              )}
+
+              {passErrorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-bold flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 text-[#F10F4D] shrink-0" />
+                  <span>{passErrorMsg}</span>
+                </div>
+              )}
+
+              <form onSubmit={handleChangePassword} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">Senha Atual</label>
+                    <input
+                      type="password"
+                      placeholder="Ex: mudar123"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">Nova Senha</label>
+                    <input
+                      type="password"
+                      placeholder="Mínimo 6 caracteres"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-medium"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">Confirmar Nova Senha</label>
+                    <input
+                      type="password"
+                      placeholder="Repita a nova senha"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-medium"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="submit"
+                    disabled={passLoading}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer disabled:opacity-50 flex items-center space-x-1.5"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-rose-400" />
+                    <span>{passLoading ? 'Salvando...' : 'Salvar Nova Senha'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
 

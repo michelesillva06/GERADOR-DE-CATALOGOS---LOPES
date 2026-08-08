@@ -9,7 +9,8 @@ const KEYS = {
   JOURNAL: 'lopes_journal',
   SCHEDULE: 'lopes_schedule',
   CURRENT_USER: 'lopes_current_user',
-  TOKEN: 'lopes_token'
+  TOKEN: 'lopes_token',
+  PASSWORDS: 'lopes_passwords'
 };
 
 export function getStoredUsers(): User[] {
@@ -231,6 +232,40 @@ export function findUserByLogin(loginText: string): User | null {
 
   // Partial match fallback for convenience
   return users.find(u => u.username.toLowerCase().includes(clean) || u.name.toLowerCase().includes(clean)) || null;
+}
+
+export function getStoredPasswords(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(KEYS.PASSWORDS);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return {
+    usr_admin: 'mudar123',
+    usr_larissa: 'mudar123',
+    usr_michele: 'mudar123',
+    usr_moacir: 'mudar123',
+    usr_karine: 'mudar123'
+  };
+}
+
+export function saveStoredPasswords(passwords: Record<string, string>) {
+  try {
+    localStorage.setItem(KEYS.PASSWORDS, JSON.stringify(passwords));
+  } catch (e) {
+    console.error('Failed to save passwords locally', e);
+  }
+}
+
+export function validateUserPassword(userId: string, passText: string): boolean {
+  const passwords = getStoredPasswords();
+  const expected = passwords[userId] || 'mudar123';
+  return passText === expected;
+}
+
+export function updateUserPassword(userId: string, newPass: string) {
+  const passwords = getStoredPasswords();
+  passwords[userId] = newPass;
+  saveStoredPasswords(passwords);
 }
 
 export function calculateStats(properties: Property[], users: User[]): DashboardStats {
