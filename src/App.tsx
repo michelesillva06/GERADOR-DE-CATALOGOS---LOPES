@@ -112,7 +112,7 @@ function MainApp() {
         const d = await settingsRes.json();
         if (d.settings) {
           const localSettings = getStoredSettings();
-          const mergedSettings = { ...d.settings, ...localSettings };
+          const mergedSettings = { ...localSettings, ...d.settings };
           currentSettings = mergedSettings;
           saveStoredSettings(currentSettings);
         }

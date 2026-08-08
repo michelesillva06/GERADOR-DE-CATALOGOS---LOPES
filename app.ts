@@ -126,21 +126,9 @@ async function performSystemReset() {
 // Ensure initial clean seed data in Firestore
 async function seedFirestoreIfNeeded() {
   try {
-    // Check if system has sample properties or sample users from older builds and perform clean reset
-    const propsSnap = await propertiesCol.get();
     const usersSnap = await usersCol.get();
     
-    // If sample properties exist or multiple sample users exist, perform a clean wipe
-    const samplePropsFound = propsSnap.docs.some(d => d.id.startsWith('prop_'));
-    const sampleUsersFound = usersSnap.docs.some(d => d.id === 'usr_larissa' || d.id === 'usr_michele');
-
-    if (samplePropsFound || sampleUsersFound) {
-      console.log('[Firestore] Sample data detected in database. Performing automated cleanup...');
-      await performSystemReset();
-      return;
-    }
-
-    // Otherwise, ensure usr_admin exists
+    // Ensure usr_admin exists if database is completely empty
     if (usersSnap.empty) {
       await performSystemReset();
       return;
@@ -162,7 +150,11 @@ async function seedFirestoreIfNeeded() {
         lastBackupAt: new Date().toISOString(),
         backupStatus: 'Ativo (Diário no Google Cloud Storage)'
       };
-      await settingsCol.doc('company').set(seeded);
+      try {
+        await settingsCol.doc('company').set(seeded);
+      } catch (e) {
+        console.warn('[Firestore] Error seeding company settings doc:', e);
+      }
       companySettings = seeded;
     } else {
       companySettings = { ...initialCompanySettings, ...settingsDoc.data() } as CompanySettings;
@@ -180,7 +172,7 @@ async function seedFirestoreIfNeeded() {
     const scheduleFullSnap = await scheduleCol.get();
     scheduleEvents = scheduleFullSnap.docs.map(d => d.data() as ScheduleEvent);
 
-    console.log('[Firestore] Database synchronized.');
+    console.log('[Firestore] Database synchronized successfully.');
   } catch (err) {
     console.error('[Firestore] Initialization error:', err);
     users = [...initialUsers];
@@ -265,44 +257,38 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(403).json({ error: 'Acesso bloqueado pelo Administrador Master.' });
   }
 
-  // Authenticate using Firebase Authentication REST API
   let authSuccess = false;
-  try {
-    const firebaseApiKey = firebaseConfig.apiKey;
-    const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: user.email,
-        password,
-        returnSecureToken: true
-      })
-    });
 
-    if (authRes.ok) {
+  // 1. Check in-memory custom password on user or fallback to mudar123
+  const userCustomPassword = (user as any).password;
+  if (userCustomPassword) {
+    if (password === userCustomPassword) {
       authSuccess = true;
-    } else {
-      const errData = await authRes.json();
-      // If user doesn't exist in Firebase Auth yet, create and retry if password is "mudar123"
-      if (errData?.error?.message === 'EMAIL_NOT_FOUND' || errData?.error?.message === 'INVALID_LOGIN_CREDENTIALS') {
-        if (password === 'mudar123') {
-          try {
-            await firebaseAuth.createUser({
-              uid: user.id,
-              email: user.email,
-              password: 'mudar123',
-              displayName: user.name
-            });
-            authSuccess = true;
-          } catch {
-            authSuccess = password === 'mudar123';
-          }
-        }
-      }
     }
-  } catch (e) {
-    console.warn('[FirebaseAuth] REST login error, checking fallback password:', e);
-    authSuccess = password === 'mudar123';
+  } else if (password === 'mudar123') {
+    authSuccess = true;
+  }
+
+  // 2. Fallback to Firebase Auth REST API
+  if (!authSuccess) {
+    try {
+      const firebaseApiKey = firebaseConfig.apiKey;
+      const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          password,
+          returnSecureToken: true
+        })
+      });
+
+      if (authRes.ok) {
+        authSuccess = true;
+      }
+    } catch (e) {
+      console.warn('[FirebaseAuth] REST login error:', e);
+    }
   }
 
   if (!authSuccess) {
@@ -311,7 +297,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
-  addAuditLog(user.id, user.name, 'Login', 'Efetuou login autenticado via Firebase Auth', req);
+  addAuditLog(user.id, user.name, 'Login', 'Efetuou login no sistema', req);
 
   res.json({
     token,
@@ -379,6 +365,40 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(400).json({ error: 'A nova senha precisa ter no mínimo 6 caracteres.' });
   }
 
+  // Validate current password
+  const expectedPassword = (user as any).password || 'mudar123';
+  let isCurrentValid = (currentPassword === expectedPassword);
+
+  if (!isCurrentValid) {
+    try {
+      const firebaseApiKey = firebaseConfig.apiKey;
+      const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          password: currentPassword,
+          returnSecureToken: true
+        })
+      });
+      if (authRes.ok) {
+        isCurrentValid = true;
+      }
+    } catch {}
+  }
+
+  if (!isCurrentValid) {
+    return res.status(400).json({ error: 'Senha atual incorreta. Digite a senha atual corretamente.' });
+  }
+
+  // Save new password in memory & Firestore
+  (user as any).password = newPassword;
+  try {
+    await usersCol.doc(user.id).set({ password: newPassword }, { merge: true });
+  } catch (err) {
+    console.warn('[Firestore] Error saving user password:', err);
+  }
+
   // Update password in Firebase Auth using Firebase Admin SDK
   try {
     let authUid = user.id;
@@ -402,7 +422,7 @@ app.post('/api/auth/change-password', async (req, res) => {
     console.warn('[FirebaseAuth] Error updating Firebase user password:', err);
   }
 
-  addAuditLog(user.id, user.name, 'Alteração de Senha', 'Redefiniu sua senha de acesso via Firebase Auth', req);
+  addAuditLog(user.id, user.name, 'Alteração de Senha', 'Redefiniu sua senha de acesso no sistema', req);
 
   res.json({ message: 'Sua senha foi alterada e salva com sucesso!' });
 });
