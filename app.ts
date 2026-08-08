@@ -61,16 +61,7 @@ function writeJsonStore(filename: string, data: any) {
 
 function loadPersistedSettings(): CompanySettings {
   const loaded = readJsonStore<CompanySettings>(SETTINGS_FILE_NAME, initialCompanySettings);
-  const merged = { ...initialCompanySettings, ...loaded };
-  const primaryCover = merged.cover_horizontal_url || merged.cover_geral_url || merged.cover_venda_url || merged.cover_locacao_url || initialCompanySettings.cover_horizontal_url;
-  
-  return {
-    ...merged,
-    cover_horizontal_url: merged.cover_horizontal_url || primaryCover,
-    cover_geral_url: merged.cover_geral_url || primaryCover,
-    cover_venda_url: merged.cover_venda_url || primaryCover,
-    cover_locacao_url: merged.cover_locacao_url || primaryCover
-  };
+  return { ...initialCompanySettings, ...loaded };
 }
 
 function savePersistedSettings(settings: CompanySettings) {
@@ -637,15 +628,9 @@ app.get('/api/settings', (req, res) => {
 
 app.put('/api/settings', (req, res) => {
   const update = req.body || {};
-  const primaryCover = update.cover_horizontal_url || update.cover_geral_url || update.cover_venda_url || update.cover_locacao_url;
-
   companySettings = {
     ...companySettings,
-    ...update,
-    cover_horizontal_url: update.cover_horizontal_url || primaryCover || companySettings.cover_horizontal_url,
-    cover_geral_url: update.cover_geral_url || primaryCover || companySettings.cover_geral_url,
-    cover_venda_url: update.cover_venda_url || primaryCover || companySettings.cover_venda_url,
-    cover_locacao_url: update.cover_locacao_url || primaryCover || companySettings.cover_locacao_url
+    ...update
   };
   savePersistedSettings(companySettings);
   addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária e capas dos catálogos', req);

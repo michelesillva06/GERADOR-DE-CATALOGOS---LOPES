@@ -108,13 +108,6 @@ function MainApp() {
         if (d.settings) {
           const localSettings = getStoredSettings();
           const mergedSettings = { ...localSettings, ...d.settings };
-          const primaryCover = mergedSettings.cover_horizontal_url || mergedSettings.cover_geral_url || mergedSettings.cover_venda_url || mergedSettings.cover_locacao_url;
-          if (primaryCover) {
-            mergedSettings.cover_horizontal_url = mergedSettings.cover_horizontal_url || primaryCover;
-            mergedSettings.cover_geral_url = mergedSettings.cover_geral_url || primaryCover;
-            mergedSettings.cover_venda_url = mergedSettings.cover_venda_url || primaryCover;
-            mergedSettings.cover_locacao_url = mergedSettings.cover_locacao_url || primaryCover;
-          }
           currentSettings = mergedSettings;
           saveStoredSettings(currentSettings);
         }
@@ -473,14 +466,9 @@ function MainApp() {
       console.warn('Backend API unavailable, saving settings locally:', e);
     }
 
-    const primaryCover = newSettings.cover_horizontal_url || newSettings.cover_geral_url || newSettings.cover_venda_url || newSettings.cover_locacao_url;
     const updated = savedSettingsFromBackend || {
       ...companySettings,
-      ...newSettings,
-      cover_horizontal_url: newSettings.cover_horizontal_url || primaryCover || companySettings.cover_horizontal_url,
-      cover_geral_url: newSettings.cover_geral_url || primaryCover || companySettings.cover_geral_url,
-      cover_venda_url: newSettings.cover_venda_url || primaryCover || companySettings.cover_venda_url,
-      cover_locacao_url: newSettings.cover_locacao_url || primaryCover || companySettings.cover_locacao_url
+      ...newSettings
     };
 
     saveStoredSettings(updated);

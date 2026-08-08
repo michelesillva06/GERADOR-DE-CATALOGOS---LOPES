@@ -67,15 +67,7 @@ export function getStoredSettings(): CompanySettings {
       return initialCompanySettings;
     }
     const parsed = JSON.parse(raw);
-    const merged = { ...initialCompanySettings, ...parsed };
-    const primaryCover = merged.cover_horizontal_url || merged.cover_geral_url || merged.cover_venda_url || merged.cover_locacao_url || initialCompanySettings.cover_horizontal_url;
-    return {
-      ...merged,
-      cover_horizontal_url: merged.cover_horizontal_url || primaryCover,
-      cover_geral_url: merged.cover_geral_url || primaryCover,
-      cover_venda_url: merged.cover_venda_url || primaryCover,
-      cover_locacao_url: merged.cover_locacao_url || primaryCover
-    };
+    return { ...initialCompanySettings, ...parsed };
   } catch {
     return initialCompanySettings;
   }

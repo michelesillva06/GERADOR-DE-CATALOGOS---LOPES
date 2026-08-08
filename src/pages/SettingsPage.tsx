@@ -72,7 +72,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
     const compressed = await compressImage(file, { maxWidth: 1400, maxHeight: 1400, quality: 0.8 });
     if (compressed) {
-      setCompanyForm(prev => ({ ...prev, [field]: compressed }));
+      setCompanyForm(prev => {
+        const next = { ...prev, [field]: compressed };
+        if (field === 'cover_horizontal_url') {
+          next.cover_geral_url = compressed;
+        }
+        return next;
+      });
     }
   };
 
@@ -430,7 +436,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 {companyForm.cover_horizontal_url && (
                   <button
                     type="button"
-                    onClick={() => setCompanyForm({ ...companyForm, cover_horizontal_url: '' })}
+                    onClick={() => setCompanyForm({ ...companyForm, cover_horizontal_url: '', cover_geral_url: '' })}
                     className="text-[10px] font-bold text-rose-600 hover:underline flex items-center space-x-1"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -473,7 +479,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   type="text"
                   placeholder="https://exemplo.com/capa-horizontal.jpg"
                   value={companyForm.cover_horizontal_url || ''}
-                  onChange={(e) => setCompanyForm({ ...companyForm, cover_horizontal_url: e.target.value })}
+                  onChange={(e) => setCompanyForm({ ...companyForm, cover_horizontal_url: e.target.value, cover_geral_url: e.target.value })}
                   className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
                 />
               </div>
