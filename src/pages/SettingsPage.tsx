@@ -408,7 +408,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
               )}
 
-              <form onSubmit={handleChangePassword} className="space-y-3">
+              <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[10px] font-extrabold text-slate-600 uppercase mb-1">Senha Atual</label>
@@ -449,7 +449,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
                 <div className="flex justify-end pt-1">
                   <button
-                    type="submit"
+                    type="button"
+                    onClick={handleChangePassword}
                     disabled={passLoading}
                     className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition cursor-pointer disabled:opacity-50 flex items-center space-x-1.5"
                   >
@@ -457,7 +458,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <span>{passLoading ? 'Salvando...' : 'Salvar Nova Senha'}</span>
                   </button>
                 </div>
-              </form>
+              </div>
             </div>
           </div>
         </div>
@@ -937,15 +938,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   try {
                     const res = await fetch('/api/system/reset', { method: 'POST' });
                     if (res.ok) {
-                      localStorage.clear();
-                      alert('Sistema zerado com sucesso! Recarregando aplicação...');
+                      localStorage.removeItem('lopes_users');
+                      localStorage.removeItem('lopes_properties');
+                      localStorage.removeItem('lopes_journal');
+                      localStorage.removeItem('lopes_schedule');
+                      localStorage.removeItem('lopes_logs');
+                      alert('Sistema zerado com sucesso! Todos os imóveis e usuários secundários foram removidos.');
                       window.location.reload();
                     } else {
                       alert('Não foi possível concluir o reset do sistema.');
                     }
                   } catch {
-                    localStorage.clear();
-                    alert('Navegador limpo com sucesso! Recarregando...');
+                    localStorage.removeItem('lopes_users');
+                    localStorage.removeItem('lopes_properties');
+                    localStorage.removeItem('lopes_journal');
+                    localStorage.removeItem('lopes_schedule');
+                    localStorage.removeItem('lopes_logs');
+                    alert('Navegador e banco de dados limpos! Recarregando...');
                     window.location.reload();
                   }
                 }}

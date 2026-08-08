@@ -79,32 +79,14 @@ function MainApp() {
       if (propsRes && propsRes.ok && (propsRes.headers.get('content-type') || '').includes('json')) {
         const d = await propsRes.json();
         if (Array.isArray(d.properties)) {
-          // Merge server properties with local stored properties so local creations are never lost
-          const localProps = getStoredProperties();
-          const serverIds = new Set(d.properties.map((p: Property) => p.id));
-          const serverCodes = new Set(d.properties.map((p: Property) => p.code.toLowerCase()));
-          const localOnly = localProps.filter(p => !serverIds.has(p.id) && !serverCodes.has(p.code.toLowerCase()));
-          
-          currentProps = [...d.properties, ...localOnly];
+          currentProps = d.properties;
           saveStoredProperties(currentProps);
-
-          // If there are local-only properties, sync them up to backend in background
-          if (localOnly.length > 0) {
-            fetch('/api/properties/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ properties: localOnly })
-            }).catch(() => null);
-          }
         }
       }
       if (usersRes && usersRes.ok && (usersRes.headers.get('content-type') || '').includes('json')) {
         const d = await usersRes.json();
         if (Array.isArray(d.users)) {
-          const localUsers = getStoredUsers();
-          const serverIds = new Set(d.users.map((u: User) => u.id));
-          const localOnly = localUsers.filter(u => !serverIds.has(u.id));
-          currentUsers = [...d.users, ...localOnly];
+          currentUsers = d.users;
           saveStoredUsers(currentUsers);
         }
       }

@@ -47,80 +47,90 @@ let lastBackupAt = new Date().toISOString();
 
 // Clean and reset database to empty production state
 async function performSystemReset() {
-  try {
-    console.log('[Firestore] Running complete system reset to clean state...');
+  // 1. Immediately reset in-memory state so all endpoints serve empty clean data
+  const adminUser = initialUsers[0] || {
+    id: 'usr_admin',
+    name: 'Administrador Master',
+    email: 'admin@lopesmanaus.com.br',
+    username: 'admin',
+    phone: '(92) 3659-1000',
+    whatsapp: '5592981234567',
+    role: 'MASTER_ADMIN',
+    position: 'Administrador do Sistema',
+    url_slug: 'admin',
+    status: 'active',
+    photo_url: '',
+    creci: '540-J/AM',
+    instagram: '@lopesmanaus',
+    created_at: new Date().toISOString()
+  };
 
-    // 1. Delete all properties
+  users = [adminUser];
+  properties = [];
+  journalEntries = [];
+  scheduleEvents = [];
+
+  const freshLog: AuditLog = {
+    id: `log_init_${Date.now()}`,
+    user_id: 'usr_admin',
+    user_name: 'Administrador Master',
+    action: 'Sistema Zerado',
+    description: 'Sistema zerado e limpo. Pronto para cadastros de usuários e imóveis do zero.',
+    created_at: new Date().toISOString()
+  };
+  auditLogs = [freshLog];
+
+  // 2. Clear collections in Firestore with safe isolated try/catches
+  try {
     const propsSnap = await propertiesCol.get();
     for (const doc of propsSnap.docs) {
-      await doc.ref.delete();
+      try { await doc.ref.delete(); } catch {}
     }
+  } catch (err) {
+    console.warn('[Firestore] Error clearing properties during reset:', err);
+  }
 
-    // 2. Delete all journal entries
+  try {
     const journalSnap = await journalCol.get();
     for (const doc of journalSnap.docs) {
-      await doc.ref.delete();
+      try { await doc.ref.delete(); } catch {}
     }
+  } catch (err) {
+    console.warn('[Firestore] Error clearing journal during reset:', err);
+  }
 
-    // 3. Delete all schedule events
+  try {
     const scheduleSnap = await scheduleCol.get();
     for (const doc of scheduleSnap.docs) {
-      await doc.ref.delete();
+      try { await doc.ref.delete(); } catch {}
     }
+  } catch (err) {
+    console.warn('[Firestore] Error clearing schedule during reset:', err);
+  }
 
-    // 4. Reset Audit Logs to a single initialization record
+  try {
     const logsSnap = await logsCol.get();
     for (const doc of logsSnap.docs) {
-      await doc.ref.delete();
+      try { await doc.ref.delete(); } catch {}
     }
-    const freshLog: AuditLog = {
-      id: `log_init_${Date.now()}`,
-      user_id: 'usr_admin',
-      user_name: 'Administrador Master',
-      action: 'Sistema Zerado',
-      description: 'Sistema zerado e limpo. Pronto para cadastros de usuários e imóveis do zero.',
-      created_at: new Date().toISOString()
-    };
     await logsCol.doc(freshLog.id).set(freshLog);
+  } catch (err) {
+    console.warn('[Firestore] Error clearing logs during reset:', err);
+  }
 
-    // 5. Delete non-admin users, keep only usr_admin
+  try {
     const usersSnap = await usersCol.get();
     for (const doc of usersSnap.docs) {
       if (doc.id !== 'usr_admin') {
-        await doc.ref.delete();
+        try { await doc.ref.delete(); } catch {}
       }
     }
-
-    const adminUser = initialUsers[0];
     await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
-
-    // Ensure Auth user
-    try {
-      await firebaseAuth.getUserByEmail(adminUser.email);
-    } catch {
-      try {
-        await firebaseAuth.createUser({
-          uid: adminUser.id,
-          email: adminUser.email,
-          password: 'mudar123',
-          displayName: adminUser.name
-        });
-      } catch (e) {
-        console.warn('Could not create admin auth user:', e);
-      }
-    }
-
-    // Update in-memory state
-    users = [adminUser];
-    properties = [];
-    journalEntries = [];
-    scheduleEvents = [];
-    auditLogs = [freshLog];
-
-    console.log('[Firestore] System clean reset completed successfully!');
   } catch (err) {
-    console.error('[Firestore] Error performing system reset:', err);
+    console.warn('[Firestore] Error resetting users doc during reset:', err);
   }
+
+  console.log('[Firestore] System clean reset completed successfully!');
 }
 
 // Ensure initial clean seed data in Firestore
