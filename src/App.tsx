@@ -36,7 +36,8 @@ import {
   saveStoredSchedule,
   saveStoredCurrentUser,
   calculateStats,
-  normalizePropertyOwners
+  normalizePropertyOwners,
+  updateUserPassword
 } from './lib/storage';
 
 function MainApp() {
@@ -386,6 +387,10 @@ function MainApp() {
       updatedUsers = [...allUsers, newUser];
     }
 
+    if (userData.password) {
+      updateUserPassword(newUser.id, userData.password);
+    }
+
     saveStoredUsers(updatedUsers);
     setUsers(updatedUsers);
     setStats(calculateStats(properties, updatedUsers));
@@ -403,6 +408,11 @@ function MainApp() {
     }
 
     const allUsers = getStoredUsers().map(u => u.id === id ? { ...u, ...userData } : u);
+    
+    if (userData.password) {
+      updateUserPassword(id, userData.password);
+    }
+
     saveStoredUsers(allUsers);
     setUsers(allUsers);
 

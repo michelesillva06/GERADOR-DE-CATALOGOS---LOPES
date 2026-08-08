@@ -148,6 +148,19 @@ async function seedFirestoreIfNeeded() {
     const usersFullSnap = await usersCol.get();
     users = usersFullSnap.docs.map(d => d.data() as User);
 
+    // Safety: ensure usr_admin exists even if database is not completely empty
+    const hasAdmin = users.some(u => u.username === 'admin' || u.id === 'usr_admin');
+    if (!hasAdmin) {
+      const adminUser = initialUsers[0];
+      try {
+        await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
+        users.push(adminUser);
+        console.log('[Firestore] Safely re-seeded missing admin user.');
+      } catch (err) {
+        console.warn('[Firestore] Error re-seeding missing admin user:', err);
+      }
+    }
+
     // Reload properties
     const propsFullSnap = await propertiesCol.get();
     properties = propsFullSnap.docs.map(d => d.data() as Property);
@@ -254,9 +267,9 @@ app.post('/api/auth/login', async (req, res) => {
 
   const cleanLogin = login.toLowerCase().trim();
   const user = users.find(u =>
-    u.username.toLowerCase() === cleanLogin ||
-    u.email.toLowerCase() === cleanLogin ||
-    u.id === cleanLogin
+    (u.username && u.username.toLowerCase() === cleanLogin) ||
+    (u.email && u.email.toLowerCase() === cleanLogin) ||
+    (u.id && u.id.toLowerCase() === cleanLogin)
   );
 
   if (!user) {
@@ -506,7 +519,7 @@ app.post('/api/users', async (req, res) => {
 
   const cleanSlug = (url_slug || username).toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  const newUser: User = {
+  const newUser: User & { password?: string } = {
     id: `usr_${Date.now()}`,
     name,
     email,
@@ -522,6 +535,10 @@ app.post('/api/users', async (req, res) => {
     instagram: instagram || '',
     created_at: new Date().toISOString()
   };
+
+  if (password) {
+    newUser.password = password;
+  }
 
   // Create Firebase Auth user
   try {
@@ -562,7 +579,7 @@ app.put('/api/users/:id', async (req, res) => {
     if (slugExists) return res.status(400).json({ error: 'URL personalizada já em uso por outro usuário.' });
   }
 
-  const updatedUser: User = {
+  const updatedUser: User & { password?: string } = {
     ...existing,
     name: name ?? existing.name,
     email: email ?? existing.email,
@@ -578,6 +595,7 @@ app.put('/api/users/:id', async (req, res) => {
   };
 
   if (password) {
+    updatedUser.password = password;
     try {
       await firebaseAuth.updateUser(id, { password });
     } catch {

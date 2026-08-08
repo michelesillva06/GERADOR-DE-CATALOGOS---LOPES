@@ -222,16 +222,19 @@ export function findUserByLogin(loginText: string): User | null {
   
   // Try exact match on username, email, or id
   const found = users.find(u => 
-    u.username.toLowerCase() === clean || 
-    u.email.toLowerCase() === clean || 
-    u.id.toLowerCase() === clean ||
-    u.url_slug.toLowerCase() === clean
+    (u.username && u.username.toLowerCase() === clean) || 
+    (u.email && u.email.toLowerCase() === clean) || 
+    (u.id && u.id.toLowerCase() === clean) ||
+    (u.url_slug && u.url_slug.toLowerCase() === clean)
   );
 
   if (found) return found;
 
   // Partial match fallback for convenience
-  return users.find(u => u.username.toLowerCase().includes(clean) || u.name.toLowerCase().includes(clean)) || null;
+  return users.find(u => 
+    (u.username && u.username.toLowerCase().includes(clean)) || 
+    (u.name && u.name.toLowerCase().includes(clean))
+  ) || null;
 }
 
 export function getStoredPasswords(): Record<string, string> {
