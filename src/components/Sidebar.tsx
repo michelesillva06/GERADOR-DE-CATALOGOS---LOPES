@@ -44,6 +44,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       show: true
     },
     {
+      id: 'general-catalog',
+      label: 'Catálogo Geral (Vitrine)',
+      icon: BookOpen,
+      show: true
+    },
+    {
       id: 'pdf-catalog',
       label: 'Gerar Catálogo PDF',
       icon: FileText,

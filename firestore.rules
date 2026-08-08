@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdminOrGerente() {
+      return isAuthenticated() && (
+        getUserRole() == 'ADMIN' || 
+        getUserRole() == 'GERENTE' || 
+        request.auth.token.role == 'ADMIN' || 
+        request.auth.token.role == 'GERENTE'
+      );
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow create, update, delete: if isAdminOrGerente() || (isAuthenticated() && request.auth.uid == userId);
+    }
+
+    // Properties Collection
+    match /properties/{propertyId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdminOrGerente() || (isAuthenticated() && resource.data.user_id == request.auth.uid);
+    }
+
+    // Settings Collection
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdminOrGerente();
+    }
+
+    // Journal / Diário
+    match /journal/{entryId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Schedule / Agenda
+    match /schedule/{eventId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Audit Logs
+    match /logs/{logId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

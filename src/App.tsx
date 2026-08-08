@@ -15,6 +15,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { CaptadorJournalPage } from './pages/CaptadorJournalPage';
 import { SchedulePage } from './pages/SchedulePage';
+import { GeneralCatalogPage } from './pages/GeneralCatalogPage';
 import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
@@ -730,6 +731,16 @@ function MainApp() {
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
               onShareWhatsApp={handleShareWhatsApp}
+            />
+          )}
+
+          {activeView === 'general-catalog' && (
+            <GeneralCatalogPage
+              properties={properties}
+              users={users}
+              companySettings={companySettings}
+              onOpenPdfCatalog={() => setIsPdfModalOpen(true)}
+              onViewProperty={handleViewPropertyDetails}
             />
           )}
 

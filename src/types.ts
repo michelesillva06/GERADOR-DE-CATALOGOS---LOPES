@@ -121,6 +121,8 @@ export interface CompanySettings {
   cover_geral_url?: string;
   cover_horizontal_url?: string;
   cover_vertical_url?: string;
+  lastBackupAt?: string;
+  backupStatus?: string;
 }
 
 export interface DashboardStats {
