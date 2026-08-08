@@ -147,6 +147,28 @@ function MainApp() {
       setStats(calculateStats(currentProps, currentUsers));
     }
 
+    // Ensure properties belong to a valid active user so they are always visible under "Meus Imóveis"
+    if (currentUsers.length > 0 && currentProps.length > 0) {
+      const activeUser = currentUsers.find(u => u.status === 'active') || currentUsers[0];
+      let sanitized = false;
+      currentProps = currentProps.map(p => {
+        const hasValidOwner = currentUsers.some(u =>
+          u.id === p.user_id ||
+          u.id.toLowerCase() === p.user_id?.toLowerCase() ||
+          u.username.toLowerCase() === p.user_id?.toLowerCase() ||
+          u.email.toLowerCase() === p.user_id?.toLowerCase()
+        );
+        if (!hasValidOwner) {
+          sanitized = true;
+          return { ...p, user_id: activeUser.id };
+        }
+        return p;
+      });
+      if (sanitized) {
+        saveStoredProperties(currentProps);
+      }
+    }
+
     setProperties(currentProps);
     setUsers(currentUsers);
     setCompanySettings(currentSettings);

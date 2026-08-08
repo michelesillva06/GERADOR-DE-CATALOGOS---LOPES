@@ -15,11 +15,12 @@ const KEYS = {
 export function getStoredUsers(): User[] {
   try {
     const raw = localStorage.getItem(KEYS.USERS);
-    if (!raw) {
-      localStorage.setItem(KEYS.USERS, JSON.stringify(initialUsers));
-      return initialUsers;
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     }
-    return JSON.parse(raw);
+    localStorage.setItem(KEYS.USERS, JSON.stringify(initialUsers));
+    return initialUsers;
   } catch {
     return initialUsers;
   }
@@ -36,16 +37,12 @@ export function saveStoredUsers(users: User[]) {
 export function getStoredProperties(): Property[] {
   try {
     const raw = localStorage.getItem(KEYS.PROPERTIES);
-    if (!raw) {
-      localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(initialProperties));
-      return initialProperties;
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
     }
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length === 0) {
-      localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(initialProperties));
-      return initialProperties;
-    }
-    return parsed;
+    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(initialProperties));
+    return initialProperties;
   } catch {
     return initialProperties;
   }

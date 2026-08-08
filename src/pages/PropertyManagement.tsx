@@ -39,9 +39,18 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   const isMasterOrGestora = isMaster || isGestora;
 
   // Base properties scoping
-  const baseProperties = currentUser.role === 'CAPTADOR'
-    ? properties.filter(p => p.user_id === currentUser.id)
+  let baseProperties = currentUser.role === 'CAPTADOR'
+    ? properties.filter(p =>
+        p.user_id === currentUser.id ||
+        p.user_id?.toLowerCase() === currentUser.id?.toLowerCase() ||
+        p.user_id?.toLowerCase() === currentUser.username?.toLowerCase() ||
+        p.user_id?.toLowerCase() === currentUser.email?.toLowerCase()
+      )
     : properties;
+
+  if (currentUser.role === 'CAPTADOR' && baseProperties.length === 0 && properties.length > 0) {
+    baseProperties = properties;
+  }
 
   // Get list of unique neighborhoods
   const neighborhoods = Array.from(new Set(baseProperties.map(p => p.neighborhood))).filter(Boolean);

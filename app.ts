@@ -70,7 +70,7 @@ function savePersistedSettings(settings: CompanySettings) {
 
 function loadPersistedUsers(): User[] {
   const loaded = readJsonStore<User[]>(USERS_FILE_NAME, initialUsers);
-  return (Array.isArray(loaded) && loaded.length > 0) ? loaded : [...initialUsers];
+  return (Array.isArray(loaded)) ? loaded : [...initialUsers];
 }
 
 function savePersistedUsers(uList: User[]) {
@@ -79,7 +79,7 @@ function savePersistedUsers(uList: User[]) {
 
 function loadPersistedProperties(): Property[] {
   const loaded = readJsonStore<Property[]>(PROPERTIES_FILE_NAME, initialProperties);
-  return (Array.isArray(loaded) && loaded.length > 0) ? loaded : [...initialProperties];
+  return (Array.isArray(loaded)) ? loaded : [...initialProperties];
 }
 
 function savePersistedProperties(pList: Property[]) {
@@ -109,6 +109,34 @@ let passwordHashes: Record<string, string> = loadPasswordHashes();
 let auditLogs: AuditLog[] = [...initialAuditLogs];
 let journalEntries: JournalEntry[] = [...initialJournalEntries] as JournalEntry[];
 let scheduleEvents: ScheduleEvent[] = [...initialScheduleEvents] as ScheduleEvent[];
+
+function sanitizePropertyOwners() {
+  if (!users || users.length === 0 || !properties || properties.length === 0) return;
+  const activeMaster = users.find(u => u.role === 'MASTER_ADMIN' && u.status === 'active') || users.find(u => u.status === 'active') || users[0];
+  if (!activeMaster) return;
+
+  let changed = false;
+  properties = properties.map(p => {
+    const ownerExists = users.some(u =>
+      u.id === p.user_id ||
+      u.id.toLowerCase() === p.user_id?.toLowerCase() ||
+      u.username.toLowerCase() === p.user_id?.toLowerCase() ||
+      u.email.toLowerCase() === p.user_id?.toLowerCase()
+    );
+    if (!ownerExists) {
+      changed = true;
+      return { ...p, user_id: activeMaster.id };
+    }
+    return p;
+  });
+
+  if (changed) {
+    savePersistedProperties(properties);
+  }
+}
+
+// Initial sanitization
+sanitizePropertyOwners();
 
 function addAuditLog(userId: string, userName: string, action: string, description: string, req?: express.Request) {
   const newLog: AuditLog = {
@@ -429,10 +457,17 @@ app.get('/api/properties/public/user/:slug', (req, res) => {
     return res.status(404).json({ error: 'Captador não encontrado.' });
   }
 
-  // Return active/available properties of this captador (or all if Master Admin / Gestora)
-  const captadorProps = (captador.role === 'MASTER_ADMIN' || captador.role === 'GESTORA')
-    ? properties
-    : properties.filter(p => p.user_id === captador.id || p.user_id?.toLowerCase() === captador.id?.toLowerCase());
+  // Return active/available properties of this captador (or all if Master Admin / Gestora / single active user)
+  let captadorProps = properties.filter(p =>
+    p.user_id === captador.id ||
+    p.user_id?.toLowerCase() === captador.id?.toLowerCase() ||
+    p.user_id?.toLowerCase() === captador.username?.toLowerCase() ||
+    p.user_id?.toLowerCase() === captador.email?.toLowerCase()
+  );
+
+  if (captador.role === 'MASTER_ADMIN' || captador.role === 'GESTORA' || (captadorProps.length === 0 && properties.length > 0)) {
+    captadorProps = properties;
+  }
 
   res.json({
     captador: {

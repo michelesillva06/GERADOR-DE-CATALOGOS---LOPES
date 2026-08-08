@@ -70,7 +70,18 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
         if (foundUser) {
           loadedCaptador = foundUser;
           const allProps = getStoredProperties();
-          loadedProps = allProps.filter(p => p.user_id === foundUser.id || foundUser.role === 'MASTER_ADMIN');
+          let filteredProps = allProps.filter(p =>
+            p.user_id === foundUser.id ||
+            p.user_id?.toLowerCase() === foundUser.id?.toLowerCase() ||
+            p.user_id?.toLowerCase() === foundUser.username?.toLowerCase() ||
+            p.user_id?.toLowerCase() === foundUser.email?.toLowerCase() ||
+            foundUser.role === 'MASTER_ADMIN' ||
+            foundUser.role === 'GESTORA'
+          );
+          if (filteredProps.length === 0 && allProps.length > 0) {
+            filteredProps = allProps;
+          }
+          loadedProps = filteredProps;
         }
       }
 
