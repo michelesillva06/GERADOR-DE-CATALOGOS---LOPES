@@ -61,7 +61,16 @@ function writeJsonStore(filename: string, data: any) {
 
 function loadPersistedSettings(): CompanySettings {
   const loaded = readJsonStore<CompanySettings>(SETTINGS_FILE_NAME, initialCompanySettings);
-  return { ...initialCompanySettings, ...loaded };
+  const merged = { ...initialCompanySettings, ...loaded };
+  const primaryCover = merged.cover_horizontal_url || merged.cover_geral_url || merged.cover_venda_url || merged.cover_locacao_url || initialCompanySettings.cover_horizontal_url;
+  
+  return {
+    ...merged,
+    cover_horizontal_url: merged.cover_horizontal_url || primaryCover,
+    cover_geral_url: merged.cover_geral_url || primaryCover,
+    cover_venda_url: merged.cover_venda_url || primaryCover,
+    cover_locacao_url: merged.cover_locacao_url || primaryCover
+  };
 }
 
 function savePersistedSettings(settings: CompanySettings) {

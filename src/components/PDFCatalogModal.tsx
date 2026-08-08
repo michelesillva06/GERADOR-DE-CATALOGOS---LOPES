@@ -52,10 +52,11 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
 
   const activeCoverImage = customCoverImage || officialCoverUrl;
 
-  // Update title when selected captador changes or modal opens
+  // Update title and reset custom cover when selected captador changes or modal opens
   useEffect(() => {
     if (isOpen) {
       setCatalogTitle(`Catálogo Digital - ${selectedCaptador.name}`);
+      setCustomCoverImage('');
     }
   }, [isOpen, selectedCaptadorId]);
 

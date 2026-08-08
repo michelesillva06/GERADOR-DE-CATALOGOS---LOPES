@@ -7,34 +7,23 @@ import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from './wh
 async function urlToBase64(url: string): Promise<string> {
   if (!url) return '';
   if (url.startsWith('data:')) return url;
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth || img.width || 1200;
-        canvas.height = img.naturalHeight || img.height || 1600;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.90));
-        } else {
-          resolve(url);
-        }
-      } catch {
-        resolve(url);
+
+  const img = await loadImageElement(url);
+  if (img) {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width || 1920;
+      canvas.height = img.naturalHeight || img.height || 1080;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL('image/jpeg', 0.88);
       }
-    };
-    img.onerror = () => {
-      // Retry without crossOrigin
-      const imgFallback = new Image();
-      imgFallback.onload = () => resolve(url);
-      imgFallback.onerror = () => resolve(url);
-      imgFallback.src = url;
-    };
-    img.src = url;
-  });
+    } catch (e) {
+      console.warn('Canvas toDataURL warning in urlToBase64:', e);
+    }
+  }
+  return url;
 }
 
 function formatCurrency(val: number): string {
@@ -1445,6 +1434,9 @@ export async function generateCatalogPDF(options: {
       selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url || companySettings?.cover_locacao_url;
     } else {
       selectedCoverUrl = companySettings?.cover_horizontal_url || companySettings?.cover_geral_url || companySettings?.cover_venda_url || companySettings?.cover_locacao_url;
+    }
+    if (!selectedCoverUrl) {
+      selectedCoverUrl = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=2000&q=80';
     }
   }
 
