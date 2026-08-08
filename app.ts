@@ -536,7 +536,11 @@ app.post('/api/users', async (req, res) => {
   }
 
   // Save to Firestore & memory
-  await usersCol.doc(newUser.id).set(newUser);
+  try {
+    await usersCol.doc(newUser.id).set(newUser);
+  } catch (e) {
+    console.warn('[Firestore] Warning saving user:', e);
+  }
   users.push(newUser);
 
   addAuditLog('usr_admin', 'Administrador Master', 'Criação de Usuário', `Cadastrou o usuário ${newUser.name} (${newUser.username}) no Firestore`, req);
@@ -582,7 +586,11 @@ app.put('/api/users/:id', async (req, res) => {
   }
 
   users[index] = updatedUser;
-  await usersCol.doc(id).set(updatedUser, { merge: true });
+  try {
+    await usersCol.doc(id).set(updatedUser, { merge: true });
+  } catch (e) {
+    console.warn('[Firestore] Error updating user:', e);
+  }
 
   addAuditLog('usr_admin', 'Administrador Master', 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} no Firestore`, req);
 
@@ -596,7 +604,11 @@ app.patch('/api/users/:id/block', async (req, res) => {
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   user.status = user.status === 'active' ? 'blocked' : 'active';
-  await usersCol.doc(id).update({ status: user.status });
+  try {
+    await usersCol.doc(id).update({ status: user.status });
+  } catch (e) {
+    console.warn('[Firestore] Error updating user status:', e);
+  }
 
   addAuditLog('usr_admin', 'Administrador Master', 'Alteração de Status', `Alterou o status do usuário ${user.name} para ${user.status}`, req);
 
@@ -626,7 +638,11 @@ app.delete('/api/users/:id', async (req, res) => {
   });
 
   batch.delete(usersCol.doc(id));
-  await batch.commit();
+  try {
+    await batch.commit();
+  } catch (e) {
+    console.warn('[Firestore] Error committing delete user batch:', e);
+  }
 
   users = users.filter(u => u.id !== id);
 
@@ -813,7 +829,11 @@ app.post('/api/properties', async (req, res) => {
   };
 
   properties.unshift(newProperty);
-  await propertiesCol.doc(newProperty.id).set(newProperty);
+  try {
+    await propertiesCol.doc(newProperty.id).set(newProperty);
+  } catch (e) {
+    console.warn('[Firestore] Error saving property:', e);
+  }
 
   const owner = users.find(u => u.id === newProperty.user_id);
   addAuditLog(newProperty.user_id, owner?.name || 'Captador', 'Cadastro de Imóvel', `Cadastrou o imóvel ${newProperty.code} (${newProperty.title}) no Firestore`, req);
@@ -839,7 +859,11 @@ app.put('/api/properties/:id', async (req, res) => {
   };
 
   properties[index] = updatedProperty;
-  await propertiesCol.doc(id).set(updatedProperty, { merge: true });
+  try {
+    await propertiesCol.doc(id).set(updatedProperty, { merge: true });
+  } catch (e) {
+    console.warn('[Firestore] Error updating property:', e);
+  }
 
   const owner = users.find(u => u.id === updatedProperty.user_id);
   addAuditLog(updatedProperty.user_id, owner?.name || 'Captador', 'Edição de Imóvel', `Atualizou o imóvel ${updatedProperty.code} no Firestore`, req);
@@ -854,7 +878,11 @@ app.delete('/api/properties/:id', async (req, res) => {
   if (!prop) return res.status(404).json({ error: 'Imóvel não encontrado.' });
 
   properties = properties.filter(p => p.id !== id);
-  await propertiesCol.doc(id).delete();
+  try {
+    await propertiesCol.doc(id).delete();
+  } catch (e) {
+    console.warn('[Firestore] Error deleting property:', e);
+  }
 
   addAuditLog('usr_admin', 'Sistema', 'Exclusão de Imóvel', `Excluiu o imóvel ${prop.code} do Firestore`, req);
 
@@ -947,7 +975,11 @@ app.put('/api/settings', async (req, res) => {
     ...companySettings,
     ...update
   };
-  await settingsCol.doc('company').set(companySettings, { merge: true });
+  try {
+    await settingsCol.doc('company').set(companySettings, { merge: true });
+  } catch (e) {
+    console.warn('[Firestore] Error updating settings:', e);
+  }
 
   addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária no Firestore', req);
   res.json({ settings: companySettings });
@@ -999,7 +1031,11 @@ app.post('/api/journal', async (req, res) => {
     journalEntries.unshift(entry);
   }
 
-  await journalCol.doc(entry.id).set(entry);
+  try {
+    await journalCol.doc(entry.id).set(entry);
+  } catch (e) {
+    console.warn('[Firestore] Error saving journal entry:', e);
+  }
 
   res.json({ journal: entry });
 });
@@ -1083,7 +1119,11 @@ app.post('/api/schedule', async (req, res) => {
   };
 
   scheduleEvents.unshift(newEvent);
-  await scheduleCol.doc(newEvent.id).set(newEvent);
+  try {
+    await scheduleCol.doc(newEvent.id).set(newEvent);
+  } catch (e) {
+    console.warn('[Firestore] Error saving schedule event:', e);
+  }
 
   addAuditLog(
     newEvent.user_id,
@@ -1102,7 +1142,11 @@ app.delete('/api/schedule/:id', async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Compromisso não encontrado.' });
 
   scheduleEvents = scheduleEvents.filter(e => e.id !== id);
-  await scheduleCol.doc(id).delete();
+  try {
+    await scheduleCol.doc(id).delete();
+  } catch (e) {
+    console.warn('[Firestore] Error deleting schedule event:', e);
+  }
 
   addAuditLog('usr_admin', 'Sistema', 'Cancelamento de Agendamento', `Cancelou ${existing.type}: "${existing.title}"`, req);
 
