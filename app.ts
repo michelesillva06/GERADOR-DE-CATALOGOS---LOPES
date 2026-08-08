@@ -13,16 +13,16 @@ import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
 
 // Initialize Firebase Admin SDK
-if (!getApps().length) {
-  initializeApp({
-    projectId: firebaseConfig.projectId,
-  });
-}
+const adminApp = getApps().length
+  ? getApps()[0]
+  : initializeApp({
+      projectId: firebaseConfig.projectId,
+    });
 
 // Get Firestore instance (with databaseId if specified)
 const firestoreDb = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(firebaseConfig.firestoreDatabaseId)
-  : getFirestore();
+  ? getFirestore(adminApp, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(adminApp);
 
 const firebaseAuth = getAuth();
 
@@ -45,56 +45,118 @@ let scheduleEvents: ScheduleEvent[] = [];
 // Track backup metadata
 let lastBackupAt = new Date().toISOString();
 
-// Ensure initial seed data in Firestore
+// Clean and reset database to empty production state
+async function performSystemReset() {
+  try {
+    console.log('[Firestore] Running complete system reset to clean state...');
+
+    // 1. Delete all properties
+    const propsSnap = await propertiesCol.get();
+    for (const doc of propsSnap.docs) {
+      await doc.ref.delete();
+    }
+
+    // 2. Delete all journal entries
+    const journalSnap = await journalCol.get();
+    for (const doc of journalSnap.docs) {
+      await doc.ref.delete();
+    }
+
+    // 3. Delete all schedule events
+    const scheduleSnap = await scheduleCol.get();
+    for (const doc of scheduleSnap.docs) {
+      await doc.ref.delete();
+    }
+
+    // 4. Reset Audit Logs to a single initialization record
+    const logsSnap = await logsCol.get();
+    for (const doc of logsSnap.docs) {
+      await doc.ref.delete();
+    }
+    const freshLog: AuditLog = {
+      id: `log_init_${Date.now()}`,
+      user_id: 'usr_admin',
+      user_name: 'Administrador Master',
+      action: 'Sistema Zerado',
+      description: 'Sistema zerado e limpo. Pronto para cadastros de usuários e imóveis do zero.',
+      created_at: new Date().toISOString()
+    };
+    await logsCol.doc(freshLog.id).set(freshLog);
+
+    // 5. Delete non-admin users, keep only usr_admin
+    const usersSnap = await usersCol.get();
+    for (const doc of usersSnap.docs) {
+      if (doc.id !== 'usr_admin') {
+        await doc.ref.delete();
+      }
+    }
+
+    const adminUser = initialUsers[0];
+    await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
+
+    // Ensure Auth user
+    try {
+      await firebaseAuth.getUserByEmail(adminUser.email);
+    } catch {
+      try {
+        await firebaseAuth.createUser({
+          uid: adminUser.id,
+          email: adminUser.email,
+          password: 'mudar123',
+          displayName: adminUser.name
+        });
+      } catch (e) {
+        console.warn('Could not create admin auth user:', e);
+      }
+    }
+
+    // Update in-memory state
+    users = [adminUser];
+    properties = [];
+    journalEntries = [];
+    scheduleEvents = [];
+    auditLogs = [freshLog];
+
+    console.log('[Firestore] System clean reset completed successfully!');
+  } catch (err) {
+    console.error('[Firestore] Error performing system reset:', err);
+  }
+}
+
+// Ensure initial clean seed data in Firestore
 async function seedFirestoreIfNeeded() {
   try {
-    // 1. Users
+    // Check if system has sample properties or sample users from older builds and perform clean reset
+    const propsSnap = await propertiesCol.get();
     const usersSnap = await usersCol.get();
+    
+    // If sample properties exist or multiple sample users exist, perform a clean wipe
+    const samplePropsFound = propsSnap.docs.some(d => d.id.startsWith('prop_'));
+    const sampleUsersFound = usersSnap.docs.some(d => d.id === 'usr_larissa' || d.id === 'usr_michele');
+
+    if (samplePropsFound || sampleUsersFound) {
+      console.log('[Firestore] Sample data detected in database. Performing automated cleanup...');
+      await performSystemReset();
+      return;
+    }
+
+    // Otherwise, ensure usr_admin exists
     if (usersSnap.empty) {
-      console.log('[Firestore] Seeding initial users...');
-      const batch = firestoreDb.batch();
-      for (const u of initialUsers) {
-        batch.set(usersCol.doc(u.id), u);
-        // Ensure user exists in Firebase Auth
-        try {
-          await firebaseAuth.getUserByEmail(u.email);
-        } catch {
-          try {
-            await firebaseAuth.createUser({
-              uid: u.id,
-              email: u.email,
-              password: 'mudar123',
-              displayName: u.name,
-            });
-          } catch (e) {
-            console.warn(`[FirebaseAuth] Could not create user ${u.email}:`, e);
-          }
-        }
-      }
-      await batch.commit();
+      await performSystemReset();
+      return;
     }
 
     // Reload users from Firestore
     const usersFullSnap = await usersCol.get();
     users = usersFullSnap.docs.map(d => d.data() as User);
 
-    // 2. Properties
-    const propsSnap = await propertiesCol.get();
-    if (propsSnap.empty) {
-      console.log('[Firestore] Seeding initial properties...');
-      const batch = firestoreDb.batch();
-      for (const p of initialProperties) {
-        batch.set(propertiesCol.doc(p.id), p);
-      }
-      await batch.commit();
-    }
+    // Reload properties
     const propsFullSnap = await propertiesCol.get();
     properties = propsFullSnap.docs.map(d => d.data() as Property);
 
-    // 3. Settings
+    // Settings
     const settingsDoc = await settingsCol.doc('company').get();
     if (!settingsDoc.exists) {
-      console.log('[Firestore] Seeding company settings...');
       const seeded = {
         ...initialCompanySettings,
         lastBackupAt: new Date().toISOString(),
@@ -104,80 +166,63 @@ async function seedFirestoreIfNeeded() {
       companySettings = seeded;
     } else {
       companySettings = { ...initialCompanySettings, ...settingsDoc.data() } as CompanySettings;
-      if (companySettings.lastBackupAt) {
-        lastBackupAt = companySettings.lastBackupAt;
-      }
     }
 
-    // 4. Journal
-    const journalSnap = await journalCol.get();
-    if (journalSnap.empty) {
-      console.log('[Firestore] Seeding initial journal entries...');
-      const batch = firestoreDb.batch();
-      for (const j of initialJournalEntries) {
-        batch.set(journalCol.doc(j.id), j);
-      }
-      await batch.commit();
-    }
+    // Journal
     const journalFullSnap = await journalCol.get();
     journalEntries = journalFullSnap.docs.map(d => d.data() as JournalEntry);
 
-    // 5. Audit Logs
-    const logsSnap = await logsCol.get();
-    if (logsSnap.empty) {
-      const batch = firestoreDb.batch();
-      for (const l of initialAuditLogs) {
-        batch.set(logsCol.doc(l.id), l);
-      }
-      await batch.commit();
-    }
+    // Audit Logs
     const logsFullSnap = await logsCol.orderBy('created_at', 'desc').limit(100).get();
     auditLogs = logsFullSnap.docs.map(d => d.data() as AuditLog);
 
-    // 6. Schedule
-    const scheduleSnap = await scheduleCol.get();
-    if (scheduleSnap.empty) {
-      const batch = firestoreDb.batch();
-      for (const s of initialScheduleEvents) {
-        batch.set(scheduleCol.doc(s.id), s);
-      }
-      await batch.commit();
-    }
+    // Schedule
     const scheduleFullSnap = await scheduleCol.get();
     scheduleEvents = scheduleFullSnap.docs.map(d => d.data() as ScheduleEvent);
 
-    console.log('[Firestore] Database fully initialized and synchronized.');
+    console.log('[Firestore] Database synchronized.');
   } catch (err) {
     console.error('[Firestore] Initialization error:', err);
-    // Fallback to initial mock data if offline
     users = [...initialUsers];
-    properties = [...initialProperties];
+    properties = [];
     companySettings = { ...initialCompanySettings };
-    journalEntries = [...initialJournalEntries] as JournalEntry[];
+    journalEntries = [];
     auditLogs = [...initialAuditLogs];
-    scheduleEvents = [...initialScheduleEvents] as ScheduleEvent[];
+    scheduleEvents = [];
   }
 }
 
+
+// Global process handler for unhandled rejections to prevent process crashes
+process.on('unhandledRejection', (reason, promise) => {
+  console.warn('[Process] Caught Unhandled Rejection:', reason);
+});
+
 // Perform initial seed asynchronously
-seedFirestoreIfNeeded();
+seedFirestoreIfNeeded().catch(err => {
+  console.warn('[Firestore] Unhandled seed error (fallback active):', err);
+});
 
 // Helper to log audit actions into Firestore and memory
 async function addAuditLog(userId: string, userName: string, action: string, description: string, req?: express.Request) {
-  const newLog: AuditLog = {
-    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-    user_id: userId,
-    user_name: userName,
-    action,
-    description,
-    created_at: new Date().toISOString(),
-    ip_address: req?.ip || '127.0.0.1'
-  };
-  auditLogs.unshift(newLog);
   try {
-    await logsCol.doc(newLog.id).set(newLog);
-  } catch (e) {
-    console.warn('Could not save audit log to Firestore:', e);
+    const newLog: AuditLog = {
+      id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      user_id: userId,
+      user_name: userName,
+      action,
+      description,
+      created_at: new Date().toISOString(),
+      ip_address: req?.ip || '127.0.0.1'
+    };
+    auditLogs.unshift(newLog);
+    try {
+      await logsCol.doc(newLog.id).set(newLog);
+    } catch (e) {
+      console.warn('Could not save audit log to Firestore:', e);
+    }
+  } catch (err) {
+    console.warn('Error in addAuditLog:', err);
   }
 }
 
@@ -1034,4 +1079,15 @@ app.delete('/api/schedule/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+app.post('/api/system/reset', async (req, res) => {
+  try {
+    await performSystemReset();
+    addAuditLog('usr_admin', 'Administrador Master', 'Reset do Sistema', 'Reset de fábrica executado via Painel.', req);
+    res.json({ success: true, message: 'Sistema zerado com sucesso! Todos os dados fictícios foram removidos.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Falha ao zerar o sistema.' });
+  }
+});
+
 export default app;
+

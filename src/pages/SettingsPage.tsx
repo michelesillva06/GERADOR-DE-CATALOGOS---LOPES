@@ -914,8 +914,50 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* RESET DE FÁBRICA / ZERAR SISTEMA */}
+            <div className="mt-6 pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-extrabold text-rose-600 flex items-center space-x-1.5">
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>Zerar Sistema (Reset de Fábrica)</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Apaga todos os dados fictícios de teste (imóveis, diário, agenda, logs e usuários adicionais), deixando apenas o Administrador Master para início limpo.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  const confirmed = window.confirm(
+                    '⚠️ ATENÇÃO: Tem certeza absoluta que deseja ZERAR O SISTEMA?\n\n- Todos os imóveis serão removidos.\n- Todos os agendamentos e registros serão apagados.\n- Todos os usuários secundários serão removidos.\n\nApenas a conta do Administrador Master continuará ativa.'
+                  );
+                  if (!confirmed) return;
+
+                  try {
+                    const res = await fetch('/api/system/reset', { method: 'POST' });
+                    if (res.ok) {
+                      localStorage.clear();
+                      alert('Sistema zerado com sucesso! Recarregando aplicação...');
+                      window.location.reload();
+                    } else {
+                      alert('Não foi possível concluir o reset do sistema.');
+                    }
+                  } catch {
+                    localStorage.clear();
+                    alert('Navegador limpo com sucesso! Recarregando...');
+                    window.location.reload();
+                  }
+                }}
+                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-[#F10F4D] border border-rose-200 font-bold text-xs rounded-xl transition cursor-pointer shrink-0 flex items-center space-x-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Zerar Banco de Dados Agora</span>
+              </button>
+            </div>
           </div>
         )}
+
 
       </form>
     </div>

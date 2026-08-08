@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Building2, User as UserIcon, LogOut, ExternalLink, ShieldAlert, Sparkles, ChevronDown } from 'lucide-react';
-
 import { LopesLogo } from './LopesLogo';
+import { getStoredUsers } from '../lib/storage';
 
 interface HeaderProps {
   onOpenPublicCatalog?: () => void;
@@ -16,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
 
   const publicUrl = user ? `${window.location.origin}/catalogo/${user.url_slug || user.username}` : '#';
+  const availableUsers = getStoredUsers();
 
   return (
     <header className="bg-white/95 backdrop-blur-md text-slate-900 border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
@@ -43,12 +44,12 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
             </a>
           )}
 
-          {/* Quick User Switcher Demo Dropdown - Only visible for MASTER_ADMIN */}
-          {user?.role === 'MASTER_ADMIN' && (
+          {/* Quick User Switcher Dropdown - Visible for MASTER_ADMIN if users exist */}
+          {user?.role === 'MASTER_ADMIN' && availableUsers.length > 0 && (
             <div className="relative">
               <button
                 onClick={() => setShowUserSwitcher(!showUserSwitcher)}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200/80 flex items-center space-x-1.5 transition"
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200/80 flex items-center space-x-1.5 transition cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span className="hidden lg:inline">Alternar Perfil</span>
@@ -58,79 +59,31 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
               {showUserSwitcher && (
                 <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200/90 rounded-2xl shadow-xl py-2 z-50">
                   <div className="px-3.5 py-2 border-b border-slate-100">
-                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Demonstração de Perfis Reais</p>
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Alternar entre Usuários do Sistema</p>
                   </div>
-                  <button
-                    onClick={() => {
-                      switchUserSimulated('usr_admin');
-                      setShowUserSwitcher(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
-                  >
-                    <div>
-                      <p className="font-bold text-[#F10F4D]">Administrador (Master Admin)</p>
-                      <p className="text-[10px] text-slate-400">admin@lopesmanaus.com.br</p>
-                    </div>
-                    {user?.role === 'MASTER_ADMIN' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchUserSimulated('usr_larissa');
-                      setShowUserSwitcher(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
-                  >
-                    <div>
-                      <p className="font-bold text-purple-600">Larissa Maia (Gestora)</p>
-                      <p className="text-[10px] text-slate-400">larissamaia (Gestão e Catálogos)</p>
-                    </div>
-                    {user?.username === 'larissamaia' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchUserSimulated('usr_michele');
-                      setShowUserSwitcher(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
-                  >
-                    <div>
-                      <p className="font-bold text-[#F10F4D]">Michele Silva (Corretora / Captadora)</p>
-                      <p className="text-[10px] text-slate-400">michelesilva</p>
-                    </div>
-                    {user?.username === 'michelesilva' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchUserSimulated('usr_moacir');
-                      setShowUserSwitcher(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
-                  >
-                    <div>
-                      <p className="font-bold text-amber-600">Moacir Martins (Consultor / Captador)</p>
-                      <p className="text-[10px] text-slate-400">moacirmartins</p>
-                    </div>
-                    {user?.username === 'moacirmartins' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
-                  </button>
-                  <button
-                    onClick={() => {
-                      switchUserSimulated('usr_karine');
-                      setShowUserSwitcher(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
-                  >
-                    <div>
-                      <p className="font-bold text-emerald-600">Karine Corrêa (Captadora Executiva)</p>
-                      <p className="text-[10px] text-slate-400">karinecorrea</p>
-                    </div>
-                    {user?.username === 'karinecorrea' && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
-                  </button>
+                  {availableUsers.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => {
+                        switchUserSimulated(u.id);
+                        setShowUserSwitcher(false);
+                      }}
+                      className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center justify-between text-slate-800 font-semibold"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-900">{u.name} ({u.role})</p>
+                        <p className="text-[10px] text-slate-400">{u.email}</p>
+                      </div>
+                      {user?.id === u.id && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
           )}
 
           {/* User Badge Profile Dropdown */}
+
           {user && (
             <div className="relative">
               <button
