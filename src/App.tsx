@@ -77,8 +77,23 @@ function MainApp() {
       if (propsRes && propsRes.ok && (propsRes.headers.get('content-type') || '').includes('json')) {
         const d = await propsRes.json();
         if (Array.isArray(d.properties)) {
-          currentProps = d.properties;
+          // Merge server properties with local stored properties so local creations are never lost
+          const localProps = getStoredProperties();
+          const serverIds = new Set(d.properties.map((p: Property) => p.id));
+          const serverCodes = new Set(d.properties.map((p: Property) => p.code.toLowerCase()));
+          const localOnly = localProps.filter(p => !serverIds.has(p.id) && !serverCodes.has(p.code.toLowerCase()));
+          
+          currentProps = [...d.properties, ...localOnly];
           saveStoredProperties(currentProps);
+
+          // If there are local-only properties, sync them up to backend in background
+          for (const lp of localOnly) {
+            fetch('/api/properties', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(lp)
+            }).catch(() => null);
+          }
         }
       }
       if (usersRes && usersRes.ok && (usersRes.headers.get('content-type') || '').includes('json')) {
@@ -91,7 +106,16 @@ function MainApp() {
       if (settingsRes && settingsRes.ok && (settingsRes.headers.get('content-type') || '').includes('json')) {
         const d = await settingsRes.json();
         if (d.settings) {
-          currentSettings = d.settings;
+          const localSettings = getStoredSettings();
+          const mergedSettings = { ...localSettings, ...d.settings };
+          const primaryCover = mergedSettings.cover_horizontal_url || mergedSettings.cover_geral_url || mergedSettings.cover_venda_url || mergedSettings.cover_locacao_url;
+          if (primaryCover) {
+            mergedSettings.cover_horizontal_url = mergedSettings.cover_horizontal_url || primaryCover;
+            mergedSettings.cover_geral_url = mergedSettings.cover_geral_url || primaryCover;
+            mergedSettings.cover_venda_url = mergedSettings.cover_venda_url || primaryCover;
+            mergedSettings.cover_locacao_url = mergedSettings.cover_locacao_url || primaryCover;
+          }
+          currentSettings = mergedSettings;
           saveStoredSettings(currentSettings);
         }
       }
@@ -187,19 +211,30 @@ function MainApp() {
   };
 
   const handleSaveProperty = async (propData: Partial<Property>) => {
+    let savedPropFromBackend: Property | null = null;
+    const targetUserId = propData.user_id || user.id;
+
     try {
       if (editingProperty) {
-        await fetch(`/api/properties/${editingProperty.id}`, {
+        const res = await fetch(`/api/properties/${editingProperty.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(propData)
+          body: JSON.stringify({ ...propData, user_id: targetUserId })
         });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.property) savedPropFromBackend = data.property;
+        }
       } else {
-        await fetch('/api/properties', {
+        const res = await fetch('/api/properties', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...propData, user_id: propData.user_id || user.id })
+          body: JSON.stringify({ ...propData, user_id: targetUserId })
         });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.property) savedPropFromBackend = data.property;
+        }
       }
     } catch (e) {
       console.warn('Backend API unavailable, saving property locally:', e);
@@ -208,7 +243,6 @@ function MainApp() {
     // Local state fallback / synchronization
     const allProps = getStoredProperties();
     let updatedProps: Property[] = [];
-    const targetUserId = propData.user_id || user.id;
     const captadorUser = users.find(u => u.id === targetUserId) || user;
 
     const newLog: AuditLog = {
@@ -223,8 +257,16 @@ function MainApp() {
       created_at: new Date().toISOString()
     };
 
-    if (editingProperty) {
-      updatedProps = allProps.map(p => p.id === editingProperty.id ? { ...p, ...propData, updated_at: new Date().toISOString() } as Property : p);
+    if (savedPropFromBackend) {
+      const existingIdx = allProps.findIndex(p => p.id === savedPropFromBackend!.id || p.code === savedPropFromBackend!.code);
+      if (existingIdx >= 0) {
+        updatedProps = [...allProps];
+        updatedProps[existingIdx] = savedPropFromBackend;
+      } else {
+        updatedProps = [savedPropFromBackend, ...allProps];
+      }
+    } else if (editingProperty) {
+      updatedProps = allProps.map(p => p.id === editingProperty.id ? { ...p, ...propData, user_id: targetUserId, updated_at: new Date().toISOString() } as Property : p);
     } else {
       const newCode = `LOP-${Math.floor(100 + Math.random() * 900)}`;
       const mainImg = propData.images?.[0] || propData.main_image || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
@@ -379,38 +421,68 @@ function MainApp() {
       console.warn('Backend API unavailable, toggling user block locally:', e);
     }
 
-    const allUsers = getStoredUsers().map(u => u.id === id ? { ...u, status: u.status === 'blocked' ? 'active' : 'blocked' } as User : u);
+    const allUsers = getStoredUsers().map(u => {
+      if (u.id === id) {
+        const nextStatus = u.status === 'active' ? 'blocked' : 'active';
+        return { ...u, status: nextStatus } as User;
+      }
+      return u;
+    });
     saveStoredUsers(allUsers);
     setUsers(allUsers);
     setStats(calculateStats(properties, allUsers));
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (!confirm('Excluir este usuário permamente?')) return;
+    if (!confirm('Tem certeza que deseja excluir este usuário? Todos os imóveis captados por ele serão mantidos no sistema e transferidos para a administração master.')) return;
     try {
       await fetch(`/api/users/${id}`, { method: 'DELETE' });
     } catch (e) {
       console.warn('Backend API unavailable, deleting user locally:', e);
     }
 
-    const allUsers = getStoredUsers().filter(u => u.id !== id);
+    const currentUsers = getStoredUsers();
+    const masterAdmin = currentUsers.find(u => u.role === 'MASTER_ADMIN') || currentUsers[0];
+    const masterId = masterAdmin ? masterAdmin.id : 'usr_admin';
+
+    // Reassign properties owned by deleted user to Master Admin so they are never lost
+    const currentProps = getStoredProperties();
+    const updatedProps = currentProps.map(p => p.user_id === id ? { ...p, user_id: masterId } : p);
+    saveStoredProperties(updatedProps);
+    setProperties(updatedProps);
+
+    const allUsers = currentUsers.filter(u => u.id !== id);
     saveStoredUsers(allUsers);
     setUsers(allUsers);
-    setStats(calculateStats(properties, allUsers));
+    setStats(calculateStats(updatedProps, allUsers));
   };
 
   const handleSaveSettings = async (newSettings: Partial<CompanySettings>) => {
+    let savedSettingsFromBackend: CompanySettings | null = null;
     try {
-      await fetch('/api/settings', {
+      const res = await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSettings)
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) savedSettingsFromBackend = data.settings;
+      }
     } catch (e) {
       console.warn('Backend API unavailable, saving settings locally:', e);
     }
 
-    const updated = { ...companySettings, ...newSettings };
+    const primaryCover = newSettings.cover_horizontal_url || newSettings.cover_geral_url || newSettings.cover_venda_url || newSettings.cover_locacao_url;
+    const updated = savedSettingsFromBackend || {
+      ...companySettings,
+      ...newSettings,
+      cover_horizontal_url: newSettings.cover_horizontal_url || primaryCover || companySettings.cover_horizontal_url,
+      cover_geral_url: newSettings.cover_geral_url || primaryCover || companySettings.cover_geral_url,
+      cover_venda_url: newSettings.cover_venda_url || primaryCover || companySettings.cover_venda_url,
+      cover_locacao_url: newSettings.cover_locacao_url || primaryCover || companySettings.cover_locacao_url
+    };
+
     saveStoredSettings(updated);
     setCompanySettings(updated);
   };

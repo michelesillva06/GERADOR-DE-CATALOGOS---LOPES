@@ -43,11 +43,11 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   // Resolution of official cover from companySettings based on purpose
   let officialCoverUrl = '';
   if (purposeFilter === 'Locação') {
-    officialCoverUrl = companySettings.cover_locacao_url || companySettings.cover_horizontal_url || companySettings.cover_geral_url || '';
+    officialCoverUrl = companySettings.cover_locacao_url || companySettings.cover_horizontal_url || companySettings.cover_geral_url || companySettings.cover_venda_url || '';
   } else if (purposeFilter === 'Venda') {
-    officialCoverUrl = companySettings.cover_venda_url || companySettings.cover_horizontal_url || companySettings.cover_geral_url || '';
+    officialCoverUrl = companySettings.cover_venda_url || companySettings.cover_horizontal_url || companySettings.cover_geral_url || companySettings.cover_locacao_url || '';
   } else {
-    officialCoverUrl = companySettings.cover_geral_url || companySettings.cover_horizontal_url || companySettings.cover_venda_url || companySettings.cover_locacao_url || '';
+    officialCoverUrl = companySettings.cover_horizontal_url || companySettings.cover_geral_url || companySettings.cover_venda_url || companySettings.cover_locacao_url || '';
   }
 
   const activeCoverImage = customCoverImage || officialCoverUrl;

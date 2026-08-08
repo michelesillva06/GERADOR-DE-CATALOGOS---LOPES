@@ -1,6 +1,6 @@
 import React from 'react';
 import { DashboardStats, Property, User, AuditLog } from '../types';
-import { Users, Building2, CheckCircle2, ShoppingBag, Key, TrendingUp, Award, ExternalLink, PlusCircle, ShieldCheck, FileSpreadsheet } from 'lucide-react';
+import { Users, Building2, CheckCircle2, ShoppingBag, Award, ExternalLink } from 'lucide-react';
 
 interface MasterDashboardProps {
   stats: DashboardStats | null;
@@ -25,39 +25,11 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
     <div className="space-y-6">
       
       {/* Welcome Banner */}
-      <div className="bg-[#333333] rounded-3xl p-6 text-white border border-[#444444] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2 text-[#F10F4D] text-xs font-bold uppercase tracking-wider mb-1">
-            <ShieldCheck className="w-4 h-4" />
-            <span>Painel de Controle Master Admin</span>
-          </div>
-          <h1 className="text-2xl font-black">Visão Geral Imobiliária - Lopes Captação</h1>
-          <p className="text-xs text-neutral-300 mt-1">
-            Acompanhe usuários captadores, métricas de imóveis e gere catálogos digitais
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setActiveView('reports')}
-            className="px-3.5 py-2 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs shadow-lg shadow-rose-900/30 transition flex items-center space-x-1.5"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>Planilha para Diretoria</span>
-          </button>
-          <button
-            onClick={onOpenNewUserModal}
-            className="px-3.5 py-2 rounded-xl bg-[#282828] hover:bg-[#202020] text-white font-bold text-xs border border-[#444444] transition"
-          >
-            Novo Captador
-          </button>
-          <button
-            onClick={onOpenNewPropertyModal}
-            className="px-3.5 py-2 rounded-xl bg-[#282828] hover:bg-[#202020] text-white font-bold text-xs border border-[#444444] transition"
-          >
-            Cadastrar Imóvel
-          </button>
-        </div>
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
+        <h1 className="text-2xl font-black text-slate-900">Visão Geral Imobiliária - Lopes Captação</h1>
+        <p className="text-xs text-slate-500 mt-1">
+          Acompanhe usuários captadores, métricas de imóveis e gere catálogos digitais
+        </p>
       </div>
 
       {/* Main Stats Cards Grid */}

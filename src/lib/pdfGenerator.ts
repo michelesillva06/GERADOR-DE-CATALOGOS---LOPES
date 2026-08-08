@@ -6,26 +6,33 @@ import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from './wh
 // Helper to convert image URL or Data URL to Base64 JPEG DataURL safely for jsPDF
 async function urlToBase64(url: string): Promise<string> {
   if (!url) return '';
+  if (url.startsWith('data:')) return url;
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
     img.onload = () => {
       try {
         const canvas = document.createElement('canvas');
-        canvas.width = img.width || 1200;
-        canvas.height = img.height || 1600;
+        canvas.width = img.naturalWidth || img.width || 1200;
+        canvas.height = img.naturalHeight || img.height || 1600;
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           resolve(canvas.toDataURL('image/jpeg', 0.90));
         } else {
-          resolve(url.startsWith('data:') ? url : '');
+          resolve(url);
         }
       } catch {
-        resolve(url.startsWith('data:') ? url : '');
+        resolve(url);
       }
     };
-    img.onerror = () => resolve(url.startsWith('data:') ? url : '');
+    img.onerror = () => {
+      // Retry without crossOrigin
+      const imgFallback = new Image();
+      imgFallback.onload = () => resolve(url);
+      imgFallback.onerror = () => resolve(url);
+      imgFallback.src = url;
+    };
     img.src = url;
   });
 }
@@ -1433,11 +1440,11 @@ export async function generateCatalogPDF(options: {
 
   if (!selectedCoverUrl) {
     if (coverType === 'LOCACAO') {
-      selectedCoverUrl = companySettings?.cover_locacao_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
+      selectedCoverUrl = companySettings?.cover_locacao_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url || companySettings?.cover_venda_url;
     } else if (coverType === 'VENDA') {
-      selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
+      selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url || companySettings?.cover_locacao_url;
     } else {
-      selectedCoverUrl = companySettings?.cover_geral_url || companySettings?.cover_horizontal_url || companySettings?.cover_venda_url || companySettings?.cover_locacao_url;
+      selectedCoverUrl = companySettings?.cover_horizontal_url || companySettings?.cover_geral_url || companySettings?.cover_venda_url || companySettings?.cover_locacao_url;
     }
   }
 

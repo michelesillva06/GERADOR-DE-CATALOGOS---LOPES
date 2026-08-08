@@ -49,30 +49,30 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
     <div className="space-y-6">
       
       {/* Welcome Banner */}
-      <div className="bg-[#333333] rounded-3xl p-6 text-white border border-[#444444] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           {user.photo_url ? (
             <img
               src={user.photo_url}
               alt={user.name}
-              className="w-16 h-16 rounded-full object-cover border-2 border-[#F10F4D] shadow-lg shrink-0"
+              className="w-16 h-16 rounded-full object-cover border-2 border-[#F10F4D] shadow-sm shrink-0"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-[#282828] border-2 border-[#F10F4D] flex items-center justify-center text-white font-black text-xl shrink-0 shadow-lg">
+            <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-[#F10F4D] flex items-center justify-center text-slate-800 font-black text-xl shrink-0 shadow-xs">
               {user.name ? user.name.charAt(0).toUpperCase() : 'C'}
             </div>
           )}
           <div>
             <p className="text-[10px] text-[#F10F4D] font-extrabold uppercase tracking-widest">Painel do Captador</p>
-            <h1 className="text-2xl font-black text-white">Bem-vindo(a), {user.name}!</h1>
-            <p className="text-xs text-neutral-300 mt-0.5">{user.position} • CRECI: {user.creci || '1234-F/AM'}</p>
+            <h1 className="text-2xl font-black text-slate-900">Bem-vindo(a), {user.name}!</h1>
+            <p className="text-xs text-slate-500 mt-0.5">{user.position} • CRECI: {user.creci || '1234-F/AM'}</p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onOpenPdfModal}
-            className="px-4 py-2.5 rounded-xl bg-[#282828] hover:bg-[#202020] text-white font-bold text-xs border border-[#444444] flex items-center space-x-2 transition cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-200 flex items-center space-x-2 transition cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 text-[#F10F4D]" />
             <span>Gerar Catálogo PDF</span>
@@ -80,7 +80,7 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
           
           <button
             onClick={onOpenNewPropertyModal}
-            className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-rose-950/30 transition cursor-pointer"
+            className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-rose-500/20 transition cursor-pointer"
           >
             <PlusCircle className="w-4 h-4" />
             <span>Novo Imóvel</span>

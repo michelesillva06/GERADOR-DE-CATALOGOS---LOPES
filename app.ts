@@ -328,14 +328,30 @@ app.delete('/api/users/:id', (req, res) => {
   const user = users.find(u => u.id === id);
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
+  // Reassign properties owned by deleted user to Master Admin so they are never lost
+  const masterAdmin = users.find(u => u.role === 'MASTER_ADMIN') || users[0];
+  const masterId = masterAdmin ? masterAdmin.id : 'usr_admin';
+
+  let reassignedCount = 0;
+  properties = properties.map(p => {
+    if (p.user_id === id) {
+      reassignedCount++;
+      return { ...p, user_id: masterId };
+    }
+    return p;
+  });
+  if (reassignedCount > 0) {
+    savePersistedProperties(properties);
+  }
+
   users = users.filter(u => u.id !== id);
   savePersistedUsers(users);
   delete passwordHashes[id];
   savePasswordHashes(passwordHashes);
 
-  addAuditLog('usr_admin', 'Administrador Master', 'Exclusão de Usuário', `Excluiu o usuário ${user.name}`, req);
+  addAuditLog('usr_admin', 'Administrador Master', 'Exclusão de Usuário', `Excluiu o usuário ${user.name} e preservou ${reassignedCount} imóvel(is) no sistema.`, req);
 
-  res.json({ success: true });
+  res.json({ success: true, reassignedCount });
 });
 
 // Properties: List Properties (with filtering)
@@ -401,13 +417,23 @@ app.get('/api/properties/public/user/:slug', (req, res) => {
     });
   }
 
-  const captador = users.find(u => u.url_slug?.toLowerCase() === slug || u.username?.toLowerCase() === slug);
+  const captador = users.find(u =>
+    u.url_slug?.toLowerCase() === slug ||
+    u.username?.toLowerCase() === slug ||
+    u.id?.toLowerCase() === slug ||
+    u.email?.toLowerCase() === slug ||
+    u.name.toLowerCase().replace(/\s+/g, '') === slug
+  );
+
   if (!captador) {
     return res.status(404).json({ error: 'Captador não encontrado.' });
   }
 
-  // Return active/available properties of this captador
-  const captadorProps = properties.filter(p => p.user_id === captador.id);
+  // Return active/available properties of this captador (or all if Master Admin / Gestora)
+  const captadorProps = (captador.role === 'MASTER_ADMIN' || captador.role === 'GESTORA')
+    ? properties
+    : properties.filter(p => p.user_id === captador.id || p.user_id?.toLowerCase() === captador.id?.toLowerCase());
+
   res.json({
     captador: {
       id: captador.id,
@@ -601,7 +627,17 @@ app.get('/api/settings', (req, res) => {
 });
 
 app.put('/api/settings', (req, res) => {
-  companySettings = { ...companySettings, ...req.body };
+  const update = req.body || {};
+  const primaryCover = update.cover_horizontal_url || update.cover_geral_url || update.cover_venda_url || update.cover_locacao_url;
+
+  companySettings = {
+    ...companySettings,
+    ...update,
+    cover_horizontal_url: update.cover_horizontal_url || primaryCover || companySettings.cover_horizontal_url,
+    cover_geral_url: update.cover_geral_url || primaryCover || companySettings.cover_geral_url,
+    cover_venda_url: update.cover_venda_url || primaryCover || companySettings.cover_venda_url,
+    cover_locacao_url: update.cover_locacao_url || primaryCover || companySettings.cover_locacao_url
+  };
   savePersistedSettings(companySettings);
   addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária e capas dos catálogos', req);
   res.json({ settings: companySettings });
