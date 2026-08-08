@@ -122,54 +122,57 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
       .slice(0, 5);
   }, [properties]);
 
-  // Breakdown per captador
+  // Breakdown per captador (active captadores only)
   const captadoresPerformance = useMemo(() => {
-    return users.map(u => {
-      const uProps = properties.filter(p => p.user_id === u.id);
-      const uAvailable = uProps.filter(p => p.status === 'Disponível').length;
-      const uSold = uProps.filter(p => p.status === 'Vendido').length;
-      const uRented = uProps.filter(p => p.status === 'Alugado').length;
-      const uReserved = uProps.filter(p => p.status === 'Reservado').length;
+    return users
+      .filter(u => u.status === 'active')
+      .map(u => {
+        const uProps = properties.filter(p => p.user_id === u.id);
+        const uAvailable = uProps.filter(p => p.status === 'Disponível').length;
+        const uSold = uProps.filter(p => p.status === 'Vendido').length;
+        const uRented = uProps.filter(p => p.status === 'Alugado').length;
+        const uReserved = uProps.filter(p => p.status === 'Reservado').length;
 
-      const uVgvVenda = uProps
-        .filter(p => p.purpose.includes('Venda') && p.price)
-        .reduce((acc, p) => acc + (p.price || 0), 0);
+        const uVgvVenda = uProps
+          .filter(p => p.purpose.includes('Venda') && p.price)
+          .reduce((acc, p) => acc + (p.price || 0), 0);
 
-      const uVgvLocacao = uProps
-        .filter(p => p.purpose.includes('Locação') && (p.rent_price || p.price))
-        .reduce((acc, p) => acc + (p.rent_price || p.price || 0), 0);
+        const uVgvLocacao = uProps
+          .filter(p => p.purpose.includes('Locação') && (p.rent_price || p.price))
+          .reduce((acc, p) => acc + (p.rent_price || p.price || 0), 0);
 
-      const uTotalVgv = uVgvVenda + uVgvLocacao;
-      const uAvgTicket = uTotalVgv / Math.max(uProps.length, 1);
+        const uTotalVgv = uVgvVenda + uVgvLocacao;
+        const uAvgTicket = uTotalVgv / Math.max(uProps.length, 1);
 
-      // Top Neighborhoods
-      const uNeighMap: Record<string, number> = {};
-      uProps.forEach(p => {
-        const n = p.neighborhood || 'Outro';
-        uNeighMap[n] = (uNeighMap[n] || 0) + 1;
-      });
-      const topNeigh = Object.entries(uNeighMap)
-        .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Geral';
+        // Top Neighborhoods
+        const uNeighMap: Record<string, number> = {};
+        uProps.forEach(p => {
+          const n = p.neighborhood || 'Outro';
+          uNeighMap[n] = (uNeighMap[n] || 0) + 1;
+        });
+        const topNeigh = Object.entries(uNeighMap)
+          .sort((a, b) => b[1] - a[1])[0]?.[0] || 'Geral';
 
-      const uLogs = logs.filter(l => l.user_id === u.id || l.user_name?.toLowerCase() === u.name.toLowerCase());
-      const lastActivity = uLogs[0]?.created_at;
+        const uLogs = logs.filter(l => l.user_id === u.id || l.user_name?.toLowerCase() === u.name.toLowerCase());
+        const lastActivity = uLogs[0]?.created_at;
 
-      return {
-        user: u,
-        total: uProps.length,
-        available: uAvailable,
-        sold: uSold,
-        rented: uRented,
-        reserved: uReserved,
-        vgvVenda: uVgvVenda,
-        vgvLocacao: uVgvLocacao,
-        totalVgv: uTotalVgv,
-        avgTicket: uAvgTicket,
-        topNeigh,
-        lastActivity,
-        activityCount: uLogs.length
-      };
-    }).sort((a, b) => b.total - a.total);
+        return {
+          user: u,
+          total: uProps.length,
+          available: uAvailable,
+          sold: uSold,
+          rented: uRented,
+          reserved: uReserved,
+          vgvVenda: uVgvVenda,
+          vgvLocacao: uVgvLocacao,
+          totalVgv: uTotalVgv,
+          avgTicket: uAvgTicket,
+          topNeigh,
+          lastActivity,
+          activityCount: uLogs.length
+        };
+      })
+      .sort((a, b) => b.total !== a.total ? b.total - a.total : a.user.name.localeCompare(b.user.name));
   }, [users, properties, logs]);
 
   const handleDownloadXLSX = () => {

@@ -588,15 +588,17 @@ app.get('/api/stats', (req, res) => {
   });
 
   const topCaptadores = users
-    .filter(u => u.role === 'CAPTADOR')
+    .filter(u => u.status === 'active')
     .map(u => ({
       user_id: u.id,
       name: u.name,
-      photo_url: u.photo_url,
+      photo_url: u.photo_url || '',
       count: captadorCounts[u.id] || 0,
-      url_slug: u.url_slug
+      url_slug: u.url_slug || u.username
     }))
-    .sort((a, b) => b.count - a.count);
+    .filter(c => c.count > 0)
+    .sort((a, b) => b.count !== a.count ? b.count - a.count : a.name.localeCompare(b.name))
+    .slice(0, 5);
 
   const stats: DashboardStats = {
     total_users: totalUsers,

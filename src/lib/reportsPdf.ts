@@ -221,7 +221,7 @@ export function exportControlPDF(
   doc.text('3. MATRIZ DE DESEMPENHO INDIVIDUAL DOS CAPTADORES', 14, currentY);
   currentY += 4;
 
-  const captadoresPerformance = users.map(u => {
+  const captadoresPerformance = users.filter(u => u.status === 'active').map(u => {
     const userProps = properties.filter(p => p.user_id === u.id);
     const avail = userProps.filter(p => p.status === 'Disponível').length;
     const sold = userProps.filter(p => p.status === 'Vendido').length;

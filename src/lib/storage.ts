@@ -202,7 +202,7 @@ export function calculateStats(properties: Property[], users: User[]): Dashboard
   const captadorCounts: Record<string, { user_id: string; name: string; photo_url: string; count: number; url_slug: string }> = {};
   properties.forEach(p => {
     const owner = users.find(u => u.id === p.user_id);
-    if (owner) {
+    if (owner && owner.status === 'active') {
       if (!captadorCounts[owner.id]) {
         captadorCounts[owner.id] = {
           user_id: owner.id,
@@ -216,7 +216,9 @@ export function calculateStats(properties: Property[], users: User[]): Dashboard
     }
   });
 
-  const topCaptadores = Object.values(captadorCounts).sort((a, b) => b.count - a.count).slice(0, 5);
+  const topCaptadores = Object.values(captadorCounts)
+    .sort((a, b) => b.count !== a.count ? b.count - a.count : a.name.localeCompare(b.name))
+    .slice(0, 5);
 
   return {
     total_users: users.length,

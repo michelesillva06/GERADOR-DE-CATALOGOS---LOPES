@@ -99,7 +99,10 @@ function MainApp() {
       if (usersRes && usersRes.ok && (usersRes.headers.get('content-type') || '').includes('json')) {
         const d = await usersRes.json();
         if (Array.isArray(d.users)) {
-          currentUsers = d.users;
+          const localUsers = getStoredUsers();
+          const serverIds = new Set(d.users.map((u: User) => u.id));
+          const localOnly = localUsers.filter(u => !serverIds.has(u.id));
+          currentUsers = [...d.users, ...localOnly];
           saveStoredUsers(currentUsers);
         }
       }
@@ -408,14 +411,21 @@ function MainApp() {
   };
 
   const handleToggleBlockUser = async (id: string) => {
+    let updatedUserFromBackend: User | null = null;
     try {
-      await fetch(`/api/users/${id}/block`, { method: 'PATCH' });
+      const res = await fetch(`/api/users/${id}/block`, { method: 'PATCH' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.user) updatedUserFromBackend = data.user;
+      }
     } catch (e) {
       console.warn('Backend API unavailable, toggling user block locally:', e);
     }
 
-    const allUsers = getStoredUsers().map(u => {
+    const currentUsers = getStoredUsers();
+    const allUsers = currentUsers.map(u => {
       if (u.id === id) {
+        if (updatedUserFromBackend) return updatedUserFromBackend;
         const nextStatus = u.status === 'active' ? 'blocked' : 'active';
         return { ...u, status: nextStatus } as User;
       }
