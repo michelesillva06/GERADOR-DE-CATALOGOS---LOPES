@@ -43,8 +43,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [passErrorMsg, setPassErrorMsg] = useState('');
   const [passLoading, setPassLoading] = useState(false);
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleChangePassword = async (e?: React.FormEvent | React.MouseEvent) => {
+    if (e) e.preventDefault();
     setPassSuccessMsg('');
     setPassErrorMsg('');
 
@@ -418,7 +418,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-medium"
-                      required
                     />
                   </div>
 
@@ -430,7 +429,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-medium"
-                      required
                     />
                   </div>
 
@@ -442,7 +440,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 font-medium"
-                      required
                     />
                   </div>
                 </div>
