@@ -933,7 +933,8 @@ export async function renderHorizontalPropertyCanvas(
   captador: User,
   companySettings: CompanySettings,
   pageIndex: number = 0,
-  totalPages: number = 1
+  totalPages: number = 1,
+  baseUrl: string = window.location.origin
 ): Promise<string> {
   const canvas = document.createElement('canvas');
   canvas.width = 2970;
@@ -1244,6 +1245,59 @@ export async function renderHorizontalPropertyCanvas(
   });
 
   // =========================================================================
+  // DYNAMIC CTA BLOCK (VER DETALHES BUTTON & QR CODE)
+  // =========================================================================
+  const ctaY = gridY + 2 * cardH + gapY + 20;
+
+  // Draw background container
+  ctx.fillStyle = '#FFF1F2'; // Subtle light rose background
+  ctx.strokeStyle = '#FFE4E6'; // Subtle border
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(rightX, ctaY, rightW, 150, 16);
+  ctx.fill();
+  ctx.stroke();
+
+  // Draw left texts
+  ctx.fillStyle = TEXT_DARK;
+  ctx.font = '900 28px sans-serif';
+  ctx.fillText('QUER SABER MAIS DETALHES E VER OUTRAS FOTOS?', rightX + 40, ctaY + 62);
+
+  ctx.fillStyle = TEXT_MUTED;
+  ctx.font = '600 22px sans-serif';
+  ctx.fillText('Acesse a página deste imóvel no site ou escaneie o QR Code ao lado.', rightX + 40, ctaY + 105);
+
+  // Draw "VER DETALHES" Button
+  const btnX = rightX + 1060;
+  const btnY = ctaY + 35;
+  const btnW = 320;
+  const btnH = 80;
+
+  ctx.fillStyle = LOPES_RED;
+  ctx.beginPath();
+  ctx.roundRect(btnX, btnY, btnW, btnH, 12);
+  ctx.fill();
+
+  // Draw white text inside the button
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 26px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('VER DETALHES', btnX + (btnW / 2), btnY + 48);
+  ctx.textAlign = 'left';
+
+  // Draw dynamic QR Code
+  const propertyPublicUrl = `${baseUrl}/imovel/${prop.code}`;
+  const qrCodeUrl = await generateQRCodeDataUrl(propertyPublicUrl, '#F10F4D');
+  const qrImg = await loadImageElement(qrCodeUrl);
+  if (qrImg) {
+    const qrX = rightX + 1430;
+    const qrY = ctaY + 15;
+    const qrW = 120;
+    const qrH = 120;
+    ctx.drawImage(qrImg, qrX, qrY, qrW, qrH);
+  }
+
+  // =========================================================================
   // LOWER GALLERY & DESCRIPTION ROW
   // =========================================================================
   const lowerY = 1240;
@@ -1470,7 +1524,7 @@ export async function generateCatalogPDF(options: {
     doc.addPage();
 
     // Use pixel-perfect Horizontal Property Canvas matching luxury magazine layout
-    const horizontalCanvasDataUrl = await renderHorizontalPropertyCanvas(prop, captador, companySettings, i, totalPages);
+    const horizontalCanvasDataUrl = await renderHorizontalPropertyCanvas(prop, captador, companySettings, i, totalPages, baseUrl);
     doc.addImage(horizontalCanvasDataUrl, 'JPEG', 0, 0, 297, 210);
 
     // Active interactive PDF link overlay for WhatsApp
@@ -1480,6 +1534,63 @@ export async function generateCatalogPDF(options: {
 
     // Clickable link on the footer logo area for website/WhatsApp
     doc.link(10, 190, 80, 20, { url: whatsappDirectUrl });
+
+    // Calculate exact gridY to match renderHorizontalPropertyCanvas for precise CTA box link placement
+    const rightW = 1590;
+    const canvasTemp = document.createElement('canvas');
+    const ctxTemp = canvasTemp.getContext('2d');
+    let titleY = 235;
+    if (ctxTemp) {
+      ctxTemp.font = '900 82px Georgia, "Times New Roman", serif';
+      const titleWords = prop.title.split(' ');
+      let titleLine1 = '';
+      let titleLine2 = '';
+      for (let w = 0; w < titleWords.length; w++) {
+        const testLine = titleLine1 + titleWords[w] + ' ';
+        if (ctxTemp.measureText(testLine).width > (rightW - 40) && w > 0) {
+          titleLine2 = titleWords.slice(w).join(' ');
+          break;
+        } else {
+          titleLine1 = testLine;
+        }
+      }
+      if (titleLine2) titleY += 90;
+    } else {
+      if (prop.title.length > 25) titleY += 90;
+    }
+
+    titleY += 55; // Subtitle start
+
+    if (ctxTemp) {
+      ctxTemp.font = '600 36px sans-serif';
+      const subtitle = `Conforto, localização e qualidade de vida no bairro ${prop.neighborhood || 'Parque 10'} em Manaus.`;
+      const subWords = subtitle.split(' ');
+      let subLine1 = '';
+      let subLine2 = '';
+      for (let w = 0; w < subWords.length; w++) {
+        const testLine = subLine1 + subWords[w] + ' ';
+        if (ctxTemp.measureText(testLine).width > (rightW - 40) && w > 0) {
+          subLine2 = subWords.slice(w).join(' ');
+          break;
+        } else {
+          subLine1 = testLine;
+        }
+      }
+      if (subLine2) titleY += 48;
+    } else {
+      titleY += 48;
+    }
+
+    titleY += 30; // Red bar accent
+    const gridY = titleY + 50;
+    const cardH = 225;
+    const gapY = 30;
+    const ctaY = gridY + 2 * cardH + gapY + 20;
+
+    // Register active link exactly covering the visual "VER DETALHES" banner (from X = 126mm to 285mm, Y = ctaY / 10 to (ctaY + 150) / 10)
+    doc.link(126, ctaY / 10, 159, 15, { url: propertyPublicUrl });
+
+    // Keep footer slogan area link as fallback
     doc.link(120, 190, 160, 20, { url: propertyPublicUrl });
   }
 

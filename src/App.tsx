@@ -50,6 +50,7 @@ function MainApp() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>(getStoredJournal());
   const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>(getStoredSchedule());
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [isBackendHealthy, setIsBackendHealthy] = useState(false);
 
   // Modals state
   const [viewingProperty, setViewingProperty] = useState<Property | null>(null);
@@ -66,69 +67,89 @@ function MainApp() {
     let currentJournals = getStoredJournal();
     let currentSchedule = getStoredSchedule();
 
+    let healthy = false;
     try {
-      const [propsRes, usersRes, settingsRes, logsRes, statsRes, journalsRes, scheduleRes] = await Promise.all([
-        fetch('/api/properties').catch(() => null),
-        fetch('/api/users').catch(() => null),
-        fetch('/api/settings').catch(() => null),
-        fetch('/api/logs').catch(() => null),
-        fetch('/api/stats').catch(() => null),
-        fetch('/api/journal').catch(() => null),
-        fetch('/api/schedule').catch(() => null)
-      ]);
-
-      if (propsRes && propsRes.ok && (propsRes.headers.get('content-type') || '').includes('json')) {
-        const d = await propsRes.json();
-        if (Array.isArray(d.properties)) {
-          currentProps = d.properties;
-          saveStoredProperties(currentProps);
+      const healthRes = await fetch('/api/health').catch(() => null);
+      if (healthRes && healthRes.ok) {
+        const healthData = await healthRes.json();
+        if (healthData.firestoreConnected) {
+          healthy = true;
         }
-      }
-      if (usersRes && usersRes.ok && (usersRes.headers.get('content-type') || '').includes('json')) {
-        const d = await usersRes.json();
-        if (Array.isArray(d.users)) {
-          currentUsers = d.users;
-          saveStoredUsers(currentUsers);
-        }
-      }
-      if (settingsRes && settingsRes.ok && (settingsRes.headers.get('content-type') || '').includes('json')) {
-        const d = await settingsRes.json();
-        if (d.settings) {
-          const localSettings = getStoredSettings();
-          const mergedSettings = { ...localSettings, ...d.settings };
-          currentSettings = mergedSettings;
-          saveStoredSettings(currentSettings);
-        }
-      }
-      if (logsRes && logsRes.ok && (logsRes.headers.get('content-type') || '').includes('json')) {
-        const d = await logsRes.json();
-        if (d.logs) {
-          currentLogs = d.logs;
-          saveStoredLogs(currentLogs);
-        }
-      }
-      if (journalsRes && journalsRes.ok && (journalsRes.headers.get('content-type') || '').includes('json')) {
-        const d = await journalsRes.json();
-        if (d.journals) {
-          currentJournals = d.journals;
-          saveStoredJournal(currentJournals);
-        }
-      }
-      if (scheduleRes && scheduleRes.ok && (scheduleRes.headers.get('content-type') || '').includes('json')) {
-        const d = await scheduleRes.json();
-        if (d.events) {
-          currentSchedule = d.events;
-          saveStoredSchedule(currentSchedule);
-        }
-      }
-      if (statsRes && statsRes.ok && (statsRes.headers.get('content-type') || '').includes('json')) {
-        const d = await statsRes.json();
-        if (d.stats) setStats(d.stats);
-      } else {
-        setStats(calculateStats(currentProps, currentUsers));
       }
     } catch (e) {
-      console.warn('Failed to load data from backend, using local storage:', e);
+      console.warn('Backend health check failed:', e);
+    }
+
+    setIsBackendHealthy(healthy);
+
+    if (healthy) {
+      try {
+        const [propsRes, usersRes, settingsRes, logsRes, statsRes, journalsRes, scheduleRes] = await Promise.all([
+          fetch('/api/properties').catch(() => null),
+          fetch('/api/users').catch(() => null),
+          fetch('/api/settings').catch(() => null),
+          fetch('/api/logs').catch(() => null),
+          fetch('/api/stats').catch(() => null),
+          fetch('/api/journal').catch(() => null),
+          fetch('/api/schedule').catch(() => null)
+        ]);
+
+        if (propsRes && propsRes.ok && (propsRes.headers.get('content-type') || '').includes('json')) {
+          const d = await propsRes.json();
+          if (Array.isArray(d.properties)) {
+            currentProps = d.properties;
+            saveStoredProperties(currentProps);
+          }
+        }
+        if (usersRes && usersRes.ok && (usersRes.headers.get('content-type') || '').includes('json')) {
+          const d = await usersRes.json();
+          if (Array.isArray(d.users)) {
+            currentUsers = d.users;
+            saveStoredUsers(currentUsers);
+          }
+        }
+        if (settingsRes && settingsRes.ok && (settingsRes.headers.get('content-type') || '').includes('json')) {
+          const d = await settingsRes.json();
+          if (d.settings) {
+            const localSettings = getStoredSettings();
+            const mergedSettings = { ...localSettings, ...d.settings };
+            currentSettings = mergedSettings;
+            saveStoredSettings(currentSettings);
+          }
+        }
+        if (logsRes && logsRes.ok && (logsRes.headers.get('content-type') || '').includes('json')) {
+          const d = await logsRes.json();
+          if (d.logs) {
+            currentLogs = d.logs;
+            saveStoredLogs(currentLogs);
+          }
+        }
+        if (journalsRes && journalsRes.ok && (journalsRes.headers.get('content-type') || '').includes('json')) {
+          const d = await journalsRes.json();
+          if (d.journals) {
+            currentJournals = d.journals;
+            saveStoredJournal(currentJournals);
+          }
+        }
+        if (scheduleRes && scheduleRes.ok && (scheduleRes.headers.get('content-type') || '').includes('json')) {
+          const d = await scheduleRes.json();
+          if (d.events) {
+            currentSchedule = d.events;
+            saveStoredSchedule(currentSchedule);
+          }
+        }
+        if (statsRes && statsRes.ok && (statsRes.headers.get('content-type') || '').includes('json')) {
+          const d = await statsRes.json();
+          if (d.stats) setStats(d.stats);
+        } else {
+          setStats(calculateStats(currentProps, currentUsers));
+        }
+      } catch (e) {
+        console.warn('Failed to load data from backend, using local storage:', e);
+        setStats(calculateStats(currentProps, currentUsers));
+      }
+    } else {
+      console.log('[Offline Mode] Relying strictly on LocalStorage.');
       setStats(calculateStats(currentProps, currentUsers));
     }
 
@@ -210,30 +231,32 @@ function MainApp() {
     let savedPropFromBackend: Property | null = null;
     const targetUserId = propData.user_id || user.id;
 
-    try {
-      if (editingProperty) {
-        const res = await fetch(`/api/properties/${editingProperty.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...propData, user_id: targetUserId })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.property) savedPropFromBackend = data.property;
+    if (isBackendHealthy) {
+      try {
+        if (editingProperty) {
+          const res = await fetch(`/api/properties/${editingProperty.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...propData, user_id: targetUserId })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.property) savedPropFromBackend = data.property;
+          }
+        } else {
+          const res = await fetch('/api/properties', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...propData, user_id: targetUserId })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.property) savedPropFromBackend = data.property;
+          }
         }
-      } else {
-        const res = await fetch('/api/properties', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...propData, user_id: targetUserId })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.property) savedPropFromBackend = data.property;
-        }
+      } catch (e) {
+        console.warn('Backend API unavailable, saving property locally:', e);
       }
-    } catch (e) {
-      console.warn('Backend API unavailable, saving property locally:', e);
     }
 
     // Local state fallback / synchronization
@@ -312,10 +335,12 @@ function MainApp() {
 
   const handleDeleteProperty = async (prop: Property) => {
     if (!confirm(`Deseja realmente excluir o imóvel ${prop.code}?`)) return;
-    try {
-      await fetch(`/api/properties/${prop.id}`, { method: 'DELETE' });
-    } catch (e) {
-      console.warn('Backend API unavailable, deleting property locally:', e);
+    if (isBackendHealthy) {
+      try {
+        await fetch(`/api/properties/${prop.id}`, { method: 'DELETE' });
+      } catch (e) {
+        console.warn('Backend API unavailable, deleting property locally:', e);
+      }
     }
 
     const allProps = getStoredProperties().filter(p => p.id !== prop.id);
@@ -345,19 +370,21 @@ function MainApp() {
 
   const handleAddUser = async (userData: any) => {
     let createdFromBackend: User | null = null;
-    try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('json')) {
-        const data = await res.json();
-        if (data.user) createdFromBackend = data.user;
+    if (isBackendHealthy) {
+      try {
+        const res = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData)
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('json')) {
+          const data = await res.json();
+          if (data.user) createdFromBackend = data.user;
+        }
+      } catch (e) {
+        console.warn('Backend API unavailable, adding user locally:', e);
       }
-    } catch (e) {
-      console.warn('Backend API unavailable, adding user locally:', e);
     }
 
     const allUsers = getStoredUsers();
@@ -397,14 +424,16 @@ function MainApp() {
   };
 
   const handleUpdateUser = async (id: string, userData: any) => {
-    try {
-      await fetch(`/api/users/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      });
-    } catch (e) {
-      console.warn('Backend API unavailable, updating user locally:', e);
+    if (isBackendHealthy) {
+      try {
+        await fetch(`/api/users/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(userData)
+        });
+      } catch (e) {
+        console.warn('Backend API unavailable, updating user locally:', e);
+      }
     }
 
     const allUsers = getStoredUsers().map(u => u.id === id ? { ...u, ...userData } : u);
@@ -425,14 +454,16 @@ function MainApp() {
 
   const handleToggleBlockUser = async (id: string) => {
     let updatedUserFromBackend: User | null = null;
-    try {
-      const res = await fetch(`/api/users/${id}/block`, { method: 'PATCH' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.user) updatedUserFromBackend = data.user;
+    if (isBackendHealthy) {
+      try {
+        const res = await fetch(`/api/users/${id}/block`, { method: 'PATCH' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) updatedUserFromBackend = data.user;
+        }
+      } catch (e) {
+        console.warn('Backend API unavailable, toggling user block locally:', e);
       }
-    } catch (e) {
-      console.warn('Backend API unavailable, toggling user block locally:', e);
     }
 
     const currentUsers = getStoredUsers();
@@ -451,10 +482,12 @@ function MainApp() {
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este usuário? Todos os imóveis captados por ele serão mantidos no sistema e transferidos para a administração master.')) return;
-    try {
-      await fetch(`/api/users/${id}`, { method: 'DELETE' });
-    } catch (e) {
-      console.warn('Backend API unavailable, deleting user locally:', e);
+    if (isBackendHealthy) {
+      try {
+        await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      } catch (e) {
+        console.warn('Backend API unavailable, deleting user locally:', e);
+      }
     }
 
     const currentUsers = getStoredUsers();
@@ -475,18 +508,20 @@ function MainApp() {
 
   const handleSaveSettings = async (newSettings: Partial<CompanySettings>) => {
     let savedSettingsFromBackend: CompanySettings | null = null;
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSettings)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.settings) savedSettingsFromBackend = data.settings;
+    if (isBackendHealthy) {
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newSettings)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings) savedSettingsFromBackend = data.settings;
+        }
+      } catch (e) {
+        console.warn('Backend API unavailable, saving settings locally:', e);
       }
-    } catch (e) {
-      console.warn('Backend API unavailable, saving settings locally:', e);
     }
 
     const updated = savedSettingsFromBackend || {
@@ -499,30 +534,32 @@ function MainApp() {
   };
 
   const handleSaveJournal = async (entryData: Partial<JournalEntry>) => {
-    try {
-      const res = await fetch('/api/journal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entryData)
-      });
-      if (res.ok) {
-        const d = await res.json();
-        if (d.journal) {
-          const currentList = getStoredJournal();
-          const idx = currentList.findIndex(j => j.id === d.journal.id || (j.user_id === d.journal.user_id && j.date === d.journal.date));
-          let updatedList = [...currentList];
-          if (idx !== -1) {
-            updatedList[idx] = d.journal;
-          } else {
-            updatedList.unshift(d.journal);
+    if (isBackendHealthy) {
+      try {
+        const res = await fetch('/api/journal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entryData)
+        });
+        if (res.ok) {
+          const d = await res.json();
+          if (d.journal) {
+            const currentList = getStoredJournal();
+            const idx = currentList.findIndex(j => j.id === d.journal.id || (j.user_id === d.journal.user_id && j.date === d.journal.date));
+            let updatedList = [...currentList];
+            if (idx !== -1) {
+              updatedList[idx] = d.journal;
+            } else {
+              updatedList.unshift(d.journal);
+            }
+            saveStoredJournal(updatedList);
+            setJournalEntries(updatedList);
+            return;
           }
-          saveStoredJournal(updatedList);
-          setJournalEntries(updatedList);
-          return;
         }
+      } catch (e) {
+        console.warn('Backend API unavailable, saving journal locally:', e);
       }
-    } catch (e) {
-      console.warn('Backend API unavailable, saving journal locally:', e);
     }
 
     // Local fallback
@@ -553,27 +590,29 @@ function MainApp() {
   };
 
   const handleAddScheduleEvent = async (eventData: Partial<ScheduleEvent>): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const res = await fetch('/api/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(eventData)
-      });
+    if (isBackendHealthy) {
+      try {
+        const res = await fetch('/api/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(eventData)
+        });
 
-      const d = await res.json();
-      if (!res.ok) {
-        return { success: false, error: d.error || 'Erro ao agendar compromisso.' };
-      }
+        const d = await res.json();
+        if (!res.ok) {
+          return { success: false, error: d.error || 'Erro ao agendar compromisso.' };
+        }
 
-      if (d.event) {
-        const currentSchedule = getStoredSchedule();
-        const updated = [d.event, ...currentSchedule];
-        saveStoredSchedule(updated);
-        setScheduleEvents(updated);
-        return { success: true };
+        if (d.event) {
+          const currentSchedule = getStoredSchedule();
+          const updated = [d.event, ...currentSchedule];
+          saveStoredSchedule(updated);
+          setScheduleEvents(updated);
+          return { success: true };
+        }
+      } catch (e) {
+        console.warn('Backend API unavailable, saving schedule locally:', e);
       }
-    } catch (e) {
-      console.warn('Backend API unavailable, saving schedule locally:', e);
     }
 
     // Local Fallback validation & saving
@@ -630,10 +669,12 @@ function MainApp() {
   };
 
   const handleDeleteScheduleEvent = async (id: string) => {
-    try {
-      await fetch(`/api/schedule/${id}`, { method: 'DELETE' });
-    } catch (e) {
-      console.warn('Backend API unavailable, deleting event locally:', e);
+    if (isBackendHealthy) {
+      try {
+        await fetch(`/api/schedule/${id}`, { method: 'DELETE' });
+      } catch (e) {
+        console.warn('Backend API unavailable, deleting event locally:', e);
+      }
     }
 
     const currentSchedule = getStoredSchedule().filter(e => e.id !== id);

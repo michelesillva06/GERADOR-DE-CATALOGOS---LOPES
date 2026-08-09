@@ -133,6 +133,8 @@ async function performSystemReset() {
   console.log('[Firestore] System clean reset completed successfully!');
 }
 
+let isFirestoreConnected = false;
+
 // Ensure initial clean seed data in Firestore
 async function seedFirestoreIfNeeded() {
   try {
@@ -195,8 +197,10 @@ async function seedFirestoreIfNeeded() {
     const scheduleFullSnap = await scheduleCol.get();
     scheduleEvents = scheduleFullSnap.docs.map(d => d.data() as ScheduleEvent);
 
+    isFirestoreConnected = true;
     console.log('[Firestore] Database synchronized successfully.');
   } catch (err) {
+    isFirestoreConnected = false;
     console.error('[Firestore] Initialization error:', err);
     users = [...initialUsers];
     properties = [];
@@ -254,6 +258,7 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     app: 'Gerador de Catálogos Imobiliários - Lopes Manaus',
     persistence: 'Cloud Firestore & Firebase Authentication',
+    firestoreConnected: isFirestoreConnected,
     timestamp: new Date().toISOString()
   });
 });
@@ -273,11 +278,17 @@ app.post('/api/auth/login', async (req, res) => {
   );
 
   if (!user) {
-    return res.status(401).json({ error: 'Usuário ou e-mail não encontrado.' });
+    return res.status(401).json({ 
+      error: 'Usuário ou e-mail não encontrado.',
+      firestoreConnected: isFirestoreConnected
+    });
   }
 
   if (user.status === 'blocked') {
-    return res.status(403).json({ error: 'Acesso bloqueado pelo Administrador Master.' });
+    return res.status(403).json({ 
+      error: 'Acesso bloqueado pelo Administrador Master.',
+      firestoreConnected: isFirestoreConnected
+    });
   }
 
   let authSuccess = false;
@@ -315,7 +326,10 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   if (!authSuccess) {
-    return res.status(401).json({ error: 'Senha incorreta.' });
+    return res.status(401).json({ 
+      error: 'Senha incorreta.',
+      firestoreConnected: isFirestoreConnected
+    });
   }
 
   const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
