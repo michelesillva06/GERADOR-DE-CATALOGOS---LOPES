@@ -510,141 +510,111 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
       {/* SCHEDULING MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl p-6 sm:p-8 space-y-6 relative my-8">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl p-6 space-y-5 relative my-6">
             
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute right-5 top-5 p-2 text-slate-400 hover:text-slate-700 rounded-full bg-slate-100 cursor-pointer"
+              className="absolute right-4 top-4 p-1.5 text-slate-400 hover:text-slate-700 rounded-full bg-slate-100 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
 
             <div className="space-y-1">
-              <div className="inline-flex items-center space-x-2 bg-rose-50 text-[#F10F4D] px-3 py-1 rounded-full text-[10px] font-black uppercase">
-                <CalendarIcon className="w-3.5 h-3.5" />
-                <span>Novo Agendamento Simplificado</span>
+              <div className="inline-flex items-center space-x-1.5 bg-rose-50 text-[#F10F4D] px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase">
+                <CalendarIcon className="w-3 h-3" />
+                <span>Novo Agendamento</span>
               </div>
-              <h2 className="text-xl font-black text-slate-900">Agendar Visita com Proprietário</h2>
-              <p className="text-xs text-slate-500">
-                Cadastre o horário da visita. Duração padrão de <strong>1 hora e 30 minutos</strong> (deslocamento + atendimento) com acompanhamento da <strong>Gestora Larissa Maia</strong>.
-              </p>
+              <h2 className="text-lg font-black text-slate-900">Agendar Compromisso</h2>
             </div>
 
             {formError && (
-              <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-2xl flex items-start space-x-2">
-                <AlertTriangle className="w-5 h-5 shrink-0 text-[#F10F4D] mt-0.5" />
-                <div className="space-y-1">
-                  <p className="font-black">Atenção!</p>
-                  <p className="leading-relaxed">{formError}</p>
-                </div>
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl flex items-start space-x-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-[#F10F4D] mt-0.5" />
+                <p className="leading-relaxed">{formError}</p>
               </div>
             )}
 
-            {/* HOLIDAY BANNER */}
+            {/* HOLIDAY WARNING */}
             {officialHolidayName && (
-              <div className="p-4 bg-slate-900 text-white rounded-2xl border border-slate-800 space-y-2">
-                <div className="flex items-center space-x-2 text-rose-400 font-extrabold text-xs uppercase">
-                  <ShieldAlert className="w-4 h-4" />
+              <div className="p-3 bg-slate-900 text-white rounded-xl border border-slate-800 space-y-1.5 text-xs">
+                <div className="flex items-center space-x-1.5 text-rose-400 font-extrabold text-[11px] uppercase">
+                  <ShieldAlert className="w-3.5 h-3.5" />
                   <span>Feriado Oficial: {officialHolidayName}</span>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Dias de feriado são de folga da equipe. Para agendar neste dia, certifique-se da autorização prévia da Gestora Larissa Maia.
-                </p>
-                <label className="flex items-center space-x-2 pt-1 text-xs font-bold text-rose-300 cursor-pointer">
+                <label className="flex items-center space-x-2 pt-1 font-bold text-rose-300 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={holidayOverride}
                     onChange={(e) => setHolidayOverride(e.target.checked)}
                     className="w-4 h-4 accent-[#F10F4D] rounded"
                   />
-                  <span>Confirmo autorização especial da Gestora Larissa Maia para agendar neste feriado</span>
+                  <span className="text-[11px]">Confirmo autorização da Gestora Larissa Maia</span>
                 </label>
               </div>
             )}
 
-            {/* WEEKEND WARNING */}
-            {isWeekend && !officialHolidayName && (
-              <div className="p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl space-y-1">
-                <div className="flex items-center space-x-2 font-extrabold text-xs uppercase text-amber-900">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span>Final de Semana (Sábado / Domingo)</span>
+            {/* CONFLICT WARNING */}
+            {timeSlotConflict && (
+              <div className="p-3 bg-rose-500 text-white rounded-xl space-y-1 text-xs">
+                <div className="flex items-center space-x-1.5 font-black text-[11px] uppercase">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-white" />
+                  <span>Horário Ocupado por {timeSlotConflict.user_name}</span>
                 </div>
-                <p className="text-[11px] font-medium leading-relaxed">
-                  Agendamento em dia não útil sob consulta de disponibilidade do proprietário e acompanhamento da Gestora Larissa Maia.
+                <p className="text-[11px] opacity-95">
+                  Já existe o compromisso "{timeSlotConflict.title}" das {timeSlotConflict.start_time} às {timeSlotConflict.end_time || calcEndTime(timeSlotConflict.start_time, 90)}. Escolha outro horário.
                 </p>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3.5">
               
-              {/* Event Type */}
-              <div className="space-y-1">
-                <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
-                  Tipo de Agendamento *
+              {/* Event Type Buttons */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  Tipo *
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { type: 'VISITA', label: 'Visita a Imóvel', icon: Building2 },
-                    { type: 'TREINAMENTO', label: 'Treinamento', icon: GraduationCap },
-                    { type: 'EVENTO', label: 'Evento / Reunião', icon: Briefcase }
-                  ].map(item => {
-                    const ItemIcon = item.icon;
-                    const isSelected = formData.type === item.type;
-                    return (
-                      <button
-                        key={item.type}
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, type: item.type as ScheduleEventType }))}
-                        className={`p-3 rounded-2xl border text-xs font-bold transition flex flex-col items-center justify-center space-y-1 cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow-md shadow-rose-900/30'
-                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        <ItemIcon className="w-4 h-4" />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
+                    { type: 'VISITA', label: 'Visita' },
+                    { type: 'TREINAMENTO', label: 'Treinamento' },
+                    { type: 'EVENTO', label: 'Evento / Reunião' }
+                  ].map(item => (
+                    <button
+                      key={item.type}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, type: item.type as ScheduleEventType }))}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer text-center ${
+                        formData.type === item.type
+                          ? 'bg-[#F10F4D] text-white shadow-xs'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Title */}
-              <div className="space-y-1">
-                <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
-                  Título do Agendamento *
+              {/* Title / Property Code */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  Título / Código do Imóvel *
                 </label>
                 <input
                   type="text"
                   required
                   value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Ex: Visita ao Apto Reserva das Águas com Proprietário Carlos"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value, property_code: e.target.value }))}
+                  placeholder="Ex: Visita Apt Reserva das Águas (Código 102)"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
                 />
               </div>
 
-              {/* Novo Imóvel */}
-              {formData.type === 'VISITA' && (
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
-                    Código / Identificação do Novo Imóvel
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.property_code}
-                    onChange={(e) => setFormData(prev => ({ ...prev, property_code: e.target.value }))}
-                    placeholder="Ex: NOVO-01, Captação Ed. Reserva, etc."
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                  />
-                </div>
-              )}
-
               {/* Date & Start Time */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                    Data da Visita *
+                  <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                    Data *
                   </label>
                   <input
                     type="date"
@@ -656,244 +626,100 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                    Horário de Início * (Duração 1h30)
+                  <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                    Horário de Início *
                   </label>
                   <input
                     type="time"
                     required
                     value={formData.start_time}
                     onChange={(e) => handleStartTimeChange(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-xl text-xs font-bold text-slate-900 focus:outline-none ${
-                      timeSlotConflict ? 'bg-rose-50 border-rose-500 text-rose-900 ring-2 ring-rose-500/20' : 'bg-slate-50 border-slate-200 focus:border-[#F10F4D]'
-                    }`}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
                   />
-                  <p className="text-[10px] text-[#F10F4D] font-extrabold mt-1">
-                    ⏱️ Término estimado: {calcEndTime(formData.start_time, 90)} (1h30m)
-                  </p>
                 </div>
               </div>
 
-              {/* Quick 1h30 Slot Picker */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
-                  Horários Padrão Sugeridos (1h30 cada):
-                </label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                  {[
-                    '08:00',
-                    '09:30',
-                    '11:00',
-                    '13:30',
-                    '15:00',
-                    '16:30'
-                  ].map(slotStart => {
-                    const slotEnd = calcEndTime(slotStart, 90);
-                    const isOccupied = occupiedEventsOnDate.some(ev => {
-                      const evEnd = ev.end_time || calcEndTime(ev.start_time, 90);
-                      return slotStart < evEnd && slotEnd > ev.start_time;
-                    });
-                    const isSelected = formData.start_time === slotStart;
-
-                    return (
-                      <button
-                        key={slotStart}
-                        type="button"
-                        onClick={() => handleStartTimeChange(slotStart)}
-                        disabled={isOccupied}
-                        className={`p-2 rounded-xl border text-[10px] font-extrabold transition flex flex-col items-center justify-center cursor-pointer ${
-                          isOccupied
-                            ? 'bg-slate-100 text-slate-400 border-slate-200 line-through opacity-60 cursor-not-allowed'
-                            : isSelected
-                            ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow-xs'
-                            : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                        }`}
-                      >
-                        <span>{slotStart}</span>
-                        <span className="text-[9px] opacity-80">{isOccupied ? 'Ocupado' : 'Livre'}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Real-time Conflict Warning */}
-              {timeSlotConflict && (
-                <div className="p-3.5 bg-rose-500 text-white rounded-2xl shadow-sm space-y-1">
-                  <div className="flex items-center space-x-2 font-black text-xs uppercase">
-                    <AlertTriangle className="w-4 h-4 shrink-0 text-white" />
-                    <span>Horário Indisponível (Já Reservado)</span>
-                  </div>
-                  <p className="text-[11px] font-medium leading-relaxed opacity-95">
-                    O captador(a) <strong>{timeSlotConflict.user_name}</strong> já possui um agendamento ("{timeSlotConflict.title}") neste dia das <strong>{timeSlotConflict.start_time}</strong> às <strong>{timeSlotConflict.end_time || calcEndTime(timeSlotConflict.start_time, 90)}</strong>. Escolha outro horário para evitar choque.
-                  </p>
-                </div>
-              )}
-
-              {/* Occupied slots panel on selected date */}
-              {formData.date && (
-                <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">
-                    <span>Status do Dia ({new Date(formData.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })})</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                      occupiedEventsOnDate.length >= 5 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
-                    }`}>
-                      {occupiedEventsOnDate.length} / 5 visitas agendadas
-                    </span>
-                  </div>
-
-                  {occupiedEventsOnDate.length > 0 ? (
-                    <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
-                      {occupiedEventsOnDate.map(ev => (
-                        <div key={ev.id} className="p-2 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between text-xs font-semibold">
-                          <div className="flex items-center space-x-2 min-w-0">
-                            <span className="px-2 py-0.5 bg-rose-100 text-[#F10F4D] text-[10px] font-black rounded-md shrink-0">
-                              {ev.start_time} - {ev.end_time || calcEndTime(ev.start_time, 90)}
-                            </span>
-                            <span className="truncate text-slate-800 font-bold">{ev.title}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-500 font-bold shrink-0 ml-2">
-                            👤 {ev.user_name}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-emerald-600 font-bold flex items-center space-x-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Nenhum outro compromisso agendado para esta data. Todos os horários livres!</span>
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Exclusive Visit Checkbox / Toggle */}
-              {formData.type === 'VISITA' && (
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                  <span className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
-                    Modalidade de Acompanhamento:
-                  </span>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, exclusive_visit: true }))}
-                      className={`p-3 rounded-xl border text-xs font-bold transition flex items-center space-x-2 cursor-pointer ${
-                        formData.exclusive_visit
-                          ? 'bg-rose-50 text-[#F10F4D] border-[#F10F4D]'
-                          : 'bg-white text-slate-600 border-slate-200'
-                      }`}
-                    >
-                      <UserX className="w-4 h-4 shrink-0" />
-                      <div className="text-left">
-                        <p className="font-extrabold">Ir Só (Visita Exclusiva)</p>
-                        <p className="text-[10px] text-slate-500 font-normal">Bloqueia o horário no imóvel</p>
-                      </div>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, exclusive_visit: false }))}
-                      className={`p-3 rounded-xl border text-xs font-bold transition flex items-center space-x-2 cursor-pointer ${
-                        !formData.exclusive_visit
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-500'
-                          : 'bg-white text-slate-600 border-slate-200'
-                      }`}
-                    >
-                      <Users className="w-4 h-4 shrink-0" />
-                      <div className="text-left">
-                        <p className="font-extrabold">Pode ir Acompanhado</p>
-                        <p className="text-[10px] text-slate-500 font-normal">Permite outro captador junto</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Captador Responsável */}
-              {isMasterOrGestora && (
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">
-                    Captador Responsável
-                  </label>
-                  <select
-                    value={formData.user_id}
-                    onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                  >
-                    {users.map(u => (
-                      <option key={u.id} value={u.id}>{u.name} ({u.position})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Client Info */}
+              {/* Client Info (Visita) */}
               {formData.type === 'VISITA' && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                      Nome do Cliente
+                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                      Cliente (Opcional)
                     </label>
                     <input
                       type="text"
                       value={formData.client_name}
                       onChange={(e) => setFormData(prev => ({ ...prev, client_name: e.target.value }))}
-                      placeholder="Ex: Carlos Eduardo"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                      placeholder="Nome do cliente"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
                     />
                   </div>
-
                   <div>
-                    <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                      Telefone do Cliente
+                    <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                      Telefone
                     </label>
                     <input
                       type="text"
                       value={formData.client_phone}
                       onChange={(e) => setFormData(prev => ({ ...prev, client_phone: e.target.value }))}
                       placeholder="(92) 99123-4567"
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
                     />
                   </div>
                 </div>
               )}
 
-              {/* Location & Notes */}
-              <div className="space-y-2">
+              {/* Captador Responsável (Admin/Gestora) */}
+              {isMasterOrGestora && (
                 <div>
-                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                    Localização / Ponto de Encontro
+                  <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                    Captador Responsável
                   </label>
-                  <input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                    placeholder="Ex: Portaria do Condomínio Ponta Negra 1"
+                  <select
+                    value={formData.user_id}
+                    onChange={(e) => setFormData(prev => ({ ...prev, user_id: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
-                  />
+                  >
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
                 </div>
+              )}
 
-                <div>
-                  <label className="block text-[11px] font-extrabold text-slate-800 uppercase tracking-wider mb-1">
-                    Observações Internas
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={formData.notes}
-                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    placeholder="Anotações adicionais para a equipe..."
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+              {/* Exclusive Visit Checkbox */}
+              {formData.type === 'VISITA' && (
+                <label className="flex items-center space-x-2.5 p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 cursor-pointer text-xs font-bold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={formData.exclusive_visit}
+                    onChange={(e) => setFormData(prev => ({ ...prev, exclusive_visit: e.target.checked }))}
+                    className="w-4 h-4 accent-[#F10F4D] rounded shrink-0"
                   />
-                </div>
+                  <span>Visita Exclusiva (Ir Só)</span>
+                </label>
+              )}
+
+              {/* Location or Notes */}
+              <div>
+                <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
+                  Local / Observações (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value, location: e.target.value }))}
+                  placeholder="Ex: Portaria social do condomínio"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+                />
               </div>
 
-              {/* Submit Buttons */}
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
+              {/* Submit / Cancel Buttons */}
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
                 >
                   Cancelar
                 </button>
@@ -901,10 +727,10 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || (Boolean(officialHolidayName) && !holidayOverride) || Boolean(timeSlotConflict)}
-                  className="px-6 py-2.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-40 text-white font-extrabold text-xs rounded-xl shadow-md shadow-rose-950/30 transition flex items-center space-x-2 cursor-pointer"
+                  className="px-5 py-2.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-40 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Agendando...' : 'Confirmar Agendamento (1h30)'}</span>
+                  <span>{isSubmitting ? 'Agendando...' : 'Confirmar Agendamento'}</span>
                 </button>
               </div>
 
