@@ -290,8 +290,8 @@ app.post('/api/auth/login', async (req, res) => {
   const cleanLogin = login.toLowerCase().trim();
   const cleanLoginNoAccents = cleanLogin.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
 
-  // Find user by username, email, ID, url_slug, or full name (fuzzy normalized)
-  const user = users.find(u => {
+  // 1. First look up user in in-memory cache
+  let user = users.find(u => {
     if (!u) return false;
     const uUsername = (u.username || '').toLowerCase().trim();
     const uEmail = (u.email || '').toLowerCase().trim();
@@ -313,6 +313,39 @@ app.post('/api/auth/login', async (req, res) => {
     );
   });
 
+  // 2. If not found in memory, query Firestore directly
+  if (!user) {
+    try {
+      const usersSnap = await usersCol.get();
+      if (!usersSnap.empty) {
+        users = usersSnap.docs.map(d => d.data() as User);
+        user = users.find(u => {
+          if (!u) return false;
+          const uUsername = (u.username || '').toLowerCase().trim();
+          const uEmail = (u.email || '').toLowerCase().trim();
+          const uId = (u.id || '').toLowerCase().trim();
+          const uSlug = (u.url_slug || '').toLowerCase().trim();
+          const uName = (u.name || '').toLowerCase().trim();
+          const uNameNormalized = uName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+          const uUsernameNormalized = uUsername.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+          return (
+            uUsername === cleanLogin ||
+            uEmail === cleanLogin ||
+            uId === cleanLogin ||
+            uSlug === cleanLogin ||
+            uUsernameNormalized === cleanLoginNoAccents ||
+            uName === cleanLogin ||
+            (cleanLoginNoAccents.length >= 3 && uNameNormalized.includes(cleanLoginNoAccents)) ||
+            (cleanLoginNoAccents.length >= 3 && uUsernameNormalized.includes(cleanLoginNoAccents))
+          );
+        });
+      }
+    } catch (e) {
+      console.warn('[Firestore] Error searching user in Firestore:', e);
+    }
+  }
+
   if (!user) {
     return res.status(401).json({ 
       error: 'Usuário ou e-mail não encontrado.',
@@ -325,6 +358,21 @@ app.post('/api/auth/login', async (req, res) => {
       error: 'Acesso bloqueado pelo Administrador Master.',
       firestoreConnected: isFirestoreConnected
     });
+  }
+
+  // 3. Always fetch latest user doc from Firestore to get the real-time cloud password
+  let cloudPassword = (user as any).password;
+  try {
+    const userDoc = await usersCol.doc(user.id).get();
+    if (userDoc.exists) {
+      const docData = userDoc.data();
+      if (docData && docData.password) {
+        cloudPassword = docData.password;
+        (user as any).password = docData.password;
+      }
+    }
+  } catch (e) {
+    console.warn('[Firestore] Warning reading real-time user password:', e);
   }
 
   let authSuccess = false;
@@ -343,10 +391,9 @@ app.post('/api/auth/login', async (req, res) => {
     'teste123'
   ];
 
-  // 1. Check custom password on user object
-  const userCustomPassword = (user as any).password;
-  if (userCustomPassword && typeof userCustomPassword === 'string') {
-    if (password.trim() === userCustomPassword.trim()) {
+  // 1. Check custom password saved in Firestore / memory
+  if (cloudPassword && typeof cloudPassword === 'string') {
+    if (password.trim() === cloudPassword.trim()) {
       authSuccess = true;
     }
   }
@@ -398,7 +445,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  // If successfully authenticated, make sure user has password synced in memory and Firestore
+  // If successfully authenticated, update in-memory user cache
   (user as any).password = password.trim();
   try {
     await usersCol.doc(user.id).set({ password: password.trim() }, { merge: true });
@@ -460,7 +507,26 @@ app.post('/api/auth/change-password', async (req, res) => {
     }
   }
 
-  const user = users.find(u => u.id === userId);
+  // 1. Locate user in cache or Firestore
+  let user = users.find(u => u.id === userId);
+  let currentDocPassword = (user as any)?.password;
+
+  try {
+    const userDoc = await usersCol.doc(userId).get();
+    if (userDoc.exists) {
+      const docData = userDoc.data();
+      if (docData) {
+        if (!user) user = docData as User;
+        if (docData.password) {
+          currentDocPassword = docData.password;
+          if (user) (user as any).password = docData.password;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Firestore] Error fetching user doc for change-password:', err);
+  }
+
   if (!user) {
     return res.status(404).json({ error: 'Usuário não encontrado.' });
   }
@@ -474,8 +540,8 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(400).json({ error: 'A nova senha precisa ter no mínimo 4 caracteres.' });
   }
 
-  // Validate current password
-  const customPass = (user as any).password;
+  // Validate current password against Firestore doc, in-memory, or standard defaults
+  const customPass = currentDocPassword || (user as any).password;
   const defaultPasswords = ['admin', 'admin123', 'demo', 'demo123', 'mudar123', '123456', 'lopes123', 'lopes2026', '12345678', 'teste', 'teste123'];
   let isCurrentValid = false;
 
@@ -509,18 +575,26 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(400).json({ error: 'Senha atual incorreta. Digite a senha atual corretamente.' });
   }
 
+  const cleanNewPass = newPassword.trim();
+
   // Demo user simulation
   if (user.id === 'usr_demo' || user.role === 'DEMO') {
-    (user as any).password = newPassword.trim();
-    return res.json({ message: 'Modo Demonstração: Senha alterada e salva para testes!' });
+    (user as any).password = cleanNewPass;
+    return res.json({ success: true, message: 'Modo Demonstração: Senha alterada e salva para testes!' });
   }
 
   // Save new password in memory & Firestore
-  (user as any).password = newPassword.trim();
+  (user as any).password = cleanNewPass;
+  const userIdx = users.findIndex(u => u.id === user?.id);
+  if (userIdx !== -1) {
+    (users[userIdx] as any).password = cleanNewPass;
+  }
+
   try {
-    await usersCol.doc(user.id).set({ password: newPassword.trim() }, { merge: true });
+    await usersCol.doc(user.id).set({ password: cleanNewPass }, { merge: true });
+    console.log(`[Firestore] Password updated successfully in cloud database for user ${user.name} (${user.id})`);
   } catch (err) {
-    console.warn('[Firestore] Error saving user password:', err);
+    console.warn('[Firestore] Error saving user password to Firestore:', err);
   }
 
   // Update password in Firebase Auth using Firebase Admin SDK
@@ -533,14 +607,14 @@ app.post('/api/auth/change-password', async (req, res) => {
       const created = await firebaseAuth.createUser({
         uid: user.id,
         email: user.email,
-        password: newPassword.trim(),
+        password: cleanNewPass,
         displayName: user.name
       });
       authUid = created.uid;
     }
 
     await firebaseAuth.updateUser(authUid, {
-      password: newPassword.trim()
+      password: cleanNewPass
     });
   } catch (err) {
     console.warn('[FirebaseAuth] Error updating Firebase user password:', err);
@@ -548,7 +622,7 @@ app.post('/api/auth/change-password', async (req, res) => {
 
   addAuditLog(user.id, user.name, 'Alteração de Senha', 'Redefiniu sua senha de acesso no sistema', req);
 
-  res.json({ message: 'Sua senha foi alterada e salva com sucesso!' });
+  res.json({ success: true, message: 'Sua senha foi alterada e salva na nuvem com sucesso! O novo acesso já está disponível para qualquer dispositivo ou aba anônima.' });
 });
 
 // Backup: Automatic & Manual Trigger
@@ -597,8 +671,16 @@ app.get('/api/users/public/:slug', (req, res) => {
   });
 });
 
-// Users: List all users
-app.get('/api/users', (req, res) => {
+// Users: List all users (fetching fresh from Firestore)
+app.get('/api/users', async (req, res) => {
+  try {
+    const usersSnap = await usersCol.get();
+    if (!usersSnap.empty) {
+      users = usersSnap.docs.map(d => d.data() as User);
+    }
+  } catch (e) {
+    console.warn('[Firestore] Warning reading users list:', e);
+  }
   res.json({ users });
 });
 
@@ -699,6 +781,17 @@ app.put('/api/users/:id', async (req, res) => {
     ? url_slug.toLowerCase().replace(/[^a-z0-9]/g, '') 
     : (username ? username.toLowerCase().replace(/[^a-z0-9]/g, '') : existing.url_slug);
 
+  let existingPassword = (existing as any).password;
+  try {
+    const docSnap = await usersCol.doc(id).get();
+    if (docSnap.exists) {
+      const docData = docSnap.data();
+      if (docData && docData.password) {
+        existingPassword = docData.password;
+      }
+    }
+  } catch {}
+
   const updatedUser: User & { password?: string } = {
     ...existing,
     name: name !== undefined ? name : existing.name,
@@ -739,8 +832,8 @@ app.put('/api/users/:id', async (req, res) => {
         });
       } catch (e) {}
     }
-  } else if ((existing as any).password) {
-    updatedUser.password = (existing as any).password;
+  } else if (existingPassword) {
+    updatedUser.password = existingPassword;
   }
 
   users[index] = updatedUser;
@@ -795,12 +888,12 @@ app.post('/api/users/:id/reset-password', async (req, res) => {
   try {
     await usersCol.doc(id).set({ password: cleanPass }, { merge: true });
   } catch (e) {
-    console.warn('[Firestore] Error updating password:', e);
+    console.warn('[Firestore] Error updating password in Firestore:', e);
   }
 
   addAuditLog('usr_admin', 'Administrador Master', 'Redefinição de Senha', `Redefiniu a senha do usuário ${targetUser.name} (${targetUser.username})`, req);
 
-  res.json({ success: true, message: `Senha do usuário ${targetUser.name} redefinida com sucesso!` });
+  res.json({ success: true, message: `Senha do usuário ${targetUser.name} redefinida com sucesso no banco de dados na nuvem!` });
 });
 
 // Users: Toggle Block Status

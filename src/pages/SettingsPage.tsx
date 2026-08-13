@@ -76,30 +76,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         body: JSON.stringify({ currentPassword, newPassword })
       });
 
-      if (res.ok) {
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('json')) {
+        const data = await res.json();
         updateUserPassword(currentUser.id, newPassword);
-        setPassSuccessMsg('Senha alterada e salva com sucesso!');
+        setPassSuccessMsg(data.message || 'Senha alterada e salva na nuvem com sucesso! O novo acesso já está disponível globalmente em qualquer dispositivo e aba anônima.');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
         const data = await res.json().catch(() => ({}));
-        if (data && data.error) {
-          setPassErrorMsg(data.error);
-        } else {
-          updateUserPassword(currentUser.id, newPassword);
-          setPassSuccessMsg('Senha alterada com sucesso!');
-          setCurrentPassword('');
-          setNewPassword('');
-          setConfirmPassword('');
-        }
+        setPassErrorMsg(data?.error || 'Erro ao alterar a senha no banco de dados. Verifique a senha atual digitada.');
       }
-    } catch {
-      updateUserPassword(currentUser.id, newPassword);
-      setPassSuccessMsg('Senha alterada e salva localmente!');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+    } catch (err: any) {
+      setPassErrorMsg(err?.message || 'Falha na conexão com o servidor para alterar a senha.');
     } finally {
       setPassLoading(false);
     }
