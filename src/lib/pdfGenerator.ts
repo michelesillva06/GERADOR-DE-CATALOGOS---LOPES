@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import { Property, User, CompanySettings } from '../types';
 import { generateQRCodeDataUrl } from './qrCode';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from './whatsapp';
+import { getPropertyPriceInfo } from './priceUtils';
 
 // Helper to convert image URL or Data URL to Base64 JPEG DataURL safely for jsPDF
 async function urlToBase64(url: string): Promise<string> {
@@ -1013,10 +1014,12 @@ export async function renderHorizontalPropertyCanvas(
 
   drawRoundedImage(ctx, mainImg, mainImgX, mainImgY, mainImgW, mainImgH, 16, 'Foto Principal');
 
-  // Red Badge: "VENDA" or "LOCAÇÃO"
-  const badgeW = 220;
+  const priceInfo = getPropertyPriceInfo(prop);
+
+  // Red Badge: "VENDA" or "LOCAÇÃO" or "VENDA E LOCAÇÃO"
+  const badgeW = priceInfo.isBoth ? 360 : 220;
   const badgeH = 72;
-  const badgeText = prop.purpose === 'Locação' ? 'LOCAÇÃO' : 'VENDA';
+  const badgeText = priceInfo.isBoth ? 'VENDA E LOCAÇÃO' : (priceInfo.isRent ? 'LOCAÇÃO' : 'VENDA');
 
   ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
@@ -1024,7 +1027,7 @@ export async function renderHorizontalPropertyCanvas(
   ctx.fill();
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 34px sans-serif';
+  ctx.font = priceInfo.isBoth ? '900 28px sans-serif' : '900 34px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(badgeText, mainImgX + (badgeW / 2), mainImgY + 48);
   ctx.textAlign = 'left';
@@ -1097,10 +1100,6 @@ export async function renderHorizontalPropertyCanvas(
   const gapX = 35;
   const gapY = 30;
 
-  const priceFormatted = prop.purpose.includes('Locação') && prop.rent_price
-    ? `R$ ${prop.rent_price.toLocaleString('pt-BR')},00`
-    : `R$ ${prop.price.toLocaleString('pt-BR')},00`;
-
   const cardsData = [
     {
       icon: 'house',
@@ -1129,8 +1128,8 @@ export async function renderHorizontalPropertyCanvas(
     },
     {
       icon: 'tag',
-      label: 'VALOR',
-      value: priceFormatted,
+      label: priceInfo.pdfTagLabel,
+      value: priceInfo.pdfDisplay,
       isPrice: true
     }
   ];
@@ -1228,7 +1227,8 @@ export async function renderHorizontalPropertyCanvas(
     // Card Value
     if (card.isPrice) {
       ctx.fillStyle = LOPES_RED;
-      ctx.font = '900 40px sans-serif';
+      const vLen = card.value.length;
+      ctx.font = vLen > 24 ? '900 24px sans-serif' : vLen > 16 ? '900 30px sans-serif' : '900 38px sans-serif';
       ctx.fillText(card.value, cx + 90, cy + 115);
     } else {
       ctx.fillStyle = TEXT_DARK;

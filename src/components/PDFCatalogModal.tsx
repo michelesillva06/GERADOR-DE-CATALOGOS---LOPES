@@ -4,6 +4,7 @@ import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2, U
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 import { PROPERTY_CATEGORIES } from '../lib/constants';
 import { compressImage } from '../utils/imageCompressor';
+import { getPropertyPriceInfo } from '../lib/priceUtils';
 
 interface PDFCatalogModalProps {
   isOpen: boolean;
@@ -410,7 +411,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
                         </div>
                       </div>
                       <span className="text-xs font-extrabold text-[#F10F4D] shrink-0">
-                        R$ {p.price.toLocaleString('pt-BR')}
+                        {getPropertyPriceInfo(p).primaryFormatted}
                       </span>
                     </div>
                   );

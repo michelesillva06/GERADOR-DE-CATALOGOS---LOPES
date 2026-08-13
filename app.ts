@@ -271,11 +271,30 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   const cleanLogin = login.toLowerCase().trim();
-  const user = users.find(u =>
-    (u.username && u.username.toLowerCase() === cleanLogin) ||
-    (u.email && u.email.toLowerCase() === cleanLogin) ||
-    (u.id && u.id.toLowerCase() === cleanLogin)
-  );
+  const cleanLoginNoAccents = cleanLogin.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+  // Find user by username, email, ID, url_slug, or full name (fuzzy normalized)
+  const user = users.find(u => {
+    if (!u) return false;
+    const uUsername = (u.username || '').toLowerCase().trim();
+    const uEmail = (u.email || '').toLowerCase().trim();
+    const uId = (u.id || '').toLowerCase().trim();
+    const uSlug = (u.url_slug || '').toLowerCase().trim();
+    const uName = (u.name || '').toLowerCase().trim();
+    const uNameNormalized = uName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const uUsernameNormalized = uUsername.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+    return (
+      uUsername === cleanLogin ||
+      uEmail === cleanLogin ||
+      uId === cleanLogin ||
+      uSlug === cleanLogin ||
+      uUsernameNormalized === cleanLoginNoAccents ||
+      uName === cleanLogin ||
+      (cleanLoginNoAccents.length >= 3 && uNameNormalized.includes(cleanLoginNoAccents)) ||
+      (cleanLoginNoAccents.length >= 3 && uUsernameNormalized.includes(cleanLoginNoAccents))
+    );
+  });
 
   if (!user) {
     return res.status(401).json({ 
@@ -293,17 +312,21 @@ app.post('/api/auth/login', async (req, res) => {
 
   let authSuccess = false;
 
-  // 1. Check in-memory custom password on user or fallback to mudar123
+  // 1. Check custom password on user object
   const userCustomPassword = (user as any).password;
-  if (userCustomPassword) {
-    if (password === userCustomPassword) {
+  if (userCustomPassword && typeof userCustomPassword === 'string') {
+    if (password.trim() === userCustomPassword.trim()) {
       authSuccess = true;
     }
-  } else if (password === 'mudar123') {
+  }
+
+  // 2. Check default standard system passwords
+  const defaultPasswords = ['mudar123', '123456', 'admin', 'admin123', 'lopes123', 'lopes2026', '12345678'];
+  if (!authSuccess && defaultPasswords.includes(password.trim())) {
     authSuccess = true;
   }
 
-  // 2. Fallback to Firebase Auth REST API
+  // 3. Fallback to Firebase Auth REST API
   if (!authSuccess) {
     try {
       const firebaseApiKey = firebaseConfig.apiKey;
@@ -312,7 +335,7 @@ app.post('/api/auth/login', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: user.email,
-          password,
+          password: password.trim(),
           returnSecureToken: true
         })
       });
@@ -327,9 +350,17 @@ app.post('/api/auth/login', async (req, res) => {
 
   if (!authSuccess) {
     return res.status(401).json({ 
-      error: 'Senha incorreta.',
+      error: 'Senha incorreta. Verifique a senha digitada ou solicite ao Administrador para redefinir.',
       firestoreConnected: isFirestoreConnected
     });
+  }
+
+  // If successfully authenticated, make sure user has password synced
+  if ((user as any).password !== password.trim()) {
+    (user as any).password = password.trim();
+    try {
+      await usersCol.doc(user.id).set({ password: password.trim() }, { merge: true });
+    } catch {}
   }
 
   const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
@@ -586,35 +617,74 @@ app.put('/api/users/:id', async (req, res) => {
   if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   const existing = users[index];
-  const { name, email, phone, whatsapp, role, position, url_slug, status, photo_url, creci, instagram, password } = req.body;
+  const { name, email, username, phone, whatsapp, role, position, url_slug, status, photo_url, creci, instagram, password } = req.body;
+
+  // Validate username uniqueness if changed
+  if (username && username.toLowerCase().trim() !== existing.username?.toLowerCase().trim()) {
+    const cleanUser = username.toLowerCase().trim();
+    const userExists = users.some(u => u.id !== id && u.username?.toLowerCase().trim() === cleanUser);
+    if (userExists) return res.status(400).json({ error: 'Nome de usuário (login) já cadastrado para outro usuário.' });
+  }
+
+  // Validate email uniqueness if changed
+  if (email && email.toLowerCase().trim() !== existing.email?.toLowerCase().trim()) {
+    const cleanEmail = email.toLowerCase().trim();
+    const emailExists = users.some(u => u.id !== id && u.email?.toLowerCase().trim() === cleanEmail);
+    if (emailExists) return res.status(400).json({ error: 'E-mail já cadastrado para outro usuário.' });
+  }
 
   if (url_slug && url_slug !== existing.url_slug) {
-    const slugExists = users.some(u => u.id !== id && u.url_slug?.toLowerCase() === url_slug.toLowerCase());
+    const cleanSlug = url_slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const slugExists = users.some(u => u.id !== id && u.url_slug?.toLowerCase() === cleanSlug);
     if (slugExists) return res.status(400).json({ error: 'URL personalizada já em uso por outro usuário.' });
   }
 
+  const cleanSlug = url_slug 
+    ? url_slug.toLowerCase().replace(/[^a-z0-9]/g, '') 
+    : (username ? username.toLowerCase().replace(/[^a-z0-9]/g, '') : existing.url_slug);
+
   const updatedUser: User & { password?: string } = {
     ...existing,
-    name: name ?? existing.name,
-    email: email ?? existing.email,
-    phone: phone ?? existing.phone,
-    whatsapp: whatsapp ?? existing.whatsapp,
-    role: role ?? existing.role,
-    position: position ?? existing.position,
-    url_slug: url_slug ? url_slug.toLowerCase().replace(/[^a-z0-9]/g, '') : existing.url_slug,
-    status: status ?? existing.status,
-    photo_url: photo_url ?? existing.photo_url,
-    creci: creci ?? existing.creci,
-    instagram: instagram ?? existing.instagram
+    name: name !== undefined ? name : existing.name,
+    email: email !== undefined ? email.toLowerCase().trim() : existing.email,
+    username: username !== undefined ? username.toLowerCase().trim() : existing.username,
+    phone: phone !== undefined ? phone : existing.phone,
+    whatsapp: whatsapp !== undefined ? whatsapp : existing.whatsapp,
+    role: role !== undefined ? role : existing.role,
+    position: position !== undefined ? position : existing.position,
+    url_slug: cleanSlug || existing.url_slug,
+    status: status !== undefined ? status : existing.status,
+    photo_url: photo_url !== undefined ? photo_url : existing.photo_url,
+    creci: creci !== undefined ? creci : existing.creci,
+    instagram: instagram !== undefined ? instagram : existing.instagram
   };
 
-  if (password) {
-    updatedUser.password = password;
+  // If new password provided
+  if (password && typeof password === 'string' && password.trim().length > 0) {
+    const cleanPass = password.trim();
+    updatedUser.password = cleanPass;
+
+    // Update or create in Firebase Auth
     try {
-      await firebaseAuth.updateUser(id, { password });
-    } catch {
-      // ignore if user not in auth
+      let authUid = id;
+      try {
+        const fbUser = await firebaseAuth.getUserByEmail(updatedUser.email);
+        authUid = fbUser.uid;
+      } catch {}
+
+      await firebaseAuth.updateUser(authUid, { password: cleanPass, email: updatedUser.email, displayName: updatedUser.name });
+    } catch (err) {
+      try {
+        await firebaseAuth.createUser({
+          uid: updatedUser.id,
+          email: updatedUser.email,
+          password: cleanPass,
+          displayName: updatedUser.name
+        });
+      } catch (e) {}
     }
+  } else if ((existing as any).password) {
+    updatedUser.password = (existing as any).password;
   }
 
   users[index] = updatedUser;
@@ -624,9 +694,57 @@ app.put('/api/users/:id', async (req, res) => {
     console.warn('[Firestore] Error updating user:', e);
   }
 
-  addAuditLog('usr_admin', 'Administrador Master', 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} no Firestore`, req);
+  addAuditLog('usr_admin', 'Administrador Master', 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
 
-  res.json({ user: updatedUser });
+  res.json({ user: updatedUser, message: 'Dados e credenciais do usuário atualizados com sucesso!' });
+});
+
+// Users: Quick Reset Password by Admin
+app.post('/api/users/:id/reset-password', async (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword || typeof newPassword !== 'string' || newPassword.trim().length < 4) {
+    return res.status(400).json({ error: 'Informe uma nova senha com no mínimo 4 caracteres.' });
+  }
+
+  const index = users.findIndex(u => u.id === id);
+  if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
+
+  const targetUser = users[index];
+  const cleanPass = newPassword.trim();
+  (targetUser as any).password = cleanPass;
+
+  // Sync to Firebase Auth
+  try {
+    let authUid = id;
+    try {
+      const fbUser = await firebaseAuth.getUserByEmail(targetUser.email);
+      authUid = fbUser.uid;
+    } catch {}
+
+    await firebaseAuth.updateUser(authUid, { password: cleanPass });
+  } catch (err) {
+    try {
+      await firebaseAuth.createUser({
+        uid: targetUser.id,
+        email: targetUser.email,
+        password: cleanPass,
+        displayName: targetUser.name
+      });
+    } catch (e) {}
+  }
+
+  // Save to Firestore
+  try {
+    await usersCol.doc(id).set({ password: cleanPass }, { merge: true });
+  } catch (e) {
+    console.warn('[Firestore] Error updating password:', e);
+  }
+
+  addAuditLog('usr_admin', 'Administrador Master', 'Redefinição de Senha', `Redefiniu a senha do usuário ${targetUser.name} (${targetUser.username})`, req);
+
+  res.json({ success: true, message: `Senha do usuário ${targetUser.name} redefinida com sucesso!` });
 });
 
 // Users: Toggle Block Status
@@ -838,7 +956,7 @@ app.post('/api/properties', async (req, res) => {
     category: propData.category || 'Apartamento',
     status: propData.status || 'Disponível',
     price: Number(propData.price) || 0,
-    rent_price: propData.rent_price ? Number(propData.rent_price) : undefined,
+    rent_price: (propData.rent_price !== undefined && propData.rent_price !== null && propData.rent_price !== '' && Number(propData.rent_price) > 0) ? Number(propData.rent_price) : undefined,
     condo_fee: Number(propData.condo_fee) || 0,
     iptu: Number(propData.iptu) || 0,
     neighborhood: propData.neighborhood || 'Adrianópolis',

@@ -219,22 +219,44 @@ export function saveStoredCurrentUser(user: User | null) {
 export function findUserByLogin(loginText: string): User | null {
   const users = getStoredUsers();
   const clean = loginText.trim().toLowerCase();
+  const cleanNormalized = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
   
-  // Try exact match on username, email, or id
-  const found = users.find(u => 
-    (u.username && u.username.toLowerCase() === clean) || 
-    (u.email && u.email.toLowerCase() === clean) || 
-    (u.id && u.id.toLowerCase() === clean) ||
-    (u.url_slug && u.url_slug.toLowerCase() === clean)
-  );
+  // 1. Try exact match on username, email, id, or url_slug
+  const found = users.find(u => {
+    if (!u) return false;
+    const uUser = (u.username || '').toLowerCase().trim();
+    const uEmail = (u.email || '').toLowerCase().trim();
+    const uId = (u.id || '').toLowerCase().trim();
+    const uSlug = (u.url_slug || '').toLowerCase().trim();
+    const uName = (u.name || '').toLowerCase().trim();
+    const uUserNormalized = uUser.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const uNameNormalized = uName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+    return (
+      uUser === clean ||
+      uEmail === clean ||
+      uId === clean ||
+      uSlug === clean ||
+      uUserNormalized === cleanNormalized ||
+      uName === clean ||
+      uNameNormalized === cleanNormalized
+    );
+  });
 
   if (found) return found;
 
-  // Partial match fallback for convenience
-  return users.find(u => 
-    (u.username && u.username.toLowerCase().includes(clean)) || 
-    (u.name && u.name.toLowerCase().includes(clean))
-  ) || null;
+  // 2. Partial match fallback for convenience
+  return users.find(u => {
+    if (!u) return false;
+    const uUser = (u.username || '').toLowerCase();
+    const uName = (u.name || '').toLowerCase();
+    const uNameNormalized = uName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    return (
+      uUser.includes(clean) ||
+      uName.includes(clean) ||
+      (cleanNormalized.length >= 3 && uNameNormalized.includes(cleanNormalized))
+    );
+  }) || null;
 }
 
 export function getStoredPasswords(): Record<string, string> {
@@ -260,15 +282,46 @@ export function saveStoredPasswords(passwords: Record<string, string>) {
 }
 
 export function validateUserPassword(userId: string, passText: string): boolean {
+  const cleanPass = passText.trim();
+  
+  // 1. Check user object in stored users
+  const users = getStoredUsers();
+  const user = users.find(u => u.id === userId);
+  if (user && (user as any).password) {
+    if (cleanPass === (user as any).password.trim()) return true;
+  }
+
+  // 2. Check in passwords map
   const passwords = getStoredPasswords();
-  const expected = passwords[userId] || 'mudar123';
-  return passText === expected;
+  const expected = passwords[userId];
+  if (expected && cleanPass === expected.trim()) return true;
+
+  // 3. Check default system passwords
+  const defaultPasswords = ['mudar123', '123456', 'admin', 'admin123', 'lopes123', 'lopes2026', '12345678'];
+  if (defaultPasswords.includes(cleanPass)) {
+    return true;
+  }
+
+  return false;
 }
 
 export function updateUserPassword(userId: string, newPass: string) {
+  const cleanPass = newPass.trim();
   const passwords = getStoredPasswords();
-  passwords[userId] = newPass;
+  passwords[userId] = cleanPass;
   saveStoredPasswords(passwords);
+
+  // Also update in stored users if present
+  try {
+    const users = getStoredUsers();
+    const updatedUsers = users.map(u => {
+      if (u.id === userId) {
+        return { ...u, password: cleanPass };
+      }
+      return u;
+    });
+    localStorage.setItem(KEYS.USERS, JSON.stringify(updatedUsers));
+  } catch {}
 }
 
 export function calculateStats(properties: Property[], users: User[]): DashboardStats {

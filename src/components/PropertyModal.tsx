@@ -23,6 +23,7 @@ import { generateQRCodeDataUrl } from '../lib/qrCode';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { getPropertyImages, handleImageError } from '../lib/imageUtils';
+import { getPropertyPriceInfo, formatCurrencyBRL } from '../lib/priceUtils';
 
 interface PropertyModalProps {
   property: Property | null;
@@ -198,14 +199,23 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
             </div>
 
             <div className="text-left md:text-right shrink-0 bg-rose-50 p-3.5 rounded-2xl border border-rose-100">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block">Valor de Investimento</span>
-              <span className="text-2xl font-black text-[#F10F4D]">
-                {property.purpose.includes('Locação') && property.rent_price
-                  ? `${formatPrice(property.rent_price)} /mês`
-                  : formatPrice(property.price)}
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                {getPropertyPriceInfo(property).isBoth
+                  ? 'Venda / Locação'
+                  : getPropertyPriceInfo(property).isRent
+                  ? 'Valor de Locação'
+                  : 'Valor de Venda'}
               </span>
+              <span className="text-2xl font-black text-[#F10F4D]">
+                {getPropertyPriceInfo(property).primaryFormatted}
+              </span>
+              {getPropertyPriceInfo(property).isBoth && getPropertyPriceInfo(property).rentPrice > 0 && getPropertyPriceInfo(property).salePrice > 0 && (
+                <div className="text-xs font-bold text-slate-700 mt-0.5">
+                  Locação: {getPropertyPriceInfo(property).rentFormatted}
+                </div>
+              )}
               <div className="text-[11px] text-slate-500 mt-0.5">
-                <span>Cond: {formatPrice(property.condo_fee)}</span> • <span>IPTU: {formatPrice(property.iptu)}</span>
+                <span>Cond: {formatCurrencyBRL(property.condo_fee)}</span> • <span>IPTU: {formatCurrencyBRL(property.iptu)}</span>
               </div>
             </div>
           </div>

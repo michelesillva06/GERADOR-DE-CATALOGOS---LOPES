@@ -4,6 +4,7 @@ import { getStoredProperties, getStoredUsers, getStoredSettings } from '../lib/s
 import { LopesLogo } from '../components/LopesLogo';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { getPropertyImages, handleImageError } from '../lib/imageUtils';
+import { getPropertyPriceInfo, formatCurrencyBRL } from '../lib/priceUtils';
 import { 
   Building2, MapPin, Bed, Bath, Car, Maximize2, Calendar, Phone, 
   MessageCircle, Share2, ArrowLeft, CheckCircle2, Play, Video, 
@@ -122,9 +123,8 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
 
   const allImages = getPropertyImages(property);
 
-  const formattedPrice = property.purpose.includes('Locação') && property.rent_price
-    ? `R$ ${property.rent_price.toLocaleString('pt-BR')} /mês`
-    : `R$ ${property.price.toLocaleString('pt-BR')}`;
+  const priceInfo = getPropertyPriceInfo(property);
+  const formattedPrice = priceInfo.primaryFormatted;
 
   const agentPhone = getEffectiveWhatsApp(captador, companySettings);
 
@@ -321,13 +321,20 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
                 </div>
 
                 <div className="sm:text-right bg-rose-50/70 p-4 rounded-2xl border border-rose-100/80 shrink-0">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Valor do Imóvel</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">
+                    {priceInfo.isBoth ? 'Valor Venda / Locação' : (priceInfo.isRent ? 'Valor de Locação' : 'Valor de Venda')}
+                  </p>
                   <p className="text-2xl sm:text-3xl font-black text-[#F10F4D]">{formattedPrice}</p>
+                  {priceInfo.isBoth && priceInfo.rentPrice > 0 && priceInfo.salePrice > 0 && (
+                    <p className="text-xs font-bold text-slate-800 mt-0.5">
+                      Locação: {priceInfo.rentFormatted}
+                    </p>
+                  )}
                   {(property.condo_fee > 0 || property.iptu > 0) && (
                     <p className="text-[11px] font-semibold text-slate-600 mt-1">
-                      {property.condo_fee > 0 && `Condomínio: R$ ${property.condo_fee.toLocaleString('pt-BR')}`}
+                      {property.condo_fee > 0 && `Condomínio: ${formatCurrencyBRL(property.condo_fee)}`}
                       {property.condo_fee > 0 && property.iptu > 0 && ' • '}
-                      {property.iptu > 0 && `IPTU: R$ ${property.iptu.toLocaleString('pt-BR')}`}
+                      {property.iptu > 0 && `IPTU: ${formatCurrencyBRL(property.iptu)}`}
                     </p>
                   )}
                 </div>

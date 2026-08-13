@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { User as UserIcon, Lock, AlertCircle } from 'lucide-react';
+import { User as UserIcon, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { LopesLogo } from '../components/LopesLogo';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
   const [loginInput, setLoginInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -56,13 +57,13 @@ export const Login: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[10px] font-extrabold text-slate-600 uppercase tracking-widest mb-1.5">
-              Usuário ou E-mail
+              Usuário, E-mail ou Nome
             </label>
             <div className="relative">
               <UserIcon className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Ex: admin ou michelesilva"
+                placeholder="Ex: admin ou michele.silva"
                 value={loginInput}
                 onChange={(e) => setLoginInput(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#F10F4D] focus:ring-2 focus:ring-[#F10F4D]/20 transition"
@@ -78,13 +79,21 @@ export const Login: React.FC = () => {
             <div className="relative">
               <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#F10F4D] focus:ring-2 focus:ring-[#F10F4D]/20 transition"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#F10F4D] focus:ring-2 focus:ring-[#F10F4D]/20 transition"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                title={showPassword ? 'Ocultar senha' : 'Ver senha'}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 

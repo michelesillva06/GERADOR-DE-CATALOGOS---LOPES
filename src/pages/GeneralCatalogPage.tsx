@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { Building2 as BuildingIcon, Search as SearchIcon, Filter as FilterIcon, FileText as FileTextIcon, MapPin as MapPinIcon, Bed as BedIcon, Bath as BathIcon, Car as CarIcon, Maximize2 as MaximizeIcon, ExternalLink as ExternalLinkIcon, CheckCircle2 as CheckCircleIcon, User as UserIconComponent, Sparkles as SparklesIcon } from 'lucide-react';
+import { getPropertyPriceInfo } from '../lib/priceUtils';
 
 interface GeneralCatalogPageProps {
   properties: Property[];
@@ -288,16 +289,24 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
                   {/* Price */}
                   <div className="pt-2 border-t border-slate-100 flex items-baseline justify-between">
                     <div>
-                      <span className="text-[10px] font-extrabold text-slate-400 uppercase block">
-                        {isRent ? 'Valor de Locação' : 'Valor de Venda'}
-                      </span>
-                      <span className="text-lg font-black text-slate-900">
-                        {isRent && property.rent_price
-                          ? `R$ ${property.rent_price.toLocaleString('pt-BR')}/mês`
-                          : property.price > 0
-                          ? `R$ ${property.price.toLocaleString('pt-BR')}`
-                          : 'Sob Consulta'}
-                      </span>
+                      {(() => {
+                        const priceInfo = getPropertyPriceInfo(property);
+                        return (
+                          <>
+                            <span className="text-[10px] font-extrabold text-slate-400 uppercase block">
+                              {priceInfo.isBoth ? 'Venda / Locação' : (priceInfo.isRent ? 'Valor de Locação' : 'Valor de Venda')}
+                            </span>
+                            <span className="text-lg font-black text-slate-900">
+                              {priceInfo.primaryFormatted}
+                            </span>
+                            {priceInfo.isBoth && priceInfo.rentPrice > 0 && priceInfo.salePrice > 0 && (
+                              <span className="text-[10px] font-bold text-slate-600 block">
+                                Locação: {priceInfo.rentFormatted}
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {property.total_area > 0 && (

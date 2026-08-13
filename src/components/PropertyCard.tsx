@@ -2,6 +2,7 @@ import React from 'react';
 import { Property, User } from '../types';
 import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2 } from 'lucide-react';
 import { getPropertyMainImage, handleImageError } from '../lib/imageUtils';
+import { getPropertyPriceInfo } from '../lib/priceUtils';
 
 interface PropertyCardProps {
   property: Property;
@@ -22,10 +23,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
   onShareWhatsApp,
   canEdit = false
 }) => {
-  const formatPrice = (value: number) => {
-    if (!value || value === 0) return 'Sob Consulta';
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
-  };
+  const priceInfo = getPropertyPriceInfo(property);
 
   const statusColors: Record<string, string> = {
     'Disponível': 'bg-emerald-600 text-white font-black shadow-md border-emerald-700',
@@ -135,12 +133,17 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
         {/* Price & Action Row */}
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
           <div>
-            <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Valor</p>
-            <p className="text-base font-extrabold text-[#F10F4D]">
-              {property.purpose.includes('Locação') && property.rent_price
-                ? `${formatPrice(property.rent_price)} /mês`
-                : formatPrice(property.price)}
+            <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+              {priceInfo.isBoth ? 'Venda / Aluguel' : (priceInfo.isRent ? 'Aluguel' : 'Valor')}
             </p>
+            <p className="text-base font-extrabold text-[#F10F4D]">
+              {priceInfo.primaryFormatted}
+            </p>
+            {priceInfo.isBoth && priceInfo.rentPrice > 0 && priceInfo.salePrice > 0 && (
+              <p className="text-[10px] font-bold text-slate-600">
+                Locação: {priceInfo.rentFormatted}
+              </p>
+            )}
           </div>
 
           {/* Quick Action Buttons */}

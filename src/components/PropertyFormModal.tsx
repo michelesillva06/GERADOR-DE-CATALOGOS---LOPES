@@ -232,7 +232,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         category,
         status,
         price: Number(price) || 0,
-        rent_price: rentPrice ? Number(rentPrice) : undefined,
+        rent_price: (rentPrice !== '' && rentPrice !== null && rentPrice !== undefined && Number(rentPrice) > 0) ? Number(rentPrice) : undefined,
         condo_fee: Number(condoFee) || 0,
         iptu: Number(iptu) || 0,
         neighborhood,

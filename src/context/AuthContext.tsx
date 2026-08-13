@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { getStoredCurrentUser, saveStoredCurrentUser, findUserByLogin, getStoredUsers, validateUserPassword } from '../lib/storage';
+import { getStoredCurrentUser, saveStoredCurrentUser, findUserByLogin, getStoredUsers, validateUserPassword, updateUserPassword } from '../lib/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setToken(data.token);
         setUser(data.user);
         saveStoredCurrentUser(data.user);
+        updateUserPassword(data.user.id, passText);
         return { success: true };
       } else if (contentType.includes('application/json')) {
         // Handle actual server non-200 responses strictly with json error

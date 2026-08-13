@@ -381,9 +381,15 @@ function MainApp() {
         if (res.ok && contentType.includes('json')) {
           const data = await res.json();
           if (data.user) createdFromBackend = data.user;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Erro ao cadastrar usuário');
         }
-      } catch (e) {
-        console.warn('Backend API unavailable, adding user locally:', e);
+      } catch (e: any) {
+        console.warn('Backend API error or unavailable, adding user locally:', e);
+        if (e.message && !e.message.includes('Failed to fetch')) {
+          throw e;
+        }
       }
     }
 
@@ -392,12 +398,12 @@ function MainApp() {
       id: `usr_${Date.now()}`,
       name: userData.name || 'Novo Usuário',
       email: userData.email || '',
-      username: (userData.username || `user_${Date.now()}`).toLowerCase(),
+      username: (userData.username || `user_${Date.now()}`).toLowerCase().trim(),
       phone: userData.phone || '',
       whatsapp: userData.whatsapp || userData.phone || '',
       role: userData.role || 'CAPTADOR',
       position: userData.position || 'Corretor',
-      url_slug: (userData.url_slug || userData.username || `user_${Date.now()}`).toLowerCase(),
+      url_slug: (userData.url_slug || userData.username || `user_${Date.now()}`).toLowerCase().replace(/[^a-z0-9]/g, ''),
       status: 'active',
       photo_url: userData.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
       creci: userData.creci || '',
@@ -424,19 +430,37 @@ function MainApp() {
   };
 
   const handleUpdateUser = async (id: string, userData: any) => {
+    let updatedFromBackend: User | null = null;
     if (isBackendHealthy) {
       try {
-        await fetch(`/api/users/${id}`, {
+        const res = await fetch(`/api/users/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(userData)
         });
-      } catch (e) {
-        console.warn('Backend API unavailable, updating user locally:', e);
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('json')) {
+          const data = await res.json();
+          if (data.user) updatedFromBackend = data.user;
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Erro ao atualizar dados do usuário');
+        }
+      } catch (e: any) {
+        console.warn('Backend API error or unavailable, updating user locally:', e);
+        if (e.message && !e.message.includes('Failed to fetch')) {
+          throw e;
+        }
       }
     }
 
-    const allUsers = getStoredUsers().map(u => u.id === id ? { ...u, ...userData } : u);
+    const currentUsers = getStoredUsers();
+    const allUsers = currentUsers.map(u => {
+      if (u.id === id) {
+        return updatedFromBackend || { ...u, ...userData };
+      }
+      return u;
+    });
     
     if (userData.password) {
       updateUserPassword(id, userData.password);
@@ -446,10 +470,33 @@ function MainApp() {
     setUsers(allUsers);
 
     if (user && user.id === id) {
-      const updatedSelf = { ...user, ...userData };
+      const updatedSelf = updatedFromBackend || { ...user, ...userData };
       saveStoredCurrentUser(updatedSelf);
       setUser(updatedSelf);
     }
+  };
+
+  const handleResetUserPassword = async (id: string, newPass: string) => {
+    if (isBackendHealthy) {
+      try {
+        const res = await fetch(`/api/users/${id}/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newPassword: newPass })
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Falha ao redefinir senha.');
+        }
+      } catch (e: any) {
+        console.warn('Backend API reset-password fallback to local:', e);
+        if (e.message && !e.message.includes('Failed to fetch')) {
+          throw e;
+        }
+      }
+    }
+
+    updateUserPassword(id, newPass);
   };
 
   const handleToggleBlockUser = async (id: string) => {
@@ -784,6 +831,7 @@ function MainApp() {
               onRefreshUsers={fetchData}
               onAddUser={handleAddUser}
               onUpdateUser={handleUpdateUser}
+              onResetPassword={handleResetUserPassword}
               onToggleBlock={handleToggleBlockUser}
               onDeleteUser={handleDeleteUser}
             />
