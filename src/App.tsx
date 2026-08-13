@@ -370,7 +370,7 @@ function MainApp() {
   const handleShareWhatsApp = (prop: Property) => {
     const owner = users.find(u => u.id === prop.user_id) || user;
     const phone = getEffectiveWhatsApp(owner, companySettings);
-    const link = `${window.location.origin}/imovel/${prop.id}`;
+    const link = `${window.location.origin}/imovel/${encodeURIComponent(prop.code || prop.id)}`;
     const text = `Olá ${owner.name}! Gostaria de informações e agendar visita para o imóvel "${prop.title}": ${link}`;
     const waUrl = buildWhatsAppUrl(phone, text);
     window.open(waUrl, '_blank');
@@ -956,24 +956,51 @@ function MainApp() {
 }
 
 export default function App() {
-  // Check if current URL path is a public catalog route e.g. /catalogo/michelesilva
-  const path = window.location.pathname;
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [currentHash, setCurrentHash] = useState(window.location.hash);
 
-  if (path.startsWith('/imovel/')) {
-    const code = path.split('/imovel/')[1]?.split('?')[0];
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+      setCurrentHash(window.location.hash);
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
+  }, []);
+
+  const path = currentPath || '';
+  const hash = currentHash || '';
+
+  // Check if current URL is a public property route e.g. /imovel/LOP-101 or #/imovel/LOP-101
+  if (path.startsWith('/imovel/') || hash.startsWith('#/imovel/') || hash.startsWith('#imovel/')) {
+    const rawParam = path.startsWith('/imovel/')
+      ? path.substring('/imovel/'.length)
+      : hash.replace(/^#\/?imovel\//, '');
+    const cleanCode = decodeURIComponent(rawParam.split('?')[0].replace(/\/$/, '')).trim();
+
     return (
       <PublicPropertyDetail
-        code={code || 'LOP-101'}
+        code={cleanCode || 'LOP-DEMO1'}
         companySettings={getStoredSettings()}
       />
     );
   }
 
-  if (path.startsWith('/catalogo/')) {
-    const slug = path.split('/catalogo/')[1]?.split('?')[0];
+  // Check if current URL path is a public catalog route e.g. /catalogo/michelesilva or #/catalogo/michelesilva
+  if (path.startsWith('/catalogo/') || hash.startsWith('#/catalogo/') || hash.startsWith('#catalogo/')) {
+    const rawSlug = path.startsWith('/catalogo/')
+      ? path.substring('/catalogo/'.length)
+      : hash.replace(/^#\/?catalogo\//, '');
+    const cleanSlug = decodeURIComponent(rawSlug.split('?')[0].replace(/\/$/, '')).trim();
+
     return (
       <PublicCatalog
-        slug={slug || 'michelesilva'}
+        slug={cleanSlug || 'geral'}
         companySettings={getStoredSettings()}
       />
     );

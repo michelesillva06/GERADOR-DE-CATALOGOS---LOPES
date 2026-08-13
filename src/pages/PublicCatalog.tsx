@@ -319,7 +319,7 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
                 captador={captador}
                 onView={() => setSelectedProperty(prop)}
                 onShareWhatsApp={() => {
-                  const msg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" (Cód: ${prop.code}) no seu catálogo: ${window.location.origin}/imovel/${prop.code}`;
+                  const msg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" (Cód: ${prop.code}) no seu catálogo: ${window.location.origin}/imovel/${encodeURIComponent(prop.code || prop.id)}`;
                   const targetWaUrl = buildWhatsAppUrl(captadorPhone, msg);
                   window.open(targetWaUrl, '_blank');
                 }}

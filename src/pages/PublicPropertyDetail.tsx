@@ -50,25 +50,107 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
   useEffect(() => {
     const loadProperty = async () => {
       setLoading(true);
+      const cleanCode = decodeURIComponent(code || '').replace(/\/$/, '').trim();
       let foundProp: Property | null = null;
       let foundCaptador: User | null = null;
 
+      // 1. Try public property detail endpoints
       try {
-        const res = await fetch(`/api/properties/public/code/${code}`);
+        const res = await fetch(`/api/properties/public/code/${encodeURIComponent(cleanCode)}`);
         const contentType = res.headers.get('content-type') || '';
         if (res.ok && contentType.includes('json')) {
           const data = await res.json();
-          foundProp = data.property;
-          foundCaptador = data.captador;
-          if (data.companySettings) setCompanySettings(data.companySettings);
+          if (data.property) {
+            foundProp = data.property;
+            foundCaptador = data.captador;
+            if (data.companySettings) setCompanySettings(data.companySettings);
+          }
         }
       } catch (err) {
-        console.warn('Backend API unavailable, searching local storage for property code:', err);
+        console.warn('Backend API code lookup error:', err);
       }
 
+      // 2. Try generic public identifier endpoint if not found
+      if (!foundProp) {
+        try {
+          const res = await fetch(`/api/properties/public/${encodeURIComponent(cleanCode)}`);
+          const contentType = res.headers.get('content-type') || '';
+          if (res.ok && contentType.includes('json')) {
+            const data = await res.json();
+            if (data.property) {
+              foundProp = data.property;
+              foundCaptador = data.captador;
+              if (data.companySettings) setCompanySettings(data.companySettings);
+            }
+          }
+        } catch (err) {
+          console.warn('Backend API generic lookup error:', err);
+        }
+      }
+
+      // 3. Try fetching from general properties list
+      if (!foundProp) {
+        try {
+          const resAll = await fetch('/api/properties');
+          if (resAll.ok && (resAll.headers.get('content-type') || '').includes('json')) {
+            const dataAll = await resAll.json();
+            const propsList: Property[] = Array.isArray(dataAll.properties) ? dataAll.properties : [];
+            const cleanLower = cleanCode.toLowerCase();
+            const cleanAlphanumeric = cleanLower.replace(/[^a-z0-9]/g, '');
+
+            const match = propsList.find(p => 
+              p.code?.toLowerCase() === cleanLower ||
+              p.id?.toLowerCase() === cleanLower ||
+              p.id === cleanCode ||
+              p.code === cleanCode ||
+              p.code?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphanumeric ||
+              p.id?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphanumeric
+            );
+
+            if (match) {
+              foundProp = match;
+              try {
+                const [usersRes, settingsRes] = await Promise.all([
+                  fetch('/api/users').catch(() => null),
+                  fetch('/api/settings').catch(() => null)
+                ]);
+                if (usersRes && usersRes.ok) {
+                  const uData = await usersRes.json();
+                  if (Array.isArray(uData.users)) {
+                    foundCaptador = uData.users.find((u: User) =>
+                      u.id === match.user_id ||
+                      u.username?.toLowerCase() === match.user_id?.toLowerCase() ||
+                      u.email?.toLowerCase() === match.user_id?.toLowerCase()
+                    ) || uData.users[0];
+                  }
+                }
+                if (settingsRes && settingsRes.ok) {
+                  const sData = await settingsRes.json();
+                  if (sData.settings) setCompanySettings(sData.settings);
+                }
+              } catch {
+                // Ignore secondary fetch errors
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Error querying properties list:', e);
+        }
+      }
+
+      // 4. Fallback to localStorage if still not found
       if (!foundProp) {
         const allProps = getStoredProperties();
-        const matched = allProps.find(p => p.code.toLowerCase() === code.toLowerCase() || p.id === code);
+        const cleanLower = cleanCode.toLowerCase();
+        const cleanAlphanumeric = cleanLower.replace(/[^a-z0-9]/g, '');
+        const matched = allProps.find(p => 
+          p.code?.toLowerCase() === cleanLower || 
+          p.id?.toLowerCase() === cleanLower ||
+          p.id === cleanCode ||
+          p.code === cleanCode ||
+          p.code?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphanumeric ||
+          p.id?.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphanumeric
+        );
         if (matched) {
           foundProp = matched;
           const allUsers = getStoredUsers();
@@ -80,6 +162,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
       if (foundProp) {
         setProperty(foundProp);
         if (foundCaptador) setCaptador(foundCaptador);
+        document.title = `${foundProp.title} (${foundProp.code}) - ${companySettings.company_name}`;
       }
       setLoading(false);
     };

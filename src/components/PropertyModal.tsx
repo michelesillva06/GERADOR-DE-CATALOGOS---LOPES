@@ -45,7 +45,8 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
   useEffect(() => {
     if (property) {
       setActiveImageIndex(0);
-      const url = `${window.location.origin}/imovel/${property.id}`;
+      const identifier = property.code || property.id;
+      const url = `${window.location.origin}/imovel/${encodeURIComponent(identifier)}`;
       generateQRCodeDataUrl(url, '#F10F4D').then(setQrCodeUrl);
     }
   }, [property, captador]);
@@ -397,7 +398,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
           {/* Action CTAs Bottom Bar */}
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-3">
             <a
-              href={`/imovel/${property.id}`}
+              href={`/imovel/${encodeURIComponent(property.code || property.id)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center space-x-2 transition border border-slate-300"

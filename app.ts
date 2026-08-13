@@ -340,8 +340,8 @@ app.post('/api/auth/login', async (req, res) => {
     );
   });
 
-  // 2. If not found in memory, query Firestore directly
-  if (!user) {
+  // 2. If not found in memory and Firestore is connected, query Firestore
+  if (!user && isFirestoreConnected) {
     try {
       const usersSnap = await usersCol.get();
       if (!usersSnap.empty) {
@@ -369,7 +369,7 @@ app.post('/api/auth/login', async (req, res) => {
         });
       }
     } catch (e) {
-      console.warn('[Firestore] Error searching user in Firestore:', e);
+      isFirestoreConnected = false;
     }
   }
 
@@ -377,15 +377,19 @@ app.post('/api/auth/login', async (req, res) => {
     if (cleanLogin === 'demo' || cleanLogin === 'demo@lopesmanaus.com.br' || cleanLogin === 'usr_demo') {
       user = initialUsers[1];
       users.push(user);
-      try {
-        await usersCol.doc(user.id).set(user, { merge: true });
-      } catch {}
+      if (isFirestoreConnected) {
+        try {
+          await usersCol.doc(user.id).set(user, { merge: true });
+        } catch {}
+      }
     } else if (cleanLogin === 'admin' || cleanLogin === 'admin@lopesmanaus.com.br' || cleanLogin === 'usr_admin') {
       user = initialUsers[0];
       users.unshift(user);
-      try {
-        await usersCol.doc(user.id).set(user, { merge: true });
-      } catch {}
+      if (isFirestoreConnected) {
+        try {
+          await usersCol.doc(user.id).set(user, { merge: true });
+        } catch {}
+      }
     }
   }
 
@@ -403,19 +407,21 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  // 3. Always check real-time cloud password from Firestore if available
+  // 3. Check real-time cloud password from Firestore if connected
   let cloudPassword = (user as any).password;
-  try {
-    const userDoc = await usersCol.doc(user.id).get();
-    if (userDoc.exists) {
-      const docData = userDoc.data();
-      if (docData && docData.password) {
-        cloudPassword = docData.password;
-        (user as any).password = docData.password;
+  if (isFirestoreConnected) {
+    try {
+      const userDoc = await usersCol.doc(user.id).get();
+      if (userDoc.exists) {
+        const docData = userDoc.data();
+        if (docData && docData.password) {
+          cloudPassword = docData.password;
+          (user as any).password = docData.password;
+        }
       }
+    } catch (e) {
+      isFirestoreConnected = false;
     }
-  } catch (e) {
-    console.warn('[Firestore] Warning reading real-time user password:', e);
   }
 
   let authSuccess = false;
@@ -553,7 +559,7 @@ app.post('/api/auth/change-password', async (req, res) => {
   let user = users.find(u => u.id === userId || u.username === userId || u.email === userId);
   let currentDocPassword = (user as any)?.password;
 
-  if (userId) {
+  if (userId && isFirestoreConnected) {
     try {
       const userDoc = await usersCol.doc(userId).get();
       if (userDoc.exists) {
@@ -567,7 +573,7 @@ app.post('/api/auth/change-password', async (req, res) => {
         }
       }
     } catch (err) {
-      console.warn('[Firestore] Error fetching user doc for change-password:', err);
+      isFirestoreConnected = false;
     }
   }
 
@@ -719,15 +725,17 @@ app.get('/api/users/public/:slug', (req, res) => {
   });
 });
 
-// Users: List all users (fetching fresh from Firestore)
+// Users: List all users
 app.get('/api/users', async (req, res) => {
-  try {
-    const usersSnap = await usersCol.get();
-    if (!usersSnap.empty) {
-      users = usersSnap.docs.map(d => d.data() as User);
+  if (isFirestoreConnected) {
+    try {
+      const usersSnap = await usersCol.get();
+      if (!usersSnap.empty) {
+        users = usersSnap.docs.map(d => d.data() as User);
+      }
+    } catch (e) {
+      isFirestoreConnected = false;
     }
-  } catch (e) {
-    console.warn('[Firestore] Warning reading users list:', e);
   }
   res.json({ users });
 });
@@ -1009,13 +1017,15 @@ app.delete('/api/users/:id', async (req, res) => {
 
 // Properties: List Properties
 app.get('/api/properties', async (req, res) => {
-  try {
-    const propsSnap = await propertiesCol.get();
-    if (!propsSnap.empty) {
-      properties = propsSnap.docs.map(d => d.data() as Property);
+  if (isFirestoreConnected) {
+    try {
+      const propsSnap = await propertiesCol.get();
+      if (!propsSnap.empty) {
+        properties = propsSnap.docs.map(d => d.data() as Property);
+      }
+    } catch (e) {
+      isFirestoreConnected = false;
     }
-  } catch (e) {
-    console.warn('[Firestore] Error fetching properties in list:', e);
   }
 
   // Ensure demo properties are always available in memory and synced
@@ -1154,16 +1164,40 @@ app.get('/api/properties/public/user/:slug', (req, res) => {
   });
 });
 
-// Public Property Detail by Code
-app.get('/api/properties/public/code/:code', (req, res) => {
-  const codeParam = req.params.code.toLowerCase();
-  const property = properties.find(p => p.code.toLowerCase() === codeParam);
+// Helper function to robustly find a property by ID, Code, slug, or sanitized identifier
+function findPropertyRobustly(identifier: string): Property | undefined {
+  if (!identifier) return undefined;
+  const decoded = decodeURIComponent(identifier).trim();
+  const lower = decoded.toLowerCase();
+  const cleanAlphanumeric = lower.replace(/[^a-z0-9]/g, '');
+
+  return properties.find(p => {
+    if (!p) return false;
+    if (p.id === decoded || p.id === identifier) return true;
+    if (p.code && (p.code === decoded || p.code === identifier)) return true;
+    if (p.id && p.id.toLowerCase() === lower) return true;
+    if (p.code && p.code.toLowerCase() === lower) return true;
+    if (p.code && p.code.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphanumeric) return true;
+    if (p.id && p.id.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphanumeric) return true;
+    return false;
+  });
+}
+
+// Handler for single property detail response
+function handlePropertyDetailResponse(identifier: string, res: express.Response) {
+  const property = findPropertyRobustly(identifier);
   if (!property) {
-    return res.status(404).json({ error: 'Imóvel não encontrado.' });
+    return res.status(404).json({ error: 'Imóvel não encontrado.', identifier });
   }
 
-  const captador = users.find(u => u.id === property.user_id);
-  res.json({
+  const captador = users.find(u =>
+    u.id === property.user_id ||
+    u.id?.toLowerCase() === property.user_id?.toLowerCase() ||
+    u.username?.toLowerCase() === property.user_id?.toLowerCase() ||
+    u.email?.toLowerCase() === property.user_id?.toLowerCase()
+  ) || users.find(u => u.role === 'MASTER_ADMIN') || users[0] || null;
+
+  return res.json({
     property,
     captador: captador ? {
       id: captador.id,
@@ -1179,6 +1213,25 @@ app.get('/api/properties/public/code/:code', (req, res) => {
     } : null,
     companySettings
   });
+}
+
+// Public Property Detail by Code
+app.get('/api/properties/public/code/:code', (req, res) => {
+  return handlePropertyDetailResponse(req.params.code, res);
+});
+
+// Public Property Detail by generic Identifier (ID or Code)
+app.get('/api/properties/public/:identifier', (req, res) => {
+  return handlePropertyDetailResponse(req.params.identifier, res);
+});
+
+// Single Property Detail by ID
+app.get('/api/properties/:id', (req, res) => {
+  const property = findPropertyRobustly(req.params.id);
+  if (!property) {
+    return res.status(404).json({ error: 'Imóvel não encontrado.' });
+  }
+  return res.json({ property });
 });
 
 // Properties: Create Property in Firestore
