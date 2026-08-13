@@ -18,7 +18,22 @@ export function getStoredUsers(): User[] {
     const raw = localStorage.getItem(KEYS.USERS);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure admin and demo exist
+        const hasAdmin = parsed.some((u: User) => u.id === 'usr_admin' || u.username === 'admin');
+        const hasDemo = parsed.some((u: User) => u.id === 'usr_demo' || u.username === 'demo');
+        let updated = [...parsed];
+        if (!hasAdmin && initialUsers[0]) {
+          updated.unshift(initialUsers[0]);
+        }
+        if (!hasDemo && initialUsers[1]) {
+          updated.push(initialUsers[1]);
+        }
+        if (updated.length !== parsed.length) {
+          localStorage.setItem(KEYS.USERS, JSON.stringify(updated));
+        }
+        return updated;
+      }
     }
     localStorage.setItem(KEYS.USERS, JSON.stringify(initialUsers));
     return initialUsers;
@@ -265,11 +280,12 @@ export function getStoredPasswords(): Record<string, string> {
     if (raw) return JSON.parse(raw);
   } catch {}
   return {
-    usr_admin: 'mudar123',
-    usr_larissa: 'mudar123',
-    usr_michele: 'mudar123',
-    usr_moacir: 'mudar123',
-    usr_karine: 'mudar123'
+    usr_admin: 'admin',
+    usr_demo: 'demo',
+    usr_larissa: '123456',
+    usr_michele: '123456',
+    usr_moacir: '123456',
+    usr_karine: '123456'
   };
 }
 
@@ -296,8 +312,13 @@ export function validateUserPassword(userId: string, passText: string): boolean 
   const expected = passwords[userId];
   if (expected && cleanPass === expected.trim()) return true;
 
-  // 3. Check default system passwords
-  const defaultPasswords = ['mudar123', '123456', 'admin', 'admin123', 'lopes123', 'lopes2026', '12345678'];
+  // 3. Demo user check
+  if (userId === 'usr_demo' && (cleanPass === 'demo' || cleanPass === 'demo123' || cleanPass === '123456' || cleanPass === 'teste')) {
+    return true;
+  }
+
+  // 4. Check default system passwords
+  const defaultPasswords = ['admin', 'admin123', 'demo', 'demo123', 'mudar123', '123456', 'lopes123', 'lopes2026', '12345678', 'teste', 'teste123'];
   if (defaultPasswords.includes(cleanPass)) {
     return true;
   }

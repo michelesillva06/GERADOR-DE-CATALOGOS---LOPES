@@ -1,4 +1,4 @@
-export type UserRole = 'MASTER_ADMIN' | 'GESTORA' | 'CAPTADOR';
+export type UserRole = 'MASTER_ADMIN' | 'GESTORA' | 'CAPTADOR' | 'DEMO';
 export type UserStatus = 'active' | 'blocked';
 
 export interface User {
@@ -16,6 +16,8 @@ export interface User {
   instagram?: string;
   facebook?: string;
   creci?: string;
+  password?: string;
+  is_demo?: boolean;
   created_at: string;
 }
 

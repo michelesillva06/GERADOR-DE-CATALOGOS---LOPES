@@ -2,14 +2,54 @@ import { Property } from '../types';
 
 /**
  * Safely converts any numerical or string input into a valid integer/float number.
+ * Correctly handles Brazilian currency formats (e.g., "3.500", "3.500,00", "3500,00", "R$ 3.500")
+ * as well as standard numbers and US formats.
  */
 export function parseNumericPrice(val: number | string | undefined | null): number {
   if (val === undefined || val === null || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
-  const cleaned = String(val)
-    .replace(/[^\d.,]/g, '')
-    .replace(',', '.');
-  const parsed = parseFloat(cleaned);
+  
+  let s = String(val).trim();
+  // Remove currency symbols (R$), letters, extra spaces
+  s = s.replace(/[^\d.,]/g, '');
+  if (!s) return 0;
+
+  // Case 1: contains both '.' and ',' (e.g. 1.250.000,00 or 1,250,000.00)
+  if (s.includes('.') && s.includes(',')) {
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      // Brazilian format: 1.500,00 -> remove dots, replace comma with dot
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // US format: 1,500.00 -> remove commas
+      s = s.replace(/,/g, '');
+    }
+  } else if (s.includes(',')) {
+    // Only commas: e.g. "3500,00" or "3,500"
+    const parts = s.split(',');
+    if (parts.length === 2 && parts[1].length <= 2) {
+      // Decimal comma: 3500,50 -> 3500.50
+      s = s.replace(',', '.');
+    } else {
+      // Thousand separator comma: 3,500 -> 3500
+      s = s.replace(/,/g, '');
+    }
+  } else if (s.includes('.')) {
+    // Only dots: e.g. "3.500" (Brazilian thousand separator) or "1.250.000" or "3500.00"
+    const parts = s.split('.');
+    if (parts.length > 2) {
+      // Multiple dots: 1.250.000 -> 1250000
+      s = s.replace(/\./g, '');
+    } else if (parts.length === 2) {
+      // Single dot: e.g. "3.500" (3 digits after dot -> Brazilian thousand separator!)
+      if (parts[1].length === 3) {
+        s = s.replace('.', '');
+      } else {
+        // Decimal dot: "3500.50" -> keep as is
+      }
+    }
+  }
+
+  const parsed = parseFloat(s);
   return isNaN(parsed) ? 0 : parsed;
 }
 
@@ -78,14 +118,15 @@ export function getPropertyPriceInfo(property: Partial<Property> | null | undefi
   if (isLocacaoPurpose && !isBothPurpose) {
     if (rentPrice === 0 && salePrice > 0) {
       rentPrice = salePrice;
+      salePrice = 0;
     }
   }
 
   // If purpose is strictly Venda and user placed the sale amount in the rent_price field:
   if (isVendaPurpose && !isBothPurpose) {
     if (salePrice === 0 && rentPrice > 0) {
-      // If the purpose is Venda and rentPrice was filled, we treat it as rent if purpose is mixed,
-      // or if user meant rent, we preserve rentPrice
+      salePrice = rentPrice;
+      rentPrice = 0;
     }
   }
 

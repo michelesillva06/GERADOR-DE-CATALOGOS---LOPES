@@ -223,6 +223,21 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
     setError('');
 
     try {
+      let parsedPrice = Number(price) || 0;
+      let parsedRent = (rentPrice !== '' && rentPrice !== null && rentPrice !== undefined && Number(rentPrice) > 0) ? Number(rentPrice) : 0;
+
+      if (purpose === 'Locação') {
+        if (!parsedRent && parsedPrice > 0) {
+          parsedRent = parsedPrice;
+          parsedPrice = 0;
+        }
+      } else if (purpose === 'Venda') {
+        if (!parsedPrice && parsedRent > 0) {
+          parsedPrice = parsedRent;
+          parsedRent = 0;
+        }
+      }
+
       await onSave({
         code,
         user_id: userId,
@@ -231,8 +246,8 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         purpose,
         category,
         status,
-        price: Number(price) || 0,
-        rent_price: (rentPrice !== '' && rentPrice !== null && rentPrice !== undefined && Number(rentPrice) > 0) ? Number(rentPrice) : undefined,
+        price: parsedPrice,
+        rent_price: parsedRent > 0 ? parsedRent : undefined,
         condo_fee: Number(condoFee) || 0,
         iptu: Number(iptu) || 0,
         neighborhood,
@@ -479,25 +494,33 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
 
           {/* Pricing Details */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Valor Venda (R$)</label>
+            <div className={purpose === 'Locação' ? 'opacity-80' : ''}>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                {purpose === 'Locação' ? 'Valor Venda (Opcional)' : 'Valor Venda (R$)'}
+              </label>
               <input
                 type="number"
                 placeholder="0"
                 value={price}
                 onChange={(e) => setPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-[#F10F4D]"
+                className={`w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold ${
+                  purpose === 'Venda' || purpose === 'Venda e Locação' ? 'text-[#F10F4D] ring-1 ring-[#F10F4D]/20' : 'text-slate-800'
+                }`}
               />
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">Valor Aluguel (R$)</label>
+              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                {purpose === 'Locação' ? 'Valor do Aluguel (R$/mês) *' : 'Valor Aluguel (R$/mês)'}
+              </label>
               <input
                 type="number"
                 placeholder="0"
                 value={rentPrice}
                 onChange={(e) => setRentPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                className={`w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold ${
+                  purpose === 'Locação' ? 'text-[#F10F4D] ring-2 ring-[#F10F4D]/30' : 'text-slate-800'
+                }`}
               />
             </div>
 

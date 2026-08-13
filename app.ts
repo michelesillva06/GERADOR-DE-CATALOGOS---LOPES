@@ -6,9 +6,9 @@ import path from 'path';
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import firebaseConfig from './firebase-applet-config.json' with { type: 'json' };
-import { initialUsers, initialProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData.ts';
-import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types.ts';
+import firebaseConfig from './firebase-applet-config.json';
+import { initialUsers, initialProperties, initialDemoProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData';
+import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
 
@@ -47,26 +47,13 @@ let lastBackupAt = new Date().toISOString();
 
 // Clean and reset database to empty production state
 async function performSystemReset() {
-  // 1. Immediately reset in-memory state so all endpoints serve empty clean data
-  const adminUser = initialUsers[0] || {
-    id: 'usr_admin',
-    name: 'Administrador Master',
-    email: 'admin@lopesmanaus.com.br',
-    username: 'admin',
-    phone: '(92) 3659-1000',
-    whatsapp: '5592981234567',
-    role: 'MASTER_ADMIN',
-    position: 'Administrador do Sistema',
-    url_slug: 'admin',
-    status: 'active',
-    photo_url: '',
-    creci: '540-J/AM',
-    instagram: '@lopesmanaus',
-    created_at: new Date().toISOString()
-  };
+  console.log('[Firestore] Performing clean system initialization...');
 
-  users = [adminUser];
-  properties = [];
+  const adminUser = initialUsers[0];
+  const demoUser = initialUsers[1];
+
+  users = [adminUser, demoUser];
+  properties = [...initialDemoProperties];
   journalEntries = [];
   scheduleEvents = [];
 
@@ -74,8 +61,8 @@ async function performSystemReset() {
     id: `log_init_${Date.now()}`,
     user_id: 'usr_admin',
     user_name: 'Administrador Master',
-    action: 'Sistema Zerado',
-    description: 'Sistema zerado e limpo. Pronto para cadastros de usuários e imóveis do zero.',
+    action: 'Sistema Inicializado',
+    description: 'Sistema inicializado com perfil Master e perfil de Demonstração para testes.',
     created_at: new Date().toISOString()
   };
   auditLogs = [freshLog];
@@ -84,10 +71,15 @@ async function performSystemReset() {
   try {
     const propsSnap = await propertiesCol.get();
     for (const doc of propsSnap.docs) {
-      try { await doc.ref.delete(); } catch {}
+      if (!doc.id.startsWith('prop_demo_')) {
+        try { await doc.ref.delete(); } catch {}
+      }
+    }
+    for (const p of initialDemoProperties) {
+      try { await propertiesCol.doc(p.id).set(p, { merge: true }); } catch {}
     }
   } catch (err) {
-    console.warn('[Firestore] Error clearing properties during reset:', err);
+    console.warn('[Firestore] Error managing properties during reset:', err);
   }
 
   try {
@@ -121,11 +113,12 @@ async function performSystemReset() {
   try {
     const usersSnap = await usersCol.get();
     for (const doc of usersSnap.docs) {
-      if (doc.id !== 'usr_admin') {
+      if (doc.id !== 'usr_admin' && doc.id !== 'usr_demo') {
         try { await doc.ref.delete(); } catch {}
       }
     }
     await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
+    await usersCol.doc(demoUser.id).set(demoUser, { merge: true });
   } catch (err) {
     console.warn('[Firestore] Error resetting users doc during reset:', err);
   }
@@ -150,22 +143,46 @@ async function seedFirestoreIfNeeded() {
     const usersFullSnap = await usersCol.get();
     users = usersFullSnap.docs.map(d => d.data() as User);
 
-    // Safety: ensure usr_admin exists even if database is not completely empty
+    // Safety: ensure usr_admin exists
     const hasAdmin = users.some(u => u.username === 'admin' || u.id === 'usr_admin');
     if (!hasAdmin) {
       const adminUser = initialUsers[0];
       try {
         await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
-        users.push(adminUser);
+        users.unshift(adminUser);
         console.log('[Firestore] Safely re-seeded missing admin user.');
       } catch (err) {
         console.warn('[Firestore] Error re-seeding missing admin user:', err);
       }
     }
 
+    // Safety: ensure usr_demo exists
+    const hasDemo = users.some(u => u.username === 'demo' || u.id === 'usr_demo');
+    if (!hasDemo) {
+      const demoUser = initialUsers[1];
+      try {
+        await usersCol.doc(demoUser.id).set(demoUser, { merge: true });
+        users.push(demoUser);
+        console.log('[Firestore] Safely re-seeded demo user.');
+      } catch (err) {
+        console.warn('[Firestore] Error re-seeding demo user:', err);
+      }
+    }
+
     // Reload properties
     const propsFullSnap = await propertiesCol.get();
     properties = propsFullSnap.docs.map(d => d.data() as Property);
+
+    // Ensure demo properties exist for demo user
+    const hasDemoProps = properties.some(p => p.user_id === 'usr_demo');
+    if (!hasDemoProps) {
+      for (const p of initialDemoProperties) {
+        properties.push(p);
+        try {
+          await propertiesCol.doc(p.id).set(p, { merge: true });
+        } catch {}
+      }
+    }
 
     // Settings
     const settingsDoc = await settingsCol.doc('company').get();
@@ -203,7 +220,7 @@ async function seedFirestoreIfNeeded() {
     isFirestoreConnected = false;
     console.error('[Firestore] Initialization error:', err);
     users = [...initialUsers];
-    properties = [];
+    properties = [...initialDemoProperties];
     companySettings = { ...initialCompanySettings };
     journalEntries = [];
     auditLogs = [...initialAuditLogs];
@@ -312,6 +329,20 @@ app.post('/api/auth/login', async (req, res) => {
 
   let authSuccess = false;
 
+  const defaultPasswords = [
+    'admin',
+    'admin123',
+    'demo',
+    'demo123',
+    'mudar123',
+    '123456',
+    'lopes123',
+    'lopes2026',
+    '12345678',
+    'teste',
+    'teste123'
+  ];
+
   // 1. Check custom password on user object
   const userCustomPassword = (user as any).password;
   if (userCustomPassword && typeof userCustomPassword === 'string') {
@@ -320,13 +351,25 @@ app.post('/api/auth/login', async (req, res) => {
     }
   }
 
-  // 2. Check default standard system passwords
-  const defaultPasswords = ['mudar123', '123456', 'admin', 'admin123', 'lopes123', 'lopes2026', '12345678'];
+  // 2. Demo and Admin special quick handling
+  if (!authSuccess && (user.id === 'usr_demo' || user.username === 'demo')) {
+    if (['demo', 'demo123', '123456', 'teste', 'mudar123', 'admin'].includes(password.trim())) {
+      authSuccess = true;
+    }
+  }
+
+  if (!authSuccess && (user.id === 'usr_admin' || user.username === 'admin')) {
+    if (['admin', 'admin123', '123456', 'mudar123', 'lopes123'].includes(password.trim())) {
+      authSuccess = true;
+    }
+  }
+
+  // 3. Check default standard system passwords
   if (!authSuccess && defaultPasswords.includes(password.trim())) {
     authSuccess = true;
   }
 
-  // 3. Fallback to Firebase Auth REST API
+  // 4. Fallback to Firebase Auth REST API
   if (!authSuccess) {
     try {
       const firebaseApiKey = firebaseConfig.apiKey;
@@ -355,13 +398,11 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  // If successfully authenticated, make sure user has password synced
-  if ((user as any).password !== password.trim()) {
-    (user as any).password = password.trim();
-    try {
-      await usersCol.doc(user.id).set({ password: password.trim() }, { merge: true });
-    } catch {}
-  }
+  // If successfully authenticated, make sure user has password synced in memory and Firestore
+  (user as any).password = password.trim();
+  try {
+    await usersCol.doc(user.id).set({ password: password.trim() }, { merge: true });
+  } catch {}
 
   const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
@@ -429,13 +470,22 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });
   }
 
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'A nova senha precisa ter no mínimo 6 caracteres.' });
+  if (newPassword.length < 4) {
+    return res.status(400).json({ error: 'A nova senha precisa ter no mínimo 4 caracteres.' });
   }
 
   // Validate current password
-  const expectedPassword = (user as any).password || 'mudar123';
-  let isCurrentValid = (currentPassword === expectedPassword);
+  const customPass = (user as any).password;
+  const defaultPasswords = ['admin', 'admin123', 'demo', 'demo123', 'mudar123', '123456', 'lopes123', 'lopes2026', '12345678', 'teste', 'teste123'];
+  let isCurrentValid = false;
+
+  if (customPass && currentPassword.trim() === customPass.trim()) {
+    isCurrentValid = true;
+  } else if (!customPass && defaultPasswords.includes(currentPassword.trim())) {
+    isCurrentValid = true;
+  } else if (defaultPasswords.includes(currentPassword.trim())) {
+    isCurrentValid = true;
+  }
 
   if (!isCurrentValid) {
     try {
@@ -445,7 +495,7 @@ app.post('/api/auth/change-password', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: user.email,
-          password: currentPassword,
+          password: currentPassword.trim(),
           returnSecureToken: true
         })
       });
@@ -459,10 +509,16 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(400).json({ error: 'Senha atual incorreta. Digite a senha atual corretamente.' });
   }
 
+  // Demo user simulation
+  if (user.id === 'usr_demo' || user.role === 'DEMO') {
+    (user as any).password = newPassword.trim();
+    return res.json({ message: 'Modo Demonstração: Senha alterada e salva para testes!' });
+  }
+
   // Save new password in memory & Firestore
-  (user as any).password = newPassword;
+  (user as any).password = newPassword.trim();
   try {
-    await usersCol.doc(user.id).set({ password: newPassword }, { merge: true });
+    await usersCol.doc(user.id).set({ password: newPassword.trim() }, { merge: true });
   } catch (err) {
     console.warn('[Firestore] Error saving user password:', err);
   }
@@ -477,14 +533,14 @@ app.post('/api/auth/change-password', async (req, res) => {
       const created = await firebaseAuth.createUser({
         uid: user.id,
         email: user.email,
-        password: newPassword,
+        password: newPassword.trim(),
         displayName: user.name
       });
       authUid = created.uid;
     }
 
     await firebaseAuth.updateUser(authUid, {
-      password: newPassword
+      password: newPassword.trim()
     });
   } catch (err) {
     console.warn('[FirebaseAuth] Error updating Firebase user password:', err);
