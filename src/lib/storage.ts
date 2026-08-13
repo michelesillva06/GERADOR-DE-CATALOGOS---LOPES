@@ -1,5 +1,5 @@
 import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from '../types';
-import { initialUsers, initialProperties, initialCompanySettings, initialScheduleEvents, initialJournalEntries } from '../data/mockData';
+import { initialUsers, initialProperties, initialDemoProperties, initialCompanySettings, initialScheduleEvents, initialJournalEntries } from '../data/mockData';
 
 const KEYS = {
   USERS: 'lopes_users',
