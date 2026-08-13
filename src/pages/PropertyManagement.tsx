@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
-import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin } from 'lucide-react';
+import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin, FileCode } from 'lucide-react';
 import { PROPERTY_CATEGORIES } from '../lib/constants';
 
 interface PropertyManagementProps {
@@ -10,6 +10,7 @@ interface PropertyManagementProps {
   currentUser: User;
   onOpenNewPropertyModal: () => void;
   onOpenPdfModal: () => void;
+  onOpenXmlImport?: () => void;
   onViewProperty: (property: Property) => void;
   onEditProperty: (property: Property) => void;
   onDeleteProperty: (property: Property) => void;
@@ -22,6 +23,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   currentUser,
   onOpenNewPropertyModal,
   onOpenPdfModal,
+  onOpenXmlImport,
   onViewProperty,
   onEditProperty,
   onDeleteProperty,
@@ -93,7 +95,18 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          {isMasterOrGestora && onOpenXmlImport && (
+            <button
+              onClick={onOpenXmlImport}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center space-x-1.5 border border-slate-300/80 shadow-2xs transition"
+              title="Importar imóveis em lote via arquivo XML"
+            >
+              <FileCode className="w-4 h-4 text-[#F10F4D]" />
+              <span>Importar XML</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenPdfModal}
             className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center space-x-2 shadow transition"

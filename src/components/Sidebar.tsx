@@ -12,7 +12,8 @@ import {
   History,
   ExternalLink,
   BookOpen,
-  Calendar
+  Calendar,
+  FileCode
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -42,6 +43,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       label: isMasterOrGestora ? 'Todos os Imóveis' : 'Meus Imóveis',
       icon: Building2,
       show: true
+    },
+    {
+      id: 'xml-import',
+      label: 'Importar XML',
+      icon: FileCode,
+      show: isMasterOrGestora,
+      badge: 'XML'
     },
     {
       id: 'general-catalog',

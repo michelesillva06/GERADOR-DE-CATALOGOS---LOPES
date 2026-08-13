@@ -25,11 +25,29 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
     <div className="space-y-6">
       
       {/* Welcome Banner */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
-        <h1 className="text-2xl font-black text-slate-900">Visão Geral Imobiliária - Lopes Captação</h1>
-        <p className="text-xs text-slate-500 mt-1">
-          Acompanhe usuários captadores, métricas de imóveis e gere catálogos digitais
-        </p>
+      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900">Visão Geral Imobiliária - Lopes Captação</h1>
+          <p className="text-xs text-slate-500 mt-1">
+            Acompanhe usuários captadores, métricas de imóveis e gere catálogos digitais
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setActiveView('xml-import')}
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-2 cursor-pointer"
+          >
+            <Building2 className="w-4 h-4 text-[#F10F4D]" />
+            <span>Importar Imóveis (XML)</span>
+          </button>
+          <button
+            onClick={onOpenNewPropertyModal}
+            className="px-4 py-2.5 bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5 cursor-pointer"
+          >
+            <span>+ Cadastrar Imóvel</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Stats Cards Grid */}

@@ -16,6 +16,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { CaptadorJournalPage } from './pages/CaptadorJournalPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { GeneralCatalogPage } from './pages/GeneralCatalogPage';
+import { XMLImportPage } from './pages/XMLImportPage';
 import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
@@ -729,6 +730,16 @@ function MainApp() {
     setScheduleEvents(currentSchedule);
   };
 
+  const handlePropertiesImported = (newPropsList: Property[], message: string) => {
+    if (Array.isArray(newPropsList) && newPropsList.length > 0) {
+      setProperties(newPropsList);
+      saveStoredProperties(newPropsList);
+      const newStats = calculateStats(newPropsList, users);
+      setStats(newStats);
+    }
+    fetchData();
+  };
+
   const isMaster = user.role === 'MASTER_ADMIN';
   const isGestora = user.role === 'GESTORA';
   const isMasterOrGestora = isMaster || isGestora;
@@ -807,10 +818,22 @@ function MainApp() {
               currentUser={user}
               onOpenNewPropertyModal={handleOpenNewProperty}
               onOpenPdfModal={() => setIsPdfModalOpen(true)}
+              onOpenXmlImport={() => setActiveView('xml-import')}
               onViewProperty={handleViewPropertyDetails}
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
               onShareWhatsApp={handleShareWhatsApp}
+            />
+          )}
+
+          {activeView === 'xml-import' && isMasterOrGestora && (
+            <XMLImportPage
+              currentUser={user}
+              users={users}
+              properties={properties}
+              onPropertiesImported={handlePropertiesImported}
+              onNavigateToProperties={() => setActiveView('properties')}
+              onNavigateToPDF={() => setIsPdfModalOpen(true)}
             />
           )}
 

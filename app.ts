@@ -1119,6 +1119,171 @@ app.post('/api/properties/sync', async (req, res) => {
   res.json({ success: true, properties });
 });
 
+// Properties: Bulk Import from XML with Intelligent Deduplication
+app.post('/api/properties/import-xml', async (req, res) => {
+  const { properties: incomingProps, user_id, skip_existing = true, update_existing = false, source_filename } = req.body;
+
+  if (!Array.isArray(incomingProps) || incomingProps.length === 0) {
+    return res.status(400).json({ error: 'Nenhum imóvel fornecido para importação.' });
+  }
+
+  const targetUserId = user_id || 'usr_admin';
+  const targetUser = users.find(u => u.id === targetUserId) || users[0];
+
+  const existingCodeMap = new Map<string, Property>();
+  properties.forEach(p => {
+    if (p.code) existingCodeMap.set(p.code.toLowerCase().trim(), p);
+    if (p.id) existingCodeMap.set(p.id.toLowerCase().trim(), p);
+  });
+
+  const newToInsert: Property[] = [];
+  const updatedList: Property[] = [];
+  let ignoredCount = 0;
+  const nowISO = new Date().toISOString();
+
+  incomingProps.forEach((item: any, idx: number) => {
+    const cleanCode = (item.code || `IMP-${Date.now()}-${idx}`).trim();
+    const existing = existingCodeMap.get(cleanCode.toLowerCase());
+
+    if (existing) {
+      if (skip_existing && !update_existing) {
+        ignoredCount++;
+        return;
+      }
+
+      if (update_existing) {
+        // Update existing property
+        const updatedProp: Property = {
+          ...existing,
+          ...item,
+          id: existing.id,
+          code: existing.code,
+          updated_at: nowISO
+        };
+        updatedList.push(updatedProp);
+        return;
+      }
+    }
+
+    // New property insertion
+    const newProp: Property = {
+      id: `prop_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
+      code: cleanCode,
+      user_id: targetUserId,
+      title: item.title || `Imóvel ${cleanCode}`,
+      description: item.description || '',
+      category: item.category || 'Apartamento',
+      purpose: item.purpose || 'Venda',
+      status: item.status || 'Disponível',
+      price: Number(item.price) || 0,
+      rent_price: (item.rent_price !== undefined && item.rent_price !== null && Number(item.rent_price) > 0) ? Number(item.rent_price) : undefined,
+      condo_fee: Number(item.condo_fee) || 0,
+      iptu: Number(item.iptu) || 0,
+      neighborhood: item.neighborhood || 'Adrianópolis',
+      city: item.city || 'Manaus',
+      state: item.state || 'AM',
+      address: item.address || '',
+      total_area: Number(item.total_area) || 0,
+      built_area: Number(item.built_area) || 0,
+      bedrooms: Number(item.bedrooms) || 0,
+      suites: Number(item.suites) || 0,
+      bathrooms: Number(item.bathrooms) || 0,
+      parking_spaces: Number(item.parking_spaces) || 0,
+      features: Array.isArray(item.features) && item.features.length > 0 ? item.features : ['Excelente Localização'],
+      images: Array.isArray(item.images) && item.images.length > 0
+        ? item.images
+        : ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'],
+      main_image: item.main_image || (item.images?.[0]) || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+      created_at: nowISO,
+      updated_at: nowISO
+    };
+
+    newToInsert.push(newProp);
+    existingCodeMap.set(cleanCode.toLowerCase(), newProp);
+  });
+
+  // Batch insert into Firestore (limit 450 per batch)
+  if (newToInsert.length > 0) {
+    try {
+      const BATCH_SIZE = 400;
+      for (let i = 0; i < newToInsert.length; i += BATCH_SIZE) {
+        const chunk = newToInsert.slice(i, i + BATCH_SIZE);
+        const batch = firestoreDb.batch();
+        chunk.forEach(p => {
+          batch.set(propertiesCol.doc(p.id), p);
+        });
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('[Firestore] Error saving imported properties batch:', e);
+    }
+
+    // Prepend new to properties in memory
+    properties = [...newToInsert, ...properties];
+  }
+
+  // Handle updates in Firestore if any
+  if (updatedList.length > 0) {
+    try {
+      const batch = firestoreDb.batch();
+      updatedList.forEach(p => {
+        batch.set(propertiesCol.doc(p.id), p, { merge: true });
+        const idx = properties.findIndex(existing => existing.id === p.id);
+        if (idx !== -1) properties[idx] = p;
+      });
+      await batch.commit();
+    } catch (e) {
+      console.warn('[Firestore] Error updating existing properties batch:', e);
+    }
+  }
+
+  // Add audit log
+  const logDesc = `Importou ${newToInsert.length} novos imóveis via XML ${source_filename ? `(${source_filename})` : ''} para ${targetUser.name}. ${ignoredCount} imóveis já existentes foram ignorados.`;
+  addAuditLog(
+    targetUserId,
+    targetUser.name,
+    'Importação XML',
+    logDesc,
+    req
+  );
+
+  res.json({
+    success: true,
+    totalReceived: incomingProps.length,
+    importedCount: newToInsert.length,
+    updatedCount: updatedList.length,
+    ignoredCount,
+    properties,
+    message: `${newToInsert.length} novos imóveis cadastrados com sucesso! ${ignoredCount} imóveis já existentes foram ignorados.`
+  });
+});
+
+// Proxy to fetch external XML feed if needed
+app.post('/api/properties/fetch-feed-xml', async (req, res) => {
+  const { url } = req.body;
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'URL do feed XML é obrigatória.' });
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LopesManausXMLBot/2.0)',
+        'Accept': 'application/xml, text/xml, */*'
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Não foi possível carregar a URL (Status: ${response.status})` });
+    }
+
+    const xmlText = await response.text();
+    res.json({ success: true, xml: xmlText });
+  } catch (err: any) {
+    res.status(500).json({ error: `Falha ao baixar feed XML: ${err.message || err}` });
+  }
+});
+
 // Dashboard Stats
 app.get('/api/stats', (req, res) => {
   const totalUsers = users.length;

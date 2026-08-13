@@ -14,7 +14,8 @@ import {
   Calendar,
   History,
   Share2,
-  ExternalLink
+  ExternalLink,
+  FileCode
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -36,6 +37,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const isMasterOrGestora = user.role === 'MASTER_ADMIN' || user.role === 'GESTORA';
 
   const secondaryMenuItems = [
+    { id: 'xml-import', label: 'Importar XML', icon: FileCode, show: isMasterOrGestora },
     { id: 'schedule', label: 'Agenda & Visitas', icon: Calendar, show: true },
     { id: 'users', label: 'Usuários & Captadores', icon: Users, show: isMasterOrGestora },
     { id: 'logs', label: 'Histórico & Logs', icon: History, show: isMasterOrGestora },
