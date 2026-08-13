@@ -1009,12 +1009,28 @@ app.get('/api/properties', async (req, res) => {
     console.warn('[Firestore] Error fetching properties in list:', e);
   }
 
+  // Ensure demo properties are always available in memory and synced
+  const hasDemo = properties.some(p => p.id === 'prop_demo_1' || p.user_id === 'usr_demo');
+  if (!hasDemo) {
+    for (const p of initialDemoProperties) {
+      if (!properties.some(existing => existing.id === p.id)) {
+        properties.push(p);
+        try {
+          propertiesCol.doc(p.id).set(p, { merge: true }).catch(() => {});
+        } catch {}
+      }
+    }
+  }
+
   const { user_id, category, purpose, status, neighborhood, search, min_price, max_price } = req.query;
 
   let filtered = [...properties];
 
   if (user_id) {
-    filtered = filtered.filter(p => p.user_id === user_id);
+    filtered = filtered.filter(p => 
+      p.user_id === user_id || 
+      (user_id === 'usr_demo' && (p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_')))
+    );
   }
   if (category && category !== 'todos') {
     filtered = filtered.filter(p => p.category.toLowerCase() === (category as string).toLowerCase());

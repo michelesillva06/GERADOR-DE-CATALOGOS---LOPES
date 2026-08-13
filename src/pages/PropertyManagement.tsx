@@ -40,7 +40,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
 
   const isMaster = currentUser.role === 'MASTER_ADMIN';
   const isGestora = currentUser.role === 'GESTORA';
-  const isCaptador = currentUser.role === 'CAPTADOR';
+  const isCaptador = currentUser.role === 'CAPTADOR' || currentUser.role === 'DEMO';
   const isMasterOrGestora = isMaster || isGestora;
 
   const handleSeedDemoProperties = async () => {
@@ -61,7 +61,8 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
     p.user_id === currentUser.id ||
     p.user_id?.toLowerCase() === currentUser.id?.toLowerCase() ||
     p.user_id?.toLowerCase() === currentUser.username?.toLowerCase() ||
-    p.user_id?.toLowerCase() === currentUser.email?.toLowerCase();
+    p.user_id?.toLowerCase() === currentUser.email?.toLowerCase() ||
+    ((currentUser.role === 'DEMO' || currentUser.id === 'usr_demo') && (p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_')));
 
   const myProperties = properties.filter(isOwnedByCurrentUser);
 

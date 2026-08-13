@@ -154,6 +154,16 @@ function MainApp() {
       setStats(calculateStats(currentProps, currentUsers));
     }
 
+    // Ensure demo properties are present
+    const hasDemo = currentProps.some(p => p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_'));
+    if (!hasDemo) {
+      const stored = getStoredProperties();
+      const demoFromStored = stored.filter(p => p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_'));
+      if (demoFromStored.length > 0) {
+        currentProps = [...currentProps, ...demoFromStored];
+      }
+    }
+
     // Normalize property owners accurately without destroying active captador ownership
     if (currentUsers.length > 0 && currentProps.length > 0) {
       const { properties: normalizedProps, changed } = normalizePropertyOwners(currentProps, currentUsers);

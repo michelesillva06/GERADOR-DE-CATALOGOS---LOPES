@@ -55,12 +55,21 @@ export function getStoredProperties(): Property[] {
     const raw = localStorage.getItem(KEYS.PROPERTIES);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        // Ensure initial demo properties are always present for demo testing
+        const hasDemo = parsed.some((p: Property) => p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_'));
+        if (!hasDemo) {
+          const merged = [...parsed, ...initialDemoProperties];
+          localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(merged));
+          return merged;
+        }
+        return parsed;
+      }
     }
-    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(initialProperties));
-    return initialProperties;
+    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(initialDemoProperties));
+    return initialDemoProperties;
   } catch {
-    return initialProperties;
+    return initialDemoProperties;
   }
 }
 
@@ -81,6 +90,16 @@ export function normalizePropertyOwners(properties: Property[], users: User[]): 
   let changed = false;
 
   const normalized = properties.map(p => {
+    // 0. Demo properties always stay with usr_demo
+    if (p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_')) {
+      const demoUser = users.find(u => u.id === 'usr_demo' || u.username === 'demo' || u.role === 'DEMO');
+      if (demoUser && p.user_id !== demoUser.id) {
+        changed = true;
+        return { ...p, user_id: demoUser.id };
+      }
+      return { ...p, user_id: 'usr_demo' };
+    }
+
     // 1. Direct match with user ID
     const directUser = users.find(u => u.id === p.user_id || u.id?.toLowerCase() === p.user_id?.toLowerCase());
     if (directUser) {
