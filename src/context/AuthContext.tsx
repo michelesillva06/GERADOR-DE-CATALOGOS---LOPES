@@ -89,23 +89,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (contentType.includes('application/json')) {
         // Handle actual server non-200 responses strictly with json error
         let errorMsg = 'Senha incorreta ou usuário não encontrado.';
-        let firestoreConnected = true;
         try {
           const data = await res.json();
-          if (data) {
-            if (data.error) errorMsg = data.error;
-            if (data.firestoreConnected === false) firestoreConnected = false;
+          if (data && data.error) {
+            errorMsg = data.error;
           }
         } catch {}
 
-        if (!firestoreConnected) {
-          console.warn('Backend database is not connected, falling back to client-side credentials.');
-        } else {
-          return { success: false, error: errorMsg };
-        }
+        return { success: false, error: errorMsg };
       } else {
         // If the server doesn't return JSON, it means the API is either not found (404 returning index.html)
-        // or there's a gateway error. We should log it and fall through to client-side mode so Vercel/Static hosting works.
+        // or there's a gateway error. We log it and fall through to client-side mode.
         console.warn('Backend API returned non-JSON response, falling back to client auth mode.');
       }
     } catch (e) {

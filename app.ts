@@ -45,6 +45,74 @@ let scheduleEvents: ScheduleEvent[] = [];
 // Track backup metadata
 let lastBackupAt = new Date().toISOString();
 
+const DB_FILE = path.join(process.cwd(), 'server-database.json');
+
+function loadLocalDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.users) && data.users.length > 0) {
+        users = data.users;
+      }
+      if (data && Array.isArray(data.properties)) {
+        properties = data.properties;
+      }
+      if (data && data.companySettings) {
+        companySettings = { ...initialCompanySettings, ...data.companySettings };
+      }
+      if (data && Array.isArray(data.auditLogs) && data.auditLogs.length > 0) {
+        auditLogs = data.auditLogs;
+      }
+      if (data && Array.isArray(data.journalEntries)) {
+        journalEntries = data.journalEntries;
+      }
+      if (data && Array.isArray(data.scheduleEvents)) {
+        scheduleEvents = data.scheduleEvents;
+      }
+      console.log(`[Server DB] Loaded ${users.length} users and ${properties.length} properties from ${DB_FILE}`);
+    }
+  } catch (e) {
+    console.warn('[Server DB] Error reading local database file:', e);
+  }
+
+  // Ensure admin user exists
+  if (!users.some(u => u.username === 'admin' || u.id === 'usr_admin')) {
+    users.unshift(initialUsers[0]);
+  }
+  // Ensure demo user exists
+  if (!users.some(u => u.username === 'demo' || u.id === 'usr_demo')) {
+    users.push(initialUsers[1]);
+  }
+  // Ensure initial demo properties exist if property list is empty
+  if (properties.length === 0) {
+    properties = [...initialDemoProperties];
+  }
+  if (auditLogs.length === 0) {
+    auditLogs = [...initialAuditLogs];
+  }
+}
+
+function saveLocalDatabase() {
+  try {
+    const data = {
+      users,
+      properties,
+      companySettings,
+      auditLogs,
+      journalEntries,
+      scheduleEvents,
+      updated_at: new Date().toISOString()
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[Server DB] Error saving local database file:', e);
+  }
+}
+
+// Initial load from file system immediately
+loadLocalDatabase();
+
 // Clean and reset database to empty production state
 async function performSystemReset() {
   console.log('[Firestore] Performing clean system initialization...');
@@ -66,6 +134,7 @@ async function performSystemReset() {
     created_at: new Date().toISOString()
   };
   auditLogs = [freshLog];
+  saveLocalDatabase();
 
   // 2. Clear collections in Firestore with safe isolated try/catches
   try {
@@ -128,103 +197,61 @@ async function performSystemReset() {
 
 let isFirestoreConnected = false;
 
-// Ensure initial clean seed data in Firestore
+// Ensure initial clean seed data in Firestore and synchronize
 async function seedFirestoreIfNeeded() {
   try {
     const usersSnap = await usersCol.get();
     
-    // Ensure usr_admin exists if database is completely empty
-    if (usersSnap.empty) {
-      await performSystemReset();
-      return;
+    // If Firestore has users, load them and merge with local users
+    if (!usersSnap.empty) {
+      const remoteUsers = usersSnap.docs.map(d => d.data() as User);
+      // Merge remote and local without losing local modifications
+      const userMap = new Map<string, User>();
+      remoteUsers.forEach(u => userMap.set(u.id, u));
+      users.forEach(u => userMap.set(u.id, u));
+      users = Array.from(userMap.values());
     }
 
-    // Reload users from Firestore
-    const usersFullSnap = await usersCol.get();
-    users = usersFullSnap.docs.map(d => d.data() as User);
+    // Safety: ensure usr_admin exists in Firestore
+    const adminUser = users.find(u => u.username === 'admin' || u.id === 'usr_admin') || initialUsers[0];
+    try {
+      await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
+    } catch {}
 
-    // Safety: ensure usr_admin exists
-    const hasAdmin = users.some(u => u.username === 'admin' || u.id === 'usr_admin');
-    if (!hasAdmin) {
-      const adminUser = initialUsers[0];
-      try {
-        await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
-        users.unshift(adminUser);
-        console.log('[Firestore] Safely re-seeded missing admin user.');
-      } catch (err) {
-        console.warn('[Firestore] Error re-seeding missing admin user:', err);
-      }
-    }
-
-    // Safety: ensure usr_demo exists
-    const hasDemo = users.some(u => u.username === 'demo' || u.id === 'usr_demo');
-    if (!hasDemo) {
-      const demoUser = initialUsers[1];
-      try {
-        await usersCol.doc(demoUser.id).set(demoUser, { merge: true });
-        users.push(demoUser);
-        console.log('[Firestore] Safely re-seeded demo user.');
-      } catch (err) {
-        console.warn('[Firestore] Error re-seeding demo user:', err);
-      }
-    }
-
-    // Reload properties
+    // Reload properties from Firestore
     const propsFullSnap = await propertiesCol.get();
-    properties = propsFullSnap.docs.map(d => d.data() as Property);
-
-    // Ensure demo properties exist for demo user
-    const hasDemoProps = properties.some(p => p.user_id === 'usr_demo');
-    if (!hasDemoProps) {
-      for (const p of initialDemoProperties) {
-        properties.push(p);
-        try {
-          await propertiesCol.doc(p.id).set(p, { merge: true });
-        } catch {}
-      }
+    if (!propsFullSnap.empty) {
+      const remoteProps = propsFullSnap.docs.map(d => d.data() as Property);
+      const propMap = new Map<string, Property>();
+      remoteProps.forEach(p => propMap.set(p.id, p));
+      properties.forEach(p => propMap.set(p.id, p));
+      properties = Array.from(propMap.values());
     }
 
     // Settings
     const settingsDoc = await settingsCol.doc('company').get();
-    if (!settingsDoc.exists) {
-      const seeded = {
-        ...initialCompanySettings,
-        lastBackupAt: new Date().toISOString(),
-        backupStatus: 'Ativo (Diário no Google Cloud Storage)'
-      };
-      try {
-        await settingsCol.doc('company').set(seeded);
-      } catch (e) {
-        console.warn('[Firestore] Error seeding company settings doc:', e);
-      }
-      companySettings = seeded;
-    } else {
-      companySettings = { ...initialCompanySettings, ...settingsDoc.data() } as CompanySettings;
+    if (settingsDoc.exists) {
+      companySettings = { ...companySettings, ...settingsDoc.data() } as CompanySettings;
     }
 
     // Journal
     const journalFullSnap = await journalCol.get();
-    journalEntries = journalFullSnap.docs.map(d => d.data() as JournalEntry);
-
-    // Audit Logs
-    const logsFullSnap = await logsCol.orderBy('created_at', 'desc').limit(100).get();
-    auditLogs = logsFullSnap.docs.map(d => d.data() as AuditLog);
+    if (!journalFullSnap.empty) {
+      journalEntries = journalFullSnap.docs.map(d => d.data() as JournalEntry);
+    }
 
     // Schedule
     const scheduleFullSnap = await scheduleCol.get();
-    scheduleEvents = scheduleFullSnap.docs.map(d => d.data() as ScheduleEvent);
+    if (!scheduleFullSnap.empty) {
+      scheduleEvents = scheduleFullSnap.docs.map(d => d.data() as ScheduleEvent);
+    }
 
     isFirestoreConnected = true;
-    console.log('[Firestore] Database synchronized successfully.');
+    saveLocalDatabase();
+    console.log('[Firestore] Database synchronized successfully with cloud.');
   } catch (err: any) {
     isFirestoreConnected = false;
     console.warn('[Firestore] Notice: Operating in resilient cache mode (' + (err?.message || err) + '). All application features are active.');
-    users = [...initialUsers];
-    properties = [...initialDemoProperties];
-    companySettings = { ...initialCompanySettings };
-    journalEntries = [];
-    auditLogs = [...initialAuditLogs];
-    scheduleEvents = [];
   }
 }
 
@@ -376,7 +403,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   }
 
-  // 3. Always fetch latest user doc from Firestore to get the real-time cloud password
+  // 3. Always check real-time cloud password from Firestore if available
   let cloudPassword = (user as any).password;
   try {
     const userDoc = await usersCol.doc(user.id).get();
@@ -392,48 +419,27 @@ app.post('/api/auth/login', async (req, res) => {
   }
 
   let authSuccess = false;
+  const cleanInputPass = password.trim();
 
-  const defaultPasswords = [
-    'admin',
-    'admin123',
-    'demo',
-    'demo123',
-    'mudar123',
-    '123456',
-    'lopes123',
-    'lopes2026',
-    '12345678',
-    'teste',
-    'teste123'
-  ];
-
-  // 1. Check custom password saved in Firestore / memory
-  if (cloudPassword && typeof cloudPassword === 'string') {
-    if (password.trim() === cloudPassword.trim()) {
+  // 1. Check custom password saved in memory, Firestore, or file
+  const customPassword = (user as any).password || cloudPassword;
+  if (customPassword && typeof customPassword === 'string' && customPassword.trim().length > 0) {
+    if (cleanInputPass === customPassword.trim()) {
       authSuccess = true;
+    }
+  } else {
+    // 2. Default credentials only if no custom password was ever configured
+    if (user.id === 'usr_admin' || user.username === 'admin') {
+      if (cleanInputPass === 'admin') authSuccess = true;
+    } else if (user.id === 'usr_demo' || user.username === 'demo' || user.role === 'DEMO') {
+      if (['demo', 'demo123', 'teste'].includes(cleanInputPass)) authSuccess = true;
+    } else {
+      if (['123456', 'mudar123'].includes(cleanInputPass)) authSuccess = true;
     }
   }
 
-  // 2. Demo and Admin special handling
-  if (!authSuccess && (user.id === 'usr_demo' || user.username === 'demo' || user.role === 'DEMO')) {
-    if (['demo', 'demo123', '123456', 'teste', 'mudar123', 'admin'].includes(password.trim())) {
-      authSuccess = true;
-    }
-  }
-
-  if (!authSuccess && (user.id === 'usr_admin' || user.username === 'admin')) {
-    if (['admin', 'admin123', '123456', 'mudar123', 'lopes123'].includes(password.trim())) {
-      authSuccess = true;
-    }
-  }
-
-  // 3. Check default standard system passwords
-  if (!authSuccess && defaultPasswords.includes(password.trim())) {
-    authSuccess = true;
-  }
-
-  // 4. Fallback to Firebase Auth REST API
-  if (!authSuccess) {
+  // 3. Fallback to Firebase Auth REST API if still unverified
+  if (!authSuccess && user.email) {
     try {
       const firebaseApiKey = firebaseConfig.apiKey;
       const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`, {
@@ -441,13 +447,15 @@ app.post('/api/auth/login', async (req, res) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: user.email,
-          password: password.trim(),
+          password: cleanInputPass,
           returnSecureToken: true
         })
       });
 
       if (authRes.ok) {
         authSuccess = true;
+        (user as any).password = cleanInputPass;
+        saveLocalDatabase();
       }
     } catch (e) {
       console.warn('[FirebaseAuth] REST login error:', e);
@@ -473,14 +481,9 @@ app.post('/api/auth/login', async (req, res) => {
           } catch {}
         }
       }
+      saveLocalDatabase();
     }
   }
-
-  // If successfully authenticated, update in-memory user cache
-  (user as any).password = password.trim();
-  try {
-    await usersCol.doc(user.id).set({ password: password.trim() }, { merge: true });
-  } catch {}
 
   const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
 
@@ -665,6 +668,7 @@ app.post('/api/auth/change-password', async (req, res) => {
   }
 
   addAuditLog(user.id, user.name, 'Alteração de Senha', 'Redefiniu sua senha de acesso nas Configurações', req);
+  saveLocalDatabase();
 
   res.json({ success: true, message: 'Sua senha foi alterada e salva na nuvem com sucesso! O novo acesso já está disponível para qualquer dispositivo ou aba anônima.' });
 });
@@ -786,6 +790,7 @@ app.post('/api/users', async (req, res) => {
     console.warn('[Firestore] Warning saving user:', e);
   }
   users.push(newUser);
+  saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Administrador Master', 'Criação de Usuário', `Cadastrou o usuário ${newUser.name} (${newUser.username}) no Firestore`, req);
 
@@ -886,6 +891,7 @@ app.put('/api/users/:id', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error updating user:', e);
   }
+  saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Administrador Master', 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
 
@@ -934,6 +940,7 @@ app.post('/api/users/:id/reset-password', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error updating password in Firestore:', e);
   }
+  saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Administrador Master', 'Redefinição de Senha', `Redefiniu a senha do usuário ${targetUser.name} (${targetUser.username})`, req);
 
@@ -952,6 +959,7 @@ app.patch('/api/users/:id/block', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error updating user status:', e);
   }
+  saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Administrador Master', 'Alteração de Status', `Alterou o status do usuário ${user.name} para ${user.status}`, req);
 
@@ -988,6 +996,7 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 
   users = users.filter(u => u.id !== id);
+  saveLocalDatabase();
 
   try {
     await firebaseAuth.deleteUser(id);
@@ -1221,6 +1230,7 @@ app.post('/api/properties', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error saving property:', e);
   }
+  saveLocalDatabase();
 
   const owner = users.find(u => u.id === newProperty.user_id);
   addAuditLog(newProperty.user_id, owner?.name || 'Captador', 'Cadastro de Imóvel', `Cadastrou o imóvel ${newProperty.code} (${newProperty.title}) no Firestore`, req);
@@ -1251,6 +1261,7 @@ app.put('/api/properties/:id', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error updating property:', e);
   }
+  saveLocalDatabase();
 
   const owner = users.find(u => u.id === updatedProperty.user_id);
   addAuditLog(updatedProperty.user_id, owner?.name || 'Captador', 'Edição de Imóvel', `Atualizou o imóvel ${updatedProperty.code} no Firestore`, req);
@@ -1270,6 +1281,7 @@ app.delete('/api/properties/:id', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error deleting property:', e);
   }
+  saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Sistema', 'Exclusão de Imóvel', `Excluiu o imóvel ${prop.code} do Firestore`, req);
 
@@ -1295,6 +1307,7 @@ app.post('/api/properties/sync', async (req, res) => {
 
     if (hasNew) {
       await batch.commit();
+      saveLocalDatabase();
     }
   }
   res.json({ success: true, properties });
@@ -1427,6 +1440,7 @@ app.post('/api/properties/import-xml', async (req, res) => {
     logDesc,
     req
   );
+  saveLocalDatabase();
 
   res.json({
     success: true,
@@ -1534,6 +1548,7 @@ app.put('/api/settings', async (req, res) => {
   }
 
   addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária no Firestore', req);
+  saveLocalDatabase();
   res.json({ settings: companySettings });
 });
 
@@ -1588,6 +1603,7 @@ app.post('/api/journal', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error saving journal entry:', e);
   }
+  saveLocalDatabase();
 
   res.json({ journal: entry });
 });
@@ -1676,6 +1692,7 @@ app.post('/api/schedule', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error saving schedule event:', e);
   }
+  saveLocalDatabase();
 
   addAuditLog(
     newEvent.user_id,
@@ -1699,6 +1716,7 @@ app.delete('/api/schedule/:id', async (req, res) => {
   } catch (e) {
     console.warn('[Firestore] Error deleting schedule event:', e);
   }
+  saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Sistema', 'Cancelamento de Agendamento', `Cancelou ${existing.type}: "${existing.title}"`, req);
 

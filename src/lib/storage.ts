@@ -124,12 +124,7 @@ export function normalizePropertyOwners(properties: Property[], users: User[]): 
       return { ...p, user_id: softUser.id };
     }
 
-    // 3. Unmatched property owner - attribute to active Captador if available, or active user
-    if (activeCaptador) {
-      changed = true;
-      return { ...p, user_id: activeCaptador.id };
-    }
-
+    // 3. Preserve original user_id without forced reassignment
     return p;
   });
 
@@ -300,11 +295,7 @@ export function getStoredPasswords(): Record<string, string> {
   } catch {}
   return {
     usr_admin: 'admin',
-    usr_demo: 'demo',
-    usr_larissa: '123456',
-    usr_michele: '123456',
-    usr_moacir: '123456',
-    usr_karine: '123456'
+    usr_demo: 'demo'
   };
 }
 
@@ -321,25 +312,24 @@ export function validateUserPassword(userId: string, passText: string): boolean 
   
   // 1. Check user object in stored users
   const users = getStoredUsers();
-  const user = users.find(u => u.id === userId);
+  const user = users.find(u => u.id === userId || u.username === userId || u.email === userId);
   if (user && (user as any).password) {
     if (cleanPass === (user as any).password.trim()) return true;
   }
 
   // 2. Check in passwords map
   const passwords = getStoredPasswords();
-  const expected = passwords[userId];
+  const expected = passwords[userId] || (user ? passwords[user.id] : undefined);
   if (expected && cleanPass === expected.trim()) return true;
 
-  // 3. Demo user check
-  if (userId === 'usr_demo' && (cleanPass === 'demo' || cleanPass === 'demo123' || cleanPass === '123456' || cleanPass === 'teste')) {
-    return true;
-  }
-
-  // 4. Check default system passwords
-  const defaultPasswords = ['admin', 'admin123', 'demo', 'demo123', 'mudar123', '123456', 'lopes123', 'lopes2026', '12345678', 'teste', 'teste123'];
-  if (defaultPasswords.includes(cleanPass)) {
-    return true;
+  // 3. Fallback defaults only if user has no custom password set at all
+  if (user && !(user as any).password && !expected) {
+    if (user.id === 'usr_admin' || user.username === 'admin') {
+      return cleanPass === 'admin';
+    }
+    if (user.id === 'usr_demo' || user.username === 'demo' || user.role === 'DEMO') {
+      return ['demo', 'demo123', 'teste'].includes(cleanPass);
+    }
   }
 
   return false;

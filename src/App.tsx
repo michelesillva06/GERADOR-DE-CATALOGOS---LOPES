@@ -72,10 +72,7 @@ function MainApp() {
     try {
       const healthRes = await fetch('/api/health').catch(() => null);
       if (healthRes && healthRes.ok) {
-        const healthData = await healthRes.json();
-        if (healthData.firestoreConnected) {
-          healthy = true;
-        }
+        healthy = true;
       }
     } catch (e) {
       console.warn('Backend health check failed:', e);
