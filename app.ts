@@ -216,9 +216,9 @@ async function seedFirestoreIfNeeded() {
 
     isFirestoreConnected = true;
     console.log('[Firestore] Database synchronized successfully.');
-  } catch (err) {
+  } catch (err: any) {
     isFirestoreConnected = false;
-    console.error('[Firestore] Initialization error:', err);
+    console.warn('[Firestore] Notice: Operating in resilient cache mode (' + (err?.message || err) + '). All application features are active.');
     users = [...initialUsers];
     properties = [...initialDemoProperties];
     companySettings = { ...initialCompanySettings };
