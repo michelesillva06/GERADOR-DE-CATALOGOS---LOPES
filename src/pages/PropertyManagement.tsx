@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
-import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin, FileCode } from 'lucide-react';
+import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin, FileCode, Sparkles } from 'lucide-react';
 import { PROPERTY_CATEGORIES } from '../lib/constants';
 
 interface PropertyManagementProps {
@@ -36,11 +36,26 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   const [filterPurpose, setFilterPurpose] = useState('todos');
   const [filterStatus, setFilterStatus] = useState('todos');
   const [filterNeighborhood, setFilterNeighborhood] = useState('todos');
+  const [loadingDemo, setLoadingDemo] = useState(false);
 
   const isMaster = currentUser.role === 'MASTER_ADMIN';
   const isGestora = currentUser.role === 'GESTORA';
   const isCaptador = currentUser.role === 'CAPTADOR';
   const isMasterOrGestora = isMaster || isGestora;
+
+  const handleSeedDemoProperties = async () => {
+    setLoadingDemo(true);
+    try {
+      const res = await fetch('/api/properties/seed-demo', { method: 'POST' });
+      if (res.ok) {
+        window.dispatchEvent(new Event('lopes_properties_updated'));
+      }
+    } catch (e) {
+      console.warn('Error loading demo properties:', e);
+    } finally {
+      setLoadingDemo(false);
+    }
+  };
 
   const isOwnedByCurrentUser = (p: Property) =>
     p.user_id === currentUser.id ||
@@ -281,12 +296,54 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
-          <Building2 className="w-12 h-12 text-slate-300 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800">Nenhum imóvel encontrado</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Tente ajustar seus filtros de busca ou cadastre um novo imóvel no sistema.
-          </p>
+        <div className="bg-white rounded-3xl p-10 sm:p-12 text-center border border-slate-200 space-y-4 max-w-xl mx-auto shadow-xs">
+          <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-400">
+            <Building2 className="w-8 h-8 text-slate-400" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-800">
+              {baseProperties.length === 0 ? 'Nenhum imóvel cadastrado no momento' : 'Nenhum imóvel corresponde aos filtros'}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              {baseProperties.length === 0
+                ? 'O sistema está pronto para receber os imóveis da sua imobiliária em Manaus. Você pode cadastrar manualmente, importar em lote via XML ou carregar imóveis de exemplo para testar.'
+                : 'Tente ajustar ou limpar os filtros de busca para visualizar outros imóveis.'}
+            </p>
+          </div>
+
+          {baseProperties.length === 0 && (
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={onOpenNewPropertyModal}
+                className="px-4 py-2.5 bg-[#F10F4D] hover:bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-sm cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Cadastrar Imóvel</span>
+              </button>
+
+              {onOpenXmlImport && (
+                <button
+                  type="button"
+                  onClick={onOpenXmlImport}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer"
+                >
+                  <FileCode className="w-4 h-4 text-emerald-600" />
+                  <span>Importar XML</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSeedDemoProperties}
+                disabled={loadingDemo}
+                className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-2 transition cursor-pointer disabled:opacity-50"
+              >
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <span>{loadingDemo ? 'Carregando Exemplos...' : 'Carregar 4 Imóveis de Exemplo'}</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 

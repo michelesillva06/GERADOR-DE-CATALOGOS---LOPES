@@ -63,7 +63,7 @@ export const Login: React.FC = () => {
               <UserIcon className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input
                 type="text"
-                placeholder="Ex: admin ou michele.silva"
+                placeholder="Ex: demo ou admin"
                 value={loginInput}
                 onChange={(e) => setLoginInput(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#F10F4D] focus:ring-2 focus:ring-[#F10F4D]/20 transition"
@@ -105,6 +105,48 @@ export const Login: React.FC = () => {
             {loading ? 'Acessando Sistema...' : 'Entrar no Sistema'}
           </button>
         </form>
+
+        {/* Quick Demo & Admin Access Helper */}
+        <div className="mt-6 pt-5 border-t border-slate-100 space-y-3">
+          <p className="text-[11px] font-bold text-slate-500 text-center uppercase tracking-wider">
+            Acessos Rápidos de Demonstração
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setLoginInput('demo');
+                setPasswordInput('demo');
+                setErrorMsg('');
+              }}
+              className="p-2.5 bg-rose-50/80 hover:bg-rose-100/80 border border-rose-200/80 rounded-xl text-left transition group cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-[#F10F4D]">🎯 Usuário Demo</span>
+                <span className="text-[9px] bg-[#F10F4D] text-white font-bold px-1.5 py-0.5 rounded">Preencher</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5 font-medium">demo / demo</p>
+              <p className="text-[9px] text-rose-600/90 font-semibold mt-1">4 Imóveis de Exemplo</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setLoginInput('admin');
+                setPasswordInput('admin');
+                setErrorMsg('');
+              }}
+              className="p-2.5 bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200 rounded-xl text-left transition group cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-800">👑 Master Admin</span>
+                <span className="text-[9px] bg-slate-800 text-white font-bold px-1.5 py-0.5 rounded">Preencher</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-0.5 font-medium">admin / admin</p>
+              <p className="text-[9px] text-slate-600 font-semibold mt-1">Acesso Total & Gestão</p>
+            </button>
+          </div>
+        </div>
 
         {/* Brand Footer */}
         <div className="mt-8 pt-5 border-t border-slate-100 text-center text-[11px] text-slate-400">

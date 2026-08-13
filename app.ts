@@ -955,7 +955,16 @@ app.delete('/api/users/:id', async (req, res) => {
 });
 
 // Properties: List Properties
-app.get('/api/properties', (req, res) => {
+app.get('/api/properties', async (req, res) => {
+  try {
+    const propsSnap = await propertiesCol.get();
+    if (!propsSnap.empty) {
+      properties = propsSnap.docs.map(d => d.data() as Property);
+    }
+  } catch (e) {
+    console.warn('[Firestore] Error fetching properties in list:', e);
+  }
+
   const { user_id, category, purpose, status, neighborhood, search, min_price, max_price } = req.query;
 
   let filtered = [...properties];
@@ -993,6 +1002,25 @@ app.get('/api/properties', (req, res) => {
   }
 
   res.json({ properties: filtered });
+});
+
+// Endpoint to load sample demo properties into Firestore
+app.post('/api/properties/seed-demo', async (req, res) => {
+  try {
+    for (const p of initialDemoProperties) {
+      await propertiesCol.doc(p.id).set(p, { merge: true });
+      const idx = properties.findIndex(existing => existing.id === p.id);
+      if (idx !== -1) {
+        properties[idx] = p;
+      } else {
+        properties.push(p);
+      }
+    }
+    addAuditLog('usr_admin', 'Administrador Master', 'Carga de Demonstração', 'Carregou os 4 imóveis de exemplo/demonstração no sistema', req);
+    res.json({ success: true, count: initialDemoProperties.length, properties });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao carregar imóveis de demonstração: ' + err.message });
+  }
 });
 
 // Public Properties for Captador Public Catalog
