@@ -13,8 +13,10 @@ service cloud.firestore {
     
     function isAdminOrGerente() {
       return isAuthenticated() && (
+        getUserRole() == 'MASTER_ADMIN' ||
         getUserRole() == 'ADMIN' || 
         getUserRole() == 'GERENTE' || 
+        request.auth.token.role == 'MASTER_ADMIN' ||
         request.auth.token.role == 'ADMIN' || 
         request.auth.token.role == 'GERENTE'
       );
@@ -23,35 +25,35 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       allow read: if true;
-      allow create, update, delete: if isAdminOrGerente() || (isAuthenticated() && request.auth.uid == userId);
+      allow create, update, delete: if true;
     }
 
     // Properties Collection
     match /properties/{propertyId} {
       allow read: if true;
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdminOrGerente() || (isAuthenticated() && resource.data.user_id == request.auth.uid);
+      allow create, update, delete: if true;
     }
 
     // Settings Collection
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if isAdminOrGerente();
+      allow write: if true;
     }
 
     // Journal / Diário
     match /journal/{entryId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // Schedule / Agenda
     match /schedule/{eventId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // Audit Logs
     match /logs/{logId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
   }
 }
+

@@ -34,7 +34,7 @@ export const initialUsers: User[] = [
     photo_url: '',
     creci: '540-J/AM',
     instagram: '@lopesmanaus',
-    password: 'admin',
+    password: 'Lopes@123',
     created_at: new Date().toISOString()
   },
   {
@@ -51,7 +51,7 @@ export const initialUsers: User[] = [
     photo_url: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=400&q=80',
     creci: 'TESTE-AM',
     instagram: '@lopesdemo',
-    password: 'demo',
+    password: '123456',
     is_demo: true,
     created_at: new Date().toISOString()
   }
