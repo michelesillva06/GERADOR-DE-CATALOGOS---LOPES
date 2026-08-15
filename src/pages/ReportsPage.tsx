@@ -110,9 +110,17 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
     });
   }, [journalEntries, dateThreshold]);
 
-  // Active Captadores & Team Members
+  // Active Captadores only (excluding Admin, Gestores, and Demo accounts)
   const activeMembers = useMemo(() => {
-    return users.filter(u => u.status === 'active');
+    return users.filter(u => {
+      if (u.status !== 'active') return false;
+      if (u.is_demo || u.username === 'demo' || u.role === 'DEMO') return false;
+      // Exclude Admin and Gestor from captadores performance matrix
+      if (u.role === 'MASTER_ADMIN' || (u.role as string) === 'ADMIN' || u.role === 'GESTOR' || u.role === 'GESTORA') {
+        return false;
+      }
+      return true;
+    });
   }, [users]);
 
   // ----------------------------------------------------
@@ -447,7 +455,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
     text += `• 💰 *VGV Total Captado:* R$ ${teamWeeklyPerformance.totalWeeklyVgv.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
     text += `• 📝 *Diários Preenchidos na Equipe:* ${teamWeeklyPerformance.totalJournals} registros\n\n`;
 
-    text += `🏆 *2. DESEMPENHO INDIVIDUAL DOS MEMBROS:*\n`;
+    text += `🏆 *2. MATRIZ DE DESEMPENHO INDIVIDUAL DOS CAPTADORES:*\n`;
     teamWeeklyPerformance.memberStats.forEach((m, idx) => {
       text += `\n*#${idx + 1} - ${m.user.name}* (${m.user.position || 'Captador'})\n`;
       text += `  └ Captados: *${m.captures}* | Leads: *${m.leads}* | Visitas: *${m.visits}*\n`;
@@ -1148,19 +1156,19 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
 
           </div>
 
-          {/* MATRIZ DE DESEMPENHO INDIVIDUAL DE CADA MEMBRO */}
+          {/* MATRIZ DE DESEMPENHO INDIVIDUAL DOS CAPTADORES */}
           <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-black text-slate-900">
-                  Desempenho Individual dos Captadores & Gestores
+                  Matriz de Desempenho Individual dos Captadores
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Métricas calculadas a partir dos diários diários e cadastros no período selecionado
+                  Métricas calculadas com base no Diário de Captação e carteira no período selecionado
                 </p>
               </div>
               <span className="text-xs font-black text-[#F10F4D] bg-rose-50 px-3 py-1 rounded-xl">
-                {teamWeeklyPerformance.memberStats.length} membros monitorados
+                {teamWeeklyPerformance.memberStats.length} captadores monitorados
               </span>
             </div>
 

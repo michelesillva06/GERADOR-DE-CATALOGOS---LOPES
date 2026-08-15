@@ -112,7 +112,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {isMasterOrGestor && onOpenXmlImport && (
+          {isMaster && onOpenXmlImport && (
             <button
               onClick={onOpenXmlImport}
               className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center space-x-1.5 border border-slate-300/80 shadow-2xs transition"
@@ -323,7 +323,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
                 <span>+ Cadastrar Imóvel</span>
               </button>
 
-              {onOpenXmlImport && (
+              {isMaster && onOpenXmlImport && (
                 <button
                   type="button"
                   onClick={onOpenXmlImport}

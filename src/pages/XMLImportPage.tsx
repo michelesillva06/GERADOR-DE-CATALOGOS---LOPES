@@ -29,7 +29,8 @@ import {
   FileSpreadsheet,
   Layers,
   ChevronRight,
-  FileText
+  FileText,
+  ShieldAlert
 } from 'lucide-react';
 
 interface XMLImportPageProps {
@@ -94,6 +95,20 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (currentUser && currentUser.role !== 'MASTER_ADMIN') {
+    return (
+      <div className="bg-white rounded-3xl p-10 border border-slate-200/80 text-center max-w-lg mx-auto space-y-4 shadow-sm my-8">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900">Acesso Restrito ao Administrador Master</h2>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          A importação de imóveis via arquivos XML/feeds é uma funcionalidade restrita exclusivamente ao Administrador Master.
+        </p>
+      </div>
+    );
+  }
 
   // File Upload Handler
   const handleFileUpload = (file: File) => {

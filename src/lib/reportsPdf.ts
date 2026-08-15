@@ -95,7 +95,12 @@ export function exportControlPDF(
   const avgPriceVenda = totalVgvVenda / Math.max(properties.filter(p => p.purpose.includes('Venda')).length, 1);
   const avgPriceLocacao = totalVgvLocacao / Math.max(properties.filter(p => p.purpose.includes('Locação')).length, 1);
 
-  const activeCaptadores = users.filter(u => u.status === 'active').length;
+  const activeCaptadores = users.filter(u => {
+    if (u.status !== 'active') return false;
+    if (u.is_demo || u.username === 'demo' || u.role === 'DEMO') return false;
+    if (u.role === 'MASTER_ADMIN' || (u.role as string) === 'ADMIN' || u.role === 'GESTOR' || u.role === 'GESTORA') return false;
+    return true;
+  }).length;
 
   // Neighborhood Breakdown for Strategy
   const neighborhoodMap: Record<string, { count: number; vgv: number }> = {};
@@ -221,7 +226,12 @@ export function exportControlPDF(
   doc.text('3. MATRIZ DE DESEMPENHO INDIVIDUAL DOS CAPTADORES', 14, currentY);
   currentY += 4;
 
-  const captadoresPerformance = users.filter(u => u.status === 'active').map(u => {
+  const captadoresPerformance = users.filter(u => {
+    if (u.status !== 'active') return false;
+    if (u.is_demo || u.username === 'demo' || u.role === 'DEMO') return false;
+    if (u.role === 'MASTER_ADMIN' || (u.role as string) === 'ADMIN' || u.role === 'GESTOR' || u.role === 'GESTORA') return false;
+    return true;
+  }).map(u => {
     const userProps = properties.filter(p => p.user_id === u.id);
     const avail = userProps.filter(p => p.status === 'Disponível').length;
     const sold = userProps.filter(p => p.status === 'Vendido').length;

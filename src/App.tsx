@@ -846,7 +846,7 @@ function MainApp() {
             />
           )}
 
-          {activeView === 'xml-import' && isMasterOrGestor && (
+          {activeView === 'xml-import' && isMaster && (
             <XMLImportPage
               currentUser={user}
               users={users}

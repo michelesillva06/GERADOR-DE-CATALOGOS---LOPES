@@ -64,7 +64,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       id: 'xml-import',
       label: 'Importar XML',
       icon: FileCode,
-      show: isMasterOrGestor,
+      show: isMaster,
       badge: 'XML'
     },
     {

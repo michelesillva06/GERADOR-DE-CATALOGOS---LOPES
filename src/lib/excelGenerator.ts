@@ -74,8 +74,13 @@ export function exportControlSpreadsheet(
     .filter(p => p.purpose.includes('Locação') && (p.rent_price || p.price))
     .reduce((acc, p) => acc + (p.rent_price || p.price || 0), 0);
 
-  const totalCaptadores = users.length;
-  const captadoresAtivos = users.filter(u => u.status === 'active').length;
+  const onlyCaptadores = users.filter(u => {
+    if (u.is_demo || u.username === 'demo' || u.role === 'DEMO') return false;
+    if (u.role === 'MASTER_ADMIN' || (u.role as string) === 'ADMIN' || u.role === 'GESTOR' || u.role === 'GESTORA') return false;
+    return true;
+  });
+  const totalCaptadores = onlyCaptadores.length;
+  const captadoresAtivos = onlyCaptadores.filter(u => u.status === 'active').length;
 
   const resumoData = [
     ["PLANILHA DE CONTROLE E MOVIMENTAÇÃO DE CAPTAÇÃO - LOPES MANAUS"],
@@ -122,7 +127,7 @@ export function exportControlSpreadsheet(
     "Link Catálogo Público"
   ];
 
-  const captadoresRows = users.map(u => {
+  const captadoresRows = onlyCaptadores.map(u => {
     const userProps = properties.filter(p => p.user_id === u.id);
     const uAvailable = userProps.filter(p => p.status === 'Disponível').length;
     const uSold = userProps.filter(p => p.status === 'Vendido').length;
