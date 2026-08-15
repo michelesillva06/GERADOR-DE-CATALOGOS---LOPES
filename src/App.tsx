@@ -22,6 +22,7 @@ import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
 import { buildWhatsAppUrl, getEffectiveWhatsApp } from './lib/whatsapp';
 import { Property, User, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './types';
+import { initialCompanySettings } from './data/mockData';
 import {
   getStoredProperties,
   saveStoredProperties,
@@ -109,9 +110,7 @@ function MainApp() {
         if (settingsRes && settingsRes.ok && (settingsRes.headers.get('content-type') || '').includes('json')) {
           const d = await settingsRes.json();
           if (d.settings) {
-            const localSettings = getStoredSettings();
-            const mergedSettings = { ...localSettings, ...d.settings };
-            currentSettings = mergedSettings;
+            currentSettings = { ...initialCompanySettings, ...d.settings };
             saveStoredSettings(currentSettings);
           }
         }
@@ -771,6 +770,7 @@ function MainApp() {
       <Header
         activeView={activeView}
         setActiveView={setActiveView}
+        users={users}
       />
 
       <div className="flex flex-1">

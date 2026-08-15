@@ -3,20 +3,22 @@ import { useAuth } from '../context/AuthContext';
 import { Building2, User as UserIcon, LogOut, ExternalLink, ShieldAlert, Sparkles, ChevronDown } from 'lucide-react';
 import { LopesLogo } from './LopesLogo';
 import { getStoredUsers } from '../lib/storage';
+import { User } from '../types';
 
 interface HeaderProps {
   onOpenPublicCatalog?: () => void;
   activeView: string;
   setActiveView: (view: string) => void;
+  users?: User[];
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => {
+export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView, users = [] }) => {
   const { user, logout, switchUserSimulated } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
 
   const publicUrl = user ? `${window.location.origin}/catalogo/${user.url_slug || user.username}` : '#';
-  const availableUsers = getStoredUsers();
+  const availableUsers = users && users.length > 0 ? users : getStoredUsers();
 
   return (
     <header className="bg-white/95 backdrop-blur-md text-slate-900 border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">

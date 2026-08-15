@@ -46,6 +46,44 @@ let scheduleEvents: ScheduleEvent[] = [];
 let lastBackupAt = new Date().toISOString();
 
 const DB_FILE = path.join(process.cwd(), 'server-database.json');
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+const COVERS_DIR = path.join(UPLOADS_DIR, 'covers');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch {}
+}
+if (!fs.existsSync(COVERS_DIR)) {
+  try { fs.mkdirSync(COVERS_DIR, { recursive: true }); } catch {}
+}
+
+/**
+ * Safely persists a Base64 data URL to the server uploads folder,
+ * returning a lightweight public URL that can be stored in Firestore without exceeding 1MB limit.
+ */
+function saveBase64ImageFile(base64Data: string, prefix: string): string {
+  if (!base64Data || !base64Data.startsWith('data:image/')) {
+    return base64Data;
+  }
+  try {
+    const matches = base64Data.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    if (!matches || matches.length < 3) {
+      return base64Data;
+    }
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1].replace('+xml', '');
+    const dataBuffer = Buffer.from(matches[2], 'base64');
+    const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `${safePrefix}.${ext}`;
+    const filePath = path.join(COVERS_DIR, filename);
+
+    fs.writeFileSync(filePath, dataBuffer);
+    const timestamp = Date.now();
+    return `/uploads/covers/${filename}?v=${timestamp}`;
+  } catch (err) {
+    console.warn(`[Image Storage] Error saving image ${prefix}:`, err);
+    return base64Data;
+  }
+}
 
 function loadLocalDatabase() {
   try {
@@ -408,8 +446,9 @@ async function addAuditLog(userId: string, userName: string, action: string, des
 
 const app = express();
 
-app.use(express.json({ limit: '20mb' }));
-app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // --- REST API ROUTES ---
 
@@ -1620,15 +1659,107 @@ app.get('/api/settings', (req, res) => {
   res.json({ settings: companySettings });
 });
 
+// Dedicated cover upload endpoint
+app.post('/api/upload/cover', async (req, res) => {
+  try {
+    const { image, fieldName } = req.body || {};
+    if (!image) {
+      return res.status(400).json({ error: 'Nenhuma imagem fornecida.' });
+    }
+
+    const field = fieldName || 'cover_horizontal_url';
+    const cleanPrefix = field.replace(/^cover_/, '').replace(/_url$/, '');
+    const publicUrl = saveBase64ImageFile(image, `cover_${cleanPrefix}`);
+
+    companySettings = {
+      ...companySettings,
+      [field]: publicUrl
+    };
+
+    // If main horizontal cover, also assign to cover_geral_url for full backwards compatibility
+    if (field === 'cover_horizontal_url' || !companySettings.cover_geral_url) {
+      companySettings.cover_geral_url = publicUrl;
+    }
+
+    // Persist to Cloud Firestore
+    await safeFirestoreDocSet(settingsCol, 'company', companySettings, true);
+    saveLocalDatabase();
+
+    addAuditLog('usr_admin', 'Administrador Master', 'Capa do Catálogo', `Atualizou a imagem de capa (${field}) no servidor na nuvem`, req);
+    console.log(`[Cover Upload] Successfully saved ${field} -> ${publicUrl}`);
+
+    res.json({ success: true, url: publicUrl, settings: companySettings });
+  } catch (err: any) {
+    console.error('[Cover Upload] Error:', err);
+    res.status(500).json({ error: 'Erro ao salvar a capa no servidor.' });
+  }
+});
+
+// Dynamic cover image endpoint fallback
+app.get('/api/covers/:type', (req, res) => {
+  const type = req.params.type.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  const possibleExts = ['jpg', 'jpeg', 'png', 'webp'];
+  
+  for (const ext of possibleExts) {
+    const filename = `cover_${type}.${ext}`;
+    const filePath = path.join(COVERS_DIR, filename);
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      return res.sendFile(filePath);
+    }
+  }
+
+  // Check companySettings URL
+  let settingUrl = '';
+  if (type === 'horizontal' || type === 'geral') settingUrl = companySettings.cover_horizontal_url || companySettings.cover_geral_url || '';
+  else if (type === 'venda') settingUrl = companySettings.cover_venda_url || '';
+  else if (type === 'locacao') settingUrl = companySettings.cover_locacao_url || '';
+
+  if (settingUrl && settingUrl.startsWith('/')) {
+    const directPath = path.join(process.cwd(), settingUrl.split('?')[0]);
+    if (fs.existsSync(directPath)) {
+      return res.sendFile(directPath);
+    }
+  }
+
+  res.status(404).json({ error: 'Capa não encontrada.' });
+});
+
 app.put('/api/settings', async (req, res) => {
   const update = req.body || {};
+  
+  // Intercept base64 images to prevent Firestore 1MB document size limit failures
+  const imageFields: Array<keyof CompanySettings> = [
+    'cover_horizontal_url',
+    'cover_geral_url',
+    'cover_venda_url',
+    'cover_locacao_url',
+    'cover_vertical_url',
+    'logo_url'
+  ];
+
+  for (const field of imageFields) {
+    if (update[field] && typeof update[field] === 'string' && update[field]!.startsWith('data:image/')) {
+      const cleanPrefix = (field as string).replace(/^cover_/, '').replace(/_url$/, '');
+      const savedUrl = saveBase64ImageFile(update[field]!, `cover_${cleanPrefix}`);
+      update[field] = savedUrl;
+    }
+  }
+
   companySettings = {
     ...companySettings,
     ...update
   };
+
+  // Keep cover_geral_url synced with cover_horizontal_url if needed
+  if (companySettings.cover_horizontal_url && !companySettings.cover_geral_url) {
+    companySettings.cover_geral_url = companySettings.cover_horizontal_url;
+  }
+
+  // Save lightweight document (< 5KB) to Cloud Firestore with 100% reliability
   await safeFirestoreDocSet(settingsCol, 'company', companySettings, true);
 
-  addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária no Firestore', req);
+  addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações e capas da imobiliária no Firestore', req);
   saveLocalDatabase();
   res.json({ settings: companySettings });
 });

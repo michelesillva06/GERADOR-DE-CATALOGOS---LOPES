@@ -60,20 +60,12 @@ export function getStoredProperties(): Property[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        // Ensure initial demo properties are always present for demo testing
-        const hasDemo = parsed.some((p: Property) => p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_'));
-        if (!hasDemo) {
-          const merged = [...parsed, ...initialDemoProperties];
-          localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(merged));
-          return merged;
-        }
         return parsed;
       }
     }
-    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(initialDemoProperties));
-    return initialDemoProperties;
+    return [];
   } catch {
-    return initialDemoProperties;
+    return [];
   }
 }
 
@@ -177,13 +169,10 @@ export function saveStoredLogs(logs: AuditLog[]) {
 export function getStoredJournal(): JournalEntry[] {
   try {
     const raw = localStorage.getItem(KEYS.JOURNAL);
-    if (!raw) {
-      localStorage.setItem(KEYS.JOURNAL, JSON.stringify(initialJournalEntries));
-      return initialJournalEntries as JournalEntry[];
-    }
+    if (!raw) return [];
     return JSON.parse(raw);
   } catch {
-    return initialJournalEntries as JournalEntry[];
+    return [];
   }
 }
 
@@ -198,13 +187,10 @@ export function saveStoredJournal(journals: JournalEntry[]) {
 export function getStoredSchedule(): ScheduleEvent[] {
   try {
     const raw = localStorage.getItem(KEYS.SCHEDULE);
-    if (!raw) {
-      localStorage.setItem(KEYS.SCHEDULE, JSON.stringify(initialScheduleEvents));
-      return initialScheduleEvents as ScheduleEvent[];
-    }
+    if (!raw) return [];
     return JSON.parse(raw);
   } catch {
-    return initialScheduleEvents as ScheduleEvent[];
+    return [];
   }
 }
 

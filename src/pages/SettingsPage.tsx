@@ -19,7 +19,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   // Company Form State
   const [companyForm, setCompanyForm] = useState<CompanySettings>(settings);
-  const isAdmin = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'MASTER';
+  const isAdmin = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'MASTER' || currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
   
   // User Profile Form State
   const [name, setName] = useState(currentUser.name || '');
@@ -33,6 +33,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadingCoverField, setUploadingCoverField] = useState<string | null>(null);
+
+  // Sync settings when loaded from cloud/backend
+  React.useEffect(() => {
+    if (settings) {
+      setCompanyForm(settings);
+    }
+  }, [settings]);
 
   // Re-sync form state ONLY when user ID changes (account switch)
   const currentUserId = currentUser?.id;
@@ -67,15 +75,48 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       alert('Por favor, selecione um arquivo de imagem válido (PNG, JPG, WEBP).');
       return;
     }
-    const compressed = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.82 });
-    if (compressed) {
-      setCompanyForm(prev => {
-        const next = { ...prev, [field]: compressed };
-        if (field === 'cover_horizontal_url') {
-          next.cover_geral_url = compressed;
+
+    setUploadingCoverField(field as string);
+    try {
+      const compressed = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.85 });
+      if (!compressed) throw new Error('Falha ao processar imagem.');
+
+      let finalUrl = compressed;
+
+      // Direct cloud backend upload
+      try {
+        const uploadRes = await fetch('/api/upload/cover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: compressed, fieldName: field })
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.url) {
+            finalUrl = uploadData.url;
+          }
+          if (uploadData.settings) {
+            setCompanyForm(uploadData.settings);
+            await onSaveSettings(uploadData.settings);
+            return;
+          }
         }
-        return next;
-      });
+      } catch (err) {
+        console.warn('[Cover Upload] Falling back to standard settings save:', err);
+      }
+
+      const nextSettings = { ...companyForm, [field]: finalUrl };
+      if (field === 'cover_horizontal_url') {
+        nextSettings.cover_geral_url = finalUrl;
+      }
+      setCompanyForm(nextSettings);
+      await onSaveSettings(nextSettings);
+    } catch (err: any) {
+      console.error('Error uploading cover:', err);
+      alert('Ocorreu um erro ao salvar a capa no servidor.');
+    } finally {
+      setUploadingCoverField(null);
     }
   };
 
@@ -510,7 +551,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </p>
               
               <div className="aspect-[1.8/1] max-h-64 w-full rounded-xl border-2 border-dashed border-rose-300 bg-slate-900/5 overflow-hidden flex flex-col items-center justify-center relative group shadow-inner">
-                {companyForm.cover_horizontal_url ? (
+                {uploadingCoverField === 'cover_horizontal_url' ? (
+                  <div className="flex flex-col items-center justify-center p-6 text-center space-y-2">
+                    <div className="w-8 h-8 border-3 border-[#F10F4D] border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-xs font-extrabold text-[#F10F4D]">Salvando Capa Principal no Servidor Nuvem...</span>
+                  </div>
+                ) : companyForm.cover_horizontal_url ? (
                   <img src={companyForm.cover_horizontal_url} alt="Capa Horizontal" className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-center p-4">
@@ -524,6 +570,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <input
                     type="file"
                     accept="image/*"
+                    disabled={Boolean(uploadingCoverField)}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) handleCoverFileUpload('cover_horizontal_url', file);
@@ -535,9 +582,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
 
               {companyForm.cover_horizontal_url && (
-                <div className="flex items-center space-x-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                <div className="flex items-center space-x-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>✓ Imagem de Capa Principal pronta no formulário! Clique em "Salvar Alterações" para gravar.</span>
+                  <span>✓ Capa Principal salva no Servidor e disponível globalmente para todos os usuários em qualquer dispositivo.</span>
                 </div>
               )}
 
@@ -588,7 +635,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
                   {/* Thumbnail / Upload Box */}
                   <div className="aspect-[1.8/1] w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-900/5 overflow-hidden flex flex-col items-center justify-center relative group shadow-xs">
-                    {companyForm.cover_locacao_url ? (
+                    {uploadingCoverField === 'cover_locacao_url' ? (
+                      <div className="flex flex-col items-center justify-center p-4 text-center space-y-1">
+                        <div className="w-6 h-6 border-2 border-[#F10F4D] border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-[11px] font-bold text-[#F10F4D]">Salvando Capa...</span>
+                      </div>
+                    ) : companyForm.cover_locacao_url ? (
                       <img src={companyForm.cover_locacao_url} alt="Capa Locação" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-center p-2">
@@ -602,6 +654,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <input
                         type="file"
                         accept="image/*"
+                        disabled={Boolean(uploadingCoverField)}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) handleCoverFileUpload('cover_locacao_url', file);
@@ -615,7 +668,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   {companyForm.cover_locacao_url && (
                     <div className="flex items-center space-x-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Capa de Locação carregada!</span>
+                      <span>✓ Capa de Locação salva no servidor!</span>
                     </div>
                   )}
 
@@ -646,7 +699,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
                   {/* Thumbnail / Upload Box */}
                   <div className="aspect-[1.8/1] w-full rounded-xl border-2 border-dashed border-slate-300 bg-slate-900/5 overflow-hidden flex flex-col items-center justify-center relative group shadow-xs">
-                    {companyForm.cover_venda_url ? (
+                    {uploadingCoverField === 'cover_venda_url' ? (
+                      <div className="flex flex-col items-center justify-center p-4 text-center space-y-1">
+                        <div className="w-6 h-6 border-2 border-[#F10F4D] border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-[11px] font-bold text-[#F10F4D]">Salvando Capa...</span>
+                      </div>
+                    ) : companyForm.cover_venda_url ? (
                       <img src={companyForm.cover_venda_url} alt="Capa Venda" className="w-full h-full object-cover" />
                     ) : (
                       <div className="text-center p-2">
@@ -660,6 +718,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <input
                         type="file"
                         accept="image/*"
+                        disabled={Boolean(uploadingCoverField)}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) handleCoverFileUpload('cover_venda_url', file);
@@ -673,7 +732,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   {companyForm.cover_venda_url && (
                     <div className="flex items-center space-x-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Capa de Venda carregada!</span>
+                      <span>✓ Capa de Venda salva no servidor!</span>
                     </div>
                   )}
 

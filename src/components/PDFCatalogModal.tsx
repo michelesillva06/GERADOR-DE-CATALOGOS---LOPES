@@ -113,20 +113,42 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
       return;
     }
 
-    const compressed = await compressImage(file, { maxWidth: 1200, maxHeight: 800, quality: 0.75 });
+    const compressed = await compressImage(file, { maxWidth: 1600, maxHeight: 1600, quality: 0.82 });
     if (compressed) {
       setCustomCoverImage(compressed);
 
-      if (onSaveSettings) {
-        let updateKey: keyof CompanySettings = 'cover_horizontal_url';
-        if (purposeFilter === 'Locação') updateKey = 'cover_locacao_url';
-        else if (purposeFilter === 'Venda') updateKey = 'cover_venda_url';
-        else updateKey = 'cover_geral_url';
+      let updateKey: keyof CompanySettings = 'cover_horizontal_url';
+      if (purposeFilter === 'Locação') updateKey = 'cover_locacao_url';
+      else if (purposeFilter === 'Venda') updateKey = 'cover_venda_url';
+      else updateKey = 'cover_geral_url';
 
-        await onSaveSettings({
-          [updateKey]: compressed,
-          cover_horizontal_url: compressed
+      try {
+        const uploadRes = await fetch('/api/upload/cover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: compressed, fieldName: updateKey })
         });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          if (uploadData.url) {
+            setCustomCoverImage(uploadData.url);
+          }
+          if (uploadData.settings && onSaveSettings) {
+            await onSaveSettings(uploadData.settings);
+          }
+        } else if (onSaveSettings) {
+          await onSaveSettings({
+            [updateKey]: compressed,
+            cover_horizontal_url: compressed
+          });
+        }
+      } catch (err) {
+        if (onSaveSettings) {
+          await onSaveSettings({
+            [updateKey]: compressed,
+            cover_horizontal_url: compressed
+          });
+        }
       }
     }
     e.target.value = '';

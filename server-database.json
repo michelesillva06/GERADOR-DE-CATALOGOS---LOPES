@@ -316,8 +316,8 @@
     "state": "AM",
     "instagram": "@lopesmanaus",
     "creci_j": "540-J/AM",
-    "cover_horizontal_url": "",
-    "cover_geral_url": "",
+    "cover_horizontal_url": "/uploads/covers/cover_cover_horizontal.png?v=1786778776315",
+    "cover_geral_url": "/uploads/covers/cover_cover_horizontal.png?v=1786778776315",
     "cover_venda_url": "",
     "cover_locacao_url": ""
   },
@@ -630,5 +630,5 @@
     }
   ],
   "scheduleEvents": [],
-  "updated_at": "2026-08-15T02:24:44.685Z"
+  "updated_at": "2026-08-15T07:26:16.315Z"
 }
