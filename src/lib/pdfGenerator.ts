@@ -68,729 +68,110 @@ function drawLopesHeart(
   ctx.restore();
 }
 
+export const DEFAULT_OFFICIAL_COVERS = {
+  HORIZONTAL: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=85',
+  VENDA: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=85',
+  LOCACAO: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1920&q=85'
+};
+
 /**
- * Generates an ultra high-resolution, pixel-perfect 1-piece cover page using HTML Canvas
- * that fills 100% of Page 1 in the PDF (210mm x 297mm full-bleed).
- * Matches the exact visual identity and layout of LOPES MANAUS catalog cover.
+ * Resolves the administrator-saved cover image URL based on purpose/type.
+ * NEVER generates procedural canvas. Uses exclusively the administrator-saved covers.
  */
-export async function renderCoverCanvas(
+export function resolveAdminCoverUrl(
   type: 'VENDA' | 'LOCACAO' | 'GERAL',
-  companySettings?: CompanySettings
-): Promise<string> {
-  const canvas = document.createElement('canvas');
-  // High resolution for 300 DPI print quality
-  canvas.width = 2121;
-  canvas.height = 3000;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
-
-  // 1. Fill background pure white
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const LOPES_RED = '#E50938';
-  const LOPES_DARK_RED = '#B91C1C';
-  const TEXT_DARK = '#0F172A';
-  const TEXT_MUTED = '#475569';
-
-  // ------------------------------------------------------------------------
-  // 2. TOP HEADER LOGO & TOP-RIGHT CURVE ACCENT
-  // ------------------------------------------------------------------------
-  // Top-Right Swooping Red Accent Curve
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.moveTo(1250, 0);
-  ctx.bezierCurveTo(1550, 60, 1850, 200, 2121, 450);
-  ctx.lineTo(2121, 0);
-  ctx.closePath();
-  ctx.fill();
-
-  // CRECI Badge (Top Right inside white area)
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 36px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(`CRECI: ${companySettings?.creci_j || '540-J/AM'}`, 2070, 90);
-  ctx.textAlign = 'left';
-
-  // Logo (Top-Left)
-  drawLopesHeart(ctx, 110, 110, 130, LOPES_RED);
-
-  // "LOPES" Text
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 128px sans-serif';
-  ctx.fillText('LOPES', 260, 185);
-
-  // "MANAUS" Text
-  ctx.fillStyle = LOPES_RED;
-  ctx.font = '800 82px sans-serif';
-  ctx.fillText('MANAUS', 262, 270);
-
-  // Red accent line under "MANAUS"
-  ctx.fillStyle = LOPES_RED;
-  ctx.fillRect(110, 310, 250, 10);
-
-  // ------------------------------------------------------------------------
-  // 3. RIGHT SIDE PHOTO FRAME & BADGE (Manaus Skyline Sunset River)
-  // ------------------------------------------------------------------------
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(1120, 0);
-  ctx.bezierCurveTo(900, 420, 900, 950, 1300, 1380);
-  ctx.bezierCurveTo(1600, 1680, 1920, 1750, 2121, 1800);
-  ctx.lineTo(2121, 0);
-  ctx.closePath();
-  ctx.clip();
-
-  // Sunset sky backdrop gradient
-  const skyGrad = ctx.createLinearGradient(1000, 0, 2121, 1800);
-  skyGrad.addColorStop(0, '#0F172A');
-  skyGrad.addColorStop(0.2, '#1E1B4B');
-  skyGrad.addColorStop(0.45, '#7C2D12');
-  skyGrad.addColorStop(0.7, '#C2410C');
-  skyGrad.addColorStop(0.88, '#EA580C');
-  skyGrad.addColorStop(1, '#FBBF24');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(900, 0, 1221, 1800);
-
-  // River water reflection gradient
-  const waterGrad = ctx.createLinearGradient(900, 700, 2121, 1800);
-  waterGrad.addColorStop(0, '#0F172A');
-  waterGrad.addColorStop(0.6, '#0369A1');
-  waterGrad.addColorStop(0.9, '#D97706');
-  waterGrad.addColorStop(1, '#F59E0B');
-  ctx.fillStyle = waterGrad;
-  ctx.fillRect(900, 600, 1221, 1200);
-
-  // Buildings & City Silhouette
-  ctx.fillStyle = '#0F172A';
-  const bldgs = [
-    { x: 1100, w: 65, h: 380 },
-    { x: 1180, w: 80, h: 520 },
-    { x: 1275, w: 70, h: 440 },
-    { x: 1360, w: 90, h: 620 },
-    { x: 1465, w: 80, h: 540 },
-    { x: 1560, w: 105, h: 680 },
-    { x: 1680, w: 95, h: 580 },
-    { x: 1790, w: 120, h: 720 },
-    { x: 1920, w: 110, h: 630 },
-    { x: 2040, w: 80, h: 760 },
-  ];
-  bldgs.forEach(b => {
-    ctx.fillRect(b.x, 950 - b.h, b.w, b.h);
-    ctx.fillStyle = 'rgba(254, 240, 138, 0.75)';
-    for (let wy = 980 - b.h; wy < 920; wy += 40) {
-      for (let wx = b.x + 12; wx < b.x + b.w - 14; wx += 20) {
-        ctx.fillRect(wx, wy, 10, 16);
-      }
-    }
-    ctx.fillStyle = '#0F172A';
-  });
-
-  // Cable-stayed bridge silhouette
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 18;
-  ctx.beginPath();
-  ctx.moveTo(1050, 780);
-  ctx.lineTo(2121, 730);
-  ctx.stroke();
-
-  // Cable stays
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-  const towerX = 1750, towerY = 480;
-  ctx.beginPath();
-  ctx.moveTo(towerX, towerY);
-  ctx.lineTo(towerX, 780);
-  ctx.stroke();
-  for (let cx = 1450; cx <= 2050; cx += 40) {
-    ctx.beginPath();
-    ctx.moveTo(towerX, towerY + 30);
-    ctx.lineTo(cx, 740);
-    ctx.stroke();
+  companySettings?: CompanySettings,
+  customCoverImage?: string
+): string {
+  if (customCoverImage && customCoverImage.trim()) {
+    return customCoverImage.trim();
   }
 
-  ctx.restore(); // end clip
-
-  // Red Accent Line outlining the photo curve border
-  ctx.strokeStyle = LOPES_RED;
-  ctx.lineWidth = 20;
-  ctx.beginPath();
-  ctx.moveTo(1120, 0);
-  ctx.bezierCurveTo(900, 420, 900, 950, 1300, 1380);
-  ctx.bezierCurveTo(1600, 1680, 1920, 1750, 2121, 1800);
-  ctx.stroke();
-
-  // Circular Badge with House & Key emblem (x=1480, y=1480)
-  const badgeX = 1480;
-  const badgeY = 1480;
-  const badgeR = 170;
-
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.arc(badgeX, badgeY, badgeR, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 12;
-  ctx.beginPath();
-  ctx.arc(badgeX, badgeY, badgeR - 18, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // White Line-Art House + Key Icon inside emblem
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 9;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // House Roof
-  ctx.beginPath();
-  ctx.moveTo(badgeX - 80, badgeY - 15);
-  ctx.lineTo(badgeX, badgeY - 80);
-  ctx.lineTo(badgeX + 80, badgeY - 15);
-  ctx.stroke();
-
-  // House Frame
-  ctx.beginPath();
-  ctx.moveTo(badgeX - 60, badgeY - 20);
-  ctx.lineTo(badgeX - 60, badgeY + 65);
-  ctx.lineTo(badgeX + 60, badgeY + 65);
-  ctx.lineTo(badgeX + 60, badgeY - 20);
-  ctx.stroke();
-
-  // Key inside
-  ctx.beginPath();
-  ctx.arc(badgeX - 15, badgeY + 20, 20, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(badgeX, badgeY + 30);
-  ctx.lineTo(badgeX + 38, badgeY - 8);
-  ctx.lineTo(badgeX + 30, badgeY - 16);
-  ctx.moveTo(badgeX + 28, badgeY + 4);
-  ctx.lineTo(badgeX + 36, badgeY - 4);
-  ctx.stroke();
-
-  // ------------------------------------------------------------------------
-  // 4. MAIN TITLE SECTION (LEFT SIDE)
-  // ------------------------------------------------------------------------
-  const tx = 130;
-  let ty = 640;
-
-  // "CATÁLOGO DE"
-  ctx.fillStyle = '#334155';
-  ctx.font = '600 82px sans-serif';
-  ctx.fillText('CATÁLOGO DE', tx, ty);
-  ty += 160;
-
-  // "IMÓVEIS"
-  ctx.fillStyle = LOPES_RED;
-  ctx.font = '900 200px sans-serif';
-  ctx.fillText('IMÓVEIS', tx, ty);
-  ty += 40;
-
-  // Banner Box for "PARA LOCAÇÃO" / "PARA VENDA"
-  let bannerLabel = 'PARA LOCAÇÃO';
-  let bannerWidth = 920;
+  if (type === 'LOCACAO') {
+    return (
+      companySettings?.cover_locacao_url ||
+      companySettings?.cover_horizontal_url ||
+      companySettings?.cover_geral_url ||
+      companySettings?.cover_venda_url ||
+      DEFAULT_OFFICIAL_COVERS.LOCACAO
+    );
+  }
 
   if (type === 'VENDA') {
-    bannerLabel = 'PARA VENDA';
-    bannerWidth = 840;
-  } else if (type === 'GERAL') {
-    bannerLabel = 'TODOS OS IMÓVEIS';
-    bannerWidth = 980;
+    return (
+      companySettings?.cover_venda_url ||
+      companySettings?.cover_horizontal_url ||
+      companySettings?.cover_geral_url ||
+      companySettings?.cover_locacao_url ||
+      DEFAULT_OFFICIAL_COVERS.VENDA
+    );
   }
 
-  // Draw Red Banner Box
-  ctx.fillStyle = LOPES_RED;
-  const bannerH = 135;
-  ctx.beginPath();
-  ctx.roundRect(tx, ty, bannerWidth, bannerH, 16);
-  ctx.fill();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 86px sans-serif';
-  ctx.fillText(bannerLabel, tx + 40, ty + 98);
-
-  ty += bannerH + 90;
-
-  // Subtitle
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '600 70px sans-serif';
-  ctx.fillText('O seu próximo imóvel', tx, ty);
-  ty += 85;
-
-  ctx.fillStyle = LOPES_RED;
-  ctx.font = '900 78px sans-serif';
-  ctx.fillText('está aqui.', tx, ty);
-  ty += 110;
-
-  // Body Text Paragraph
-  if (type === 'LOCACAO') {
-    ctx.fillStyle = TEXT_MUTED;
-    ctx.font = '500 52px sans-serif';
-    ctx.fillText('Conheça todas as oportunidades', tx, ty);
-    ty += 70;
-
-    ctx.fillText('para ', tx, ty);
-    ctx.fillStyle = LOPES_RED;
-    ctx.font = '800 52px sans-serif';
-    ctx.fillText('alugar', tx + 120, ty);
-    ctx.fillStyle = TEXT_MUTED;
-    ctx.font = '500 52px sans-serif';
-    ctx.fillText(' com a segurança', tx + 280, ty);
-    ty += 70;
-
-    ctx.fillText('e praticidade da ', tx, ty);
-    ctx.fillStyle = TEXT_DARK;
-    ctx.font = '800 52px sans-serif';
-    ctx.fillText('LOPES MANAUS.', tx + 390, ty);
-    ty += 60;
-  } else if (type === 'VENDA') {
-    ctx.fillStyle = TEXT_MUTED;
-    ctx.font = '500 52px sans-serif';
-    ctx.fillText('Os melhores imóveis para ', tx, ty);
-    ctx.fillStyle = LOPES_RED;
-    ctx.font = '800 52px sans-serif';
-    ctx.fillText('investir,', tx + 630, ty);
-    ty += 70;
-
-    ctx.fillText('realizar', tx, ty);
-    ctx.fillStyle = TEXT_MUTED;
-    ctx.font = '500 52px sans-serif';
-    ctx.fillText(' e ', tx + 180, ty);
-    ctx.fillStyle = LOPES_RED;
-    ctx.font = '800 52px sans-serif';
-    ctx.fillText('viver', tx + 240, ty);
-    ctx.fillStyle = TEXT_MUTED;
-    ctx.font = '500 52px sans-serif';
-    ctx.fillText(' grandes conquistas.', tx + 370, ty);
-    ty += 60;
-  } else {
-    ctx.fillStyle = TEXT_MUTED;
-    ctx.font = '500 52px sans-serif';
-    ctx.fillText('Conheça todas as oportunidades', tx, ty);
-    ty += 70;
-    ctx.fillText('para ', tx, ty);
-    ctx.fillStyle = LOPES_RED;
-    ctx.font = '800 52px sans-serif';
-    ctx.fillText('comprar, vender ou alugar', tx + 120, ty);
-    ty += 70;
-    ctx.fillStyle = TEXT_MUTED;
-    ctx.font = '500 52px sans-serif';
-    ctx.fillText('com a segurança da ', tx, ty);
-    ctx.fillStyle = TEXT_DARK;
-    ctx.font = '800 52px sans-serif';
-    ctx.fillText('LOPES MANAUS.', tx + 490, ty);
-    ty += 60;
-  }
-
-  // Accent horizontal bar under paragraph
-  ctx.fillStyle = LOPES_RED;
-  ctx.fillRect(tx, ty + 15, 320, 10);
-
-  // ------------------------------------------------------------------------
-  // 5. CATEGORIES SECTION (MIDDLE SECTION)
-  // ------------------------------------------------------------------------
-  const catSectionY = 1840;
-
-  // Red line on left and right, centered title
-  ctx.fillStyle = LOPES_RED;
-  ctx.fillRect(130, catSectionY, 480, 5);
-  ctx.fillRect(1511, catSectionY, 480, 5);
-
-  ctx.fillStyle = LOPES_RED;
-  ctx.font = '800 46px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('NOSSAS CATEGORIAS DE IMÓVEIS', 1060, catSectionY + 15);
-  ctx.textAlign = 'left';
-
-  const categoriesData = [
-    { title: 'APARTAMENTOS', desc: 'Diversos padrões\ne localizações' },
-    { title: 'CASAS', desc: 'Térreas, duplex\ne em condomínio' },
-    { title: 'SALAS COMERCIAIS', desc: 'Espaços para seu\nnegócio crescer' },
-    { title: 'CONDOMÍNIOS', desc: 'Segurança e lazer\npara sua família' },
-    { title: 'KITNETS E STUDIOS', desc: 'Práticos e ideais\npara o dia a dia' },
-    { title: 'IMÓVEIS COMERCIAIS', desc: 'Lojas, pontos e\noutros espaços' },
-  ];
-
-  const catColW = 280;
-  const catStartX = 130;
-  const catStartY = catSectionY + 65;
-
-  categoriesData.forEach((cat, idx) => {
-    const cx = catStartX + (idx * 312);
-    const cy = catStartY;
-
-    // Vertical divider lines
-    if (idx > 0) {
-      ctx.strokeStyle = '#CBD5E1';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(cx - 16, cy + 15);
-      ctx.lineTo(cx - 16, cy + 280);
-      ctx.stroke();
-    }
-
-    // Vector Icon
-    ctx.strokeStyle = LOPES_RED;
-    ctx.fillStyle = LOPES_RED;
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    const icx = cx + (catColW / 2);
-    const icy = cy + 55;
-
-    if (idx === 0) {
-      ctx.beginPath();
-      ctx.strokeRect(icx - 35, icy - 38, 48, 76);
-      ctx.strokeRect(icx + 13, icy - 15, 26, 53);
-      ctx.fillRect(icx - 26, icy - 26, 12, 12);
-      ctx.fillRect(icx - 8, icy - 26, 12, 12);
-      ctx.fillRect(icx - 26, icy - 5, 12, 12);
-      ctx.fillRect(icx - 8, icy - 5, 12, 12);
-    } else if (idx === 1) {
-      ctx.beginPath();
-      ctx.moveTo(icx - 42, icy);
-      ctx.lineTo(icx, icy - 38);
-      ctx.lineTo(icx + 42, icy);
-      ctx.stroke();
-      ctx.strokeRect(icx - 30, icy, 60, 38);
-      ctx.strokeRect(icx - 12, icy + 12, 24, 26);
-    } else if (idx === 2) {
-      ctx.beginPath();
-      ctx.strokeRect(icx - 32, icy - 40, 64, 80);
-      ctx.fillRect(icx - 20, icy - 28, 15, 15);
-      ctx.fillRect(icx + 5, icy - 28, 15, 15);
-      ctx.fillRect(icx - 20, icy - 5, 15, 15);
-      ctx.fillRect(icx + 5, icy - 5, 15, 15);
-    } else if (idx === 3) {
-      ctx.beginPath();
-      ctx.moveTo(icx - 32, icy - 8);
-      ctx.lineTo(icx - 8, icy - 32);
-      ctx.lineTo(icx + 16, icy - 8);
-      ctx.stroke();
-      ctx.strokeRect(icx - 26, icy - 8, 36, 42);
-      ctx.beginPath();
-      ctx.moveTo(icx + 18, icy + 34);
-      ctx.lineTo(icx + 42, icy + 34);
-      ctx.moveTo(icx + 24, icy + 14);
-      ctx.lineTo(icx + 24, icy + 34);
-      ctx.moveTo(icx + 36, icy + 14);
-      ctx.lineTo(icx + 36, icy + 34);
-      ctx.stroke();
-    } else if (idx === 4) {
-      ctx.beginPath();
-      ctx.strokeRect(icx - 38, icy, 60, 32);
-      ctx.moveTo(icx - 30, icy - 20);
-      ctx.lineTo(icx + 12, icy - 20);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(icx + 32, icy - 36);
-      ctx.lineTo(icx + 24, icy - 15);
-      ctx.lineTo(icx + 40, icy - 15);
-      ctx.closePath();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(icx + 32, icy - 15);
-      ctx.lineTo(icx + 32, icy + 32);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      ctx.strokeRect(icx - 36, icy - 6, 72, 42);
-      ctx.moveTo(icx - 38, icy - 6);
-      ctx.lineTo(icx - 38, icy - 30);
-      ctx.lineTo(icx + 38, icy - 30);
-      ctx.lineTo(icx + 38, icy - 6);
-      ctx.stroke();
-      ctx.strokeRect(icx - 18, icy + 10, 36, 26);
-    }
-
-    // Title
-    ctx.fillStyle = TEXT_DARK;
-    ctx.font = '800 28px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(cat.title, icx, cy + 150);
-
-    // Subtitle
-    ctx.fillStyle = TEXT_MUTED;
-    ctx.font = '400 23px sans-serif';
-    const splitDesc = cat.desc.split('\n');
-    ctx.fillText(splitDesc[0], icx, cy + 200);
-    if (splitDesc[1]) {
-      ctx.fillText(splitDesc[1], icx, cy + 235);
-    }
-    ctx.textAlign = 'left';
-  });
-
-  // ------------------------------------------------------------------------
-  // 6. BOTTOM DEEP RED FOOTER BAR
-  // ------------------------------------------------------------------------
-  const footerY = 2430;
-  const footerH = 570;
-
-  ctx.fillStyle = LOPES_DARK_RED;
-  ctx.fillRect(0, footerY, canvas.width, footerH);
-
-  const pillars = [
-    { title: 'SEGURANÇA', desc: 'Transparência e confiança\nem cada negociação.' },
-    { title: 'ATENDIMENTO', desc: 'Atendimento personalizado\nem todas as etapas.' },
-    { title: 'EXPERIÊNCIA', desc: 'Tradição e credibilidade\nno mercado imobiliário.' },
-    { title: 'ATUAÇÃO EM MANAUS', desc: 'Conhecemos a cidade\ne os melhores bairros.' },
-  ];
-
-  const pillarW = 460;
-  const pillarStartX = 80;
-
-  pillars.forEach((p, i) => {
-    const px = pillarStartX + (i * 500);
-    const py = footerY + 85;
-
-    // Vertical dividing lines
-    if (i > 0) {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(px - 20, py);
-      ctx.lineTo(px - 20, py + 340);
-      ctx.stroke();
-    }
-
-    const icx = px + (pillarW / 2);
-    const icy = py + 60;
-
-    // Circle Badge Outline
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(icx, icy, 60, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    if (i === 0) {
-      ctx.beginPath();
-      ctx.moveTo(icx - 24, icy - 26);
-      ctx.lineTo(icx + 24, icy - 26);
-      ctx.lineTo(icx + 24, icy + 6);
-      ctx.bezierCurveTo(icx + 24, icy + 26, icx, icy + 36, icx, icy + 36);
-      ctx.bezierCurveTo(icx, icy + 36, icx - 24, icy + 26, icx - 24, icy + 6);
-      ctx.closePath();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(icx - 12, icy + 2);
-      ctx.lineTo(icx - 3, icy + 11);
-      ctx.lineTo(icx + 12, icy - 7);
-      ctx.stroke();
-    } else if (i === 1) {
-      ctx.beginPath();
-      ctx.arc(icx - 12, icy - 12, 12, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(icx + 12, icy - 12, 12, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(icx, icy + 24, 26, Math.PI, Math.PI * 2);
-      ctx.stroke();
-    } else if (i === 2) {
-      ctx.beginPath();
-      ctx.arc(icx, icy - 10, 26, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(icx - 15, icy + 16);
-      ctx.lineTo(icx - 22, icy + 38);
-      ctx.lineTo(icx - 6, icy + 30);
-      ctx.lineTo(icx + 6, icy + 30);
-      ctx.lineTo(icx + 22, icy + 38);
-      ctx.lineTo(icx + 15, icy + 16);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      ctx.arc(icx, icy - 12, 18, Math.PI * 0.85, Math.PI * 0.15);
-      ctx.lineTo(icx, icy + 28);
-      ctx.closePath();
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(icx, icy - 12, 7, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // Title
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '800 36px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(p.title, icx, py + 185);
-
-    // Subtitle
-    ctx.fillStyle = '#FEE2E2';
-    ctx.font = '400 27px sans-serif';
-    const splitDesc = p.desc.split('\n');
-    ctx.fillText(splitDesc[0], icx, py + 240);
-    if (splitDesc[1]) {
-      ctx.fillText(splitDesc[1], icx, py + 280);
-    }
-    ctx.textAlign = 'left';
-  });
-
-  return canvas.toDataURL('image/jpeg', 0.95);
+  return (
+    companySettings?.cover_horizontal_url ||
+    companySettings?.cover_geral_url ||
+    companySettings?.cover_venda_url ||
+    companySettings?.cover_locacao_url ||
+    DEFAULT_OFFICIAL_COVERS.HORIZONTAL
+  );
 }
 
-export async function renderHorizontalCoverCanvas(
+/**
+ * Prepares the high-resolution cover page image (2970x2100 at 300 DPI)
+ * using the real administrator-saved cover image.
+ */
+export async function renderAdminCoverImage(
   type: 'VENDA' | 'LOCACAO' | 'GERAL',
-  companySettings?: CompanySettings
+  companySettings?: CompanySettings,
+  customCoverImage?: string
 ): Promise<string> {
+  const coverUrl = resolveAdminCoverUrl(type, companySettings, customCoverImage);
+  const img = await loadImageElement(coverUrl);
+
   const canvas = document.createElement('canvas');
   canvas.width = 2970;
   canvas.height = 2100;
   const ctx = canvas.getContext('2d');
   if (!ctx) return '';
 
-  const LOPES_RED = '#E50938';
-  const LOPES_DARK_RED = '#B91C1C';
-  const TEXT_DARK = '#0F172A';
-  const TEXT_MUTED = '#475569';
-
-  // 1. Pure white background
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 2. Top-Right Red Accent Curve
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.moveTo(1800, 0);
-  ctx.bezierCurveTo(2200, 80, 2600, 240, 2970, 500);
-  ctx.lineTo(2970, 0);
-  ctx.closePath();
-  ctx.fill();
+  if (img) {
+    const imgRatio = (img.naturalWidth || img.width) / (img.naturalHeight || img.height);
+    const canvasRatio = canvas.width / canvas.height;
+    let renderW = canvas.width;
+    let renderH = canvas.height;
+    let offsetX = 0;
+    let offsetY = 0;
 
-  // CRECI Badge (Top Right)
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 34px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(`CRECI: ${companySettings?.creci_j || '540-J/AM'}`, 2920, 85);
-  ctx.textAlign = 'left';
+    if (imgRatio > canvasRatio) {
+      renderW = canvas.height * imgRatio;
+      offsetX = -(renderW - canvas.width) / 2;
+    } else {
+      renderH = canvas.width / imgRatio;
+      offsetY = -(renderH - canvas.height) / 2;
+    }
 
-  // Logo (Top Left)
-  drawLopesHeart(ctx, 90, 90, 110, LOPES_RED);
-
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 96px sans-serif';
-  ctx.fillText('LOPES', 220, 160);
-
-  ctx.fillStyle = LOPES_RED;
-  ctx.font = '800 64px sans-serif';
-  ctx.fillText('MANAUS', 222, 230);
-
-  ctx.fillStyle = LOPES_RED;
-  ctx.fillRect(90, 265, 210, 8);
-
-  // 3. Right Side Photo Area
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(1500, 0);
-  ctx.bezierCurveTo(1250, 450, 1250, 1050, 1750, 1500);
-  ctx.bezierCurveTo(2150, 1850, 2600, 1950, 2970, 2000);
-  ctx.lineTo(2970, 0);
-  ctx.closePath();
-  ctx.clip();
-
-  const skyGrad = ctx.createLinearGradient(1400, 0, 2970, 2100);
-  skyGrad.addColorStop(0, '#0F172A');
-  skyGrad.addColorStop(0.3, '#1E1B4B');
-  skyGrad.addColorStop(0.6, '#7C2D12');
-  skyGrad.addColorStop(0.85, '#EA580C');
-  skyGrad.addColorStop(1, '#FBBF24');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(1200, 0, 1770, 2100);
-
-  // City Skyline
-  ctx.fillStyle = '#0F172A';
-  const bldgs = [
-    { x: 1400, w: 80, h: 450 },
-    { x: 1500, w: 100, h: 620 },
-    { x: 1620, w: 90, h: 540 },
-    { x: 1730, w: 110, h: 720 },
-    { x: 1860, w: 95, h: 650 },
-    { x: 1970, w: 130, h: 780 },
-    { x: 2120, w: 110, h: 690 },
-    { x: 2250, w: 140, h: 840 },
-    { x: 2410, w: 120, h: 750 },
-    { x: 2550, w: 160, h: 890 },
-  ];
-  bldgs.forEach(b => {
-    ctx.fillRect(b.x, 1200 - b.h, b.w, b.h);
-  });
-  ctx.restore();
-
-  ctx.strokeStyle = LOPES_RED;
-  ctx.lineWidth = 18;
-  ctx.beginPath();
-  ctx.moveTo(1500, 0);
-  ctx.bezierCurveTo(1250, 450, 1250, 1050, 1750, 1500);
-  ctx.bezierCurveTo(2150, 1850, 2600, 1950, 2970, 2000);
-  ctx.stroke();
-
-  // 4. Left Content Text
-  const tx = 110;
-  let ty = 440;
-
-  ctx.fillStyle = '#334155';
-  ctx.font = '600 72px sans-serif';
-  ctx.fillText('CATÁLOGO DE', tx, ty);
-  ty += 130;
-
-  ctx.fillStyle = LOPES_RED;
-  ctx.font = '900 160px sans-serif';
-  ctx.fillText('IMÓVEIS', tx, ty);
-  ty += 40;
-
-  let bannerLabel = 'TODOS OS IMÓVEIS';
-  let bannerWidth = 840;
-  if (type === 'VENDA') {
-    bannerLabel = 'PARA VENDA';
-    bannerWidth = 720;
-  } else if (type === 'LOCACAO') {
-    bannerLabel = 'PARA LOCAÇÃO';
-    bannerWidth = 780;
+    ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
   }
 
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.roundRect(tx, ty, bannerWidth, 110, 16);
-  ctx.fill();
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 70px sans-serif';
-  ctx.fillText(bannerLabel, tx + 35, ty + 80);
-  ty += 180;
-
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '600 56px sans-serif';
-  ctx.fillText('O seu próximo imóvel está aqui.', tx, ty);
-  ty += 80;
-
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '500 40px sans-serif';
-  ctx.fillText('Conheça as melhores oportunidades de Manaus e Região', tx, ty);
-
-  // Bottom Deep Red Footer
-  const footerY = 1680;
-  ctx.fillStyle = LOPES_DARK_RED;
-  ctx.fillRect(0, footerY, canvas.width, 420);
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 42px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('LOPES MANAUS • EXCELÊNCIA E TRADIÇÃO NO MERCADO IMOBILIÁRIO', 1485, footerY + 140);
-
-  ctx.fillStyle = '#FEE2E2';
-  ctx.font = '400 30px sans-serif';
-  ctx.fillText(`Atendimento com ${companySettings?.company_name || 'Lopes Manaus'} • Telefone/WhatsApp: ${companySettings?.whatsapp || '(92) 3182-5500'}`, 1485, footerY + 230);
-  ctx.textAlign = 'left';
-
   return canvas.toDataURL('image/jpeg', 0.95);
+}
+
+// Deprecated alias for backwards compatibility if needed
+export async function renderCoverCanvas(
+  type: 'VENDA' | 'LOCACAO' | 'GERAL',
+  companySettings?: CompanySettings
+): Promise<string> {
+  return renderAdminCoverImage(type, companySettings);
+}
+
+export async function renderHorizontalCoverCanvas(
+  type: 'VENDA' | 'LOCACAO' | 'GERAL',
+  companySettings?: CompanySettings
+): Promise<string> {
+  return renderAdminCoverImage(type, companySettings);
 }
 
 function extractPropertyImages(prop: Property): string[] {
@@ -1477,41 +858,15 @@ export async function generateCatalogPDF(options: {
   }
 
   // ==========================================
-  // PÁGINA 1: CAPA OFICIAL DO CATÁLOGO (Horizontal)
+  // PÁGINA 1: CAPA OFICIAL DO ADMINISTRADOR (Horizontal 297mm x 210mm)
   // ==========================================
-  let selectedCoverUrl = customCoverImage;
-
-  if (!selectedCoverUrl) {
-    if (coverType === 'LOCACAO') {
-      selectedCoverUrl = companySettings?.cover_locacao_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
-    } else if (coverType === 'VENDA') {
-      selectedCoverUrl = companySettings?.cover_venda_url || companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
-    } else {
-      selectedCoverUrl = companySettings?.cover_horizontal_url || companySettings?.cover_geral_url;
-    }
-  }
-
-  let coverDataUrl = '';
-  if (selectedCoverUrl && selectedCoverUrl.trim()) {
-    try {
-      coverDataUrl = await urlToBase64(selectedCoverUrl);
-    } catch (err) {
-      console.warn('Could not load custom cover image URL:', err);
-    }
-  }
-
-  if (!coverDataUrl) {
-    coverDataUrl = await renderHorizontalCoverCanvas(coverType, companySettings);
-  }
-
-  if (coverDataUrl) {
-    try {
+  try {
+    const coverDataUrl = await renderAdminCoverImage(coverType, companySettings, customCoverImage);
+    if (coverDataUrl) {
       doc.addImage(coverDataUrl, 'JPEG', 0, 0, 297, 210);
-    } catch (err) {
-      console.warn('Error applying cover image to PDF:', err);
-      const defaultCanvas = await renderHorizontalCoverCanvas(coverType, companySettings);
-      doc.addImage(defaultCanvas, 'JPEG', 0, 0, 297, 210);
     }
+  } catch (err) {
+    console.warn('Error applying admin cover image to PDF:', err);
   }
 
   // ==========================================
