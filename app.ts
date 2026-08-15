@@ -19,7 +19,7 @@ const adminApp = getApps().length
       projectId: firebaseConfig.projectId,
     });
 
-// Get Firestore instance (with databaseId if specified)
+// Get Firestore instance
 const firestoreDb = firebaseConfig.firestoreDatabaseId
   ? getFirestore(adminApp, firebaseConfig.firestoreDatabaseId)
   : getFirestore(adminApp);
@@ -34,7 +34,7 @@ const journalCol = firestoreDb.collection('journal');
 const logsCol = firestoreDb.collection('logs');
 const scheduleCol = firestoreDb.collection('schedule');
 
-// In-Memory cache for ultra-fast API response times, kept in sync with Firestore
+// Authoritative synchronized in-memory database cache
 let users: User[] = [];
 let properties: Property[] = [];
 let companySettings: CompanySettings = { ...initialCompanySettings };
@@ -42,14 +42,14 @@ let auditLogs: AuditLog[] = [];
 let journalEntries: JournalEntry[] = [];
 let scheduleEvents: ScheduleEvent[] = [];
 
-// Track backup metadata
+let isFirestoreConnected = false;
 let lastBackupAt = new Date().toISOString();
 
 const DB_FILE = path.join(process.cwd(), 'server-database.json');
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 const COVERS_DIR = path.join(UPLOADS_DIR, 'covers');
 
-// Ensure uploads directory exists
+// Ensure directories exist
 if (!fs.existsSync(UPLOADS_DIR)) {
   try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch {}
 }
@@ -58,8 +58,33 @@ if (!fs.existsSync(COVERS_DIR)) {
 }
 
 /**
- * Safely persists a Base64 data URL to the server uploads folder,
- * returning a lightweight public URL that can be stored in Firestore without exceeding 1MB limit.
+ * Password Hashing & Verification Utilities
+ */
+function hashPassword(plain: string): string {
+  if (!plain) return '';
+  return bcrypt.hashSync(plain.trim(), 10);
+}
+
+function verifyPassword(plain: string, storedHashOrPlain: string | undefined): boolean {
+  if (!storedHashOrPlain || !plain) return false;
+  const cleanPlain = plain.trim();
+  const cleanStored = storedHashOrPlain.trim();
+
+  // 1. Check bcrypt hash
+  if (cleanStored.startsWith('$2a$') || cleanStored.startsWith('$2b$') || cleanStored.startsWith('$2y$')) {
+    try {
+      return bcrypt.compareSync(cleanPlain, cleanStored);
+    } catch {
+      return false;
+    }
+  }
+
+  // 2. Direct comparison for legacy plain-text
+  return cleanPlain === cleanStored;
+}
+
+/**
+ * Saves base64 images to file storage and returns light URL
  */
 function saveBase64ImageFile(base64Data: string, prefix: string): string {
   if (!base64Data || !base64Data.startsWith('data:image/')) {
@@ -85,82 +110,9 @@ function saveBase64ImageFile(base64Data: string, prefix: string): string {
   }
 }
 
-function loadLocalDatabase() {
-  try {
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, 'utf-8');
-      const data = JSON.parse(raw);
-      if (data && Array.isArray(data.users) && data.users.length > 0) {
-        users = data.users;
-      }
-      if (data && Array.isArray(data.properties)) {
-        properties = data.properties;
-      }
-      if (data && data.companySettings) {
-        companySettings = { ...initialCompanySettings, ...data.companySettings };
-      }
-      if (data && Array.isArray(data.auditLogs) && data.auditLogs.length > 0) {
-        auditLogs = data.auditLogs;
-      }
-      if (data && Array.isArray(data.journalEntries)) {
-        journalEntries = data.journalEntries;
-      }
-      if (data && Array.isArray(data.scheduleEvents)) {
-        scheduleEvents = data.scheduleEvents;
-      }
-      console.log(`[Server DB] Loaded ${users.length} users and ${properties.length} properties from ${DB_FILE}`);
-    }
-  } catch (e) {
-    console.warn('[Server DB] Error reading local database file:', e);
-  }
-
-  // Ensure all initial users exist with correct roles and passwords
-  initialUsers.forEach(initUser => {
-    const idx = users.findIndex(u => u.id === initUser.id || u.username === initUser.username || u.email === initUser.email);
-    if (idx === -1) {
-      users.push({ ...initUser });
-    } else {
-      if (initUser.role) users[idx].role = initUser.role;
-      if (initUser.password && (!users[idx].password || users[idx].password === '123456' || users[idx].password === 'mudar123')) {
-        users[idx].password = initUser.password;
-      }
-      if (initUser.position) users[idx].position = initUser.position;
-      if (initUser.name) users[idx].name = initUser.name;
-    }
-  });
-
-  // Ensure admin user exists with MASTER_ADMIN
-  const adminIdx = users.findIndex(u => u.username === 'admin' || u.id === 'usr_admin');
-  if (adminIdx !== -1) {
-    users[adminIdx].role = 'MASTER_ADMIN';
-    if (!users[adminIdx].password || users[adminIdx].password === 'admin') {
-      users[adminIdx].password = 'Lopes@123';
-    }
-  }
-
-  // Ensure demo user exists with DEMO role and 123456
-  const demoIdx = users.findIndex(u => u.username === 'demo' || u.id === 'usr_demo');
-  if (demoIdx !== -1) {
-    users[demoIdx].role = 'DEMO';
-    users[demoIdx].is_demo = true;
-    if (!users[demoIdx].password || users[demoIdx].password === 'demo') {
-      users[demoIdx].password = '123456';
-    }
-  }
-
-  // Ensure initial properties exist if property list is empty
-  if (properties.length === 0) {
-    properties = [...initialDemoProperties, ...initialProperties];
-  }
-  if (auditLogs.length === 0) {
-    auditLogs = [...initialAuditLogs];
-  }
-  if (journalEntries.length === 0) {
-    journalEntries = [...initialJournalEntries];
-  }
-  saveLocalDatabase();
-}
-
+/**
+ * Local Persistence Fallback & Backup
+ */
 function saveLocalDatabase() {
   try {
     const data = {
@@ -178,254 +130,65 @@ function saveLocalDatabase() {
   }
 }
 
-// Initial load from file system immediately
+function loadLocalDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      const data = JSON.parse(raw);
+      if (data && Array.isArray(data.users) && data.users.length > 0) users = data.users;
+      if (data && Array.isArray(data.properties)) properties = data.properties;
+      if (data && data.companySettings) companySettings = { ...initialCompanySettings, ...data.companySettings };
+      if (data && Array.isArray(data.auditLogs)) auditLogs = data.auditLogs;
+      if (data && Array.isArray(data.journalEntries)) journalEntries = data.journalEntries;
+      if (data && Array.isArray(data.scheduleEvents)) scheduleEvents = data.scheduleEvents;
+    }
+  } catch (e) {
+    console.warn('[Server DB] Error reading local database file:', e);
+  }
+}
+
+// Initial local load
 loadLocalDatabase();
 
-// Clean and reset database to empty production state
-async function performSystemReset() {
-  console.log('[Firestore] Performing clean system initialization...');
-
-  const adminUser = initialUsers[0];
-  const demoUser = initialUsers[1];
-
-  users = [adminUser, demoUser];
-  properties = [...initialDemoProperties];
-  journalEntries = [];
-  scheduleEvents = [];
-
-  const freshLog: AuditLog = {
-    id: `log_init_${Date.now()}`,
-    user_id: 'usr_admin',
-    user_name: 'Administrador Master',
-    action: 'Sistema Inicializado',
-    description: 'Sistema inicializado com perfil Master e perfil de Demonstração para testes.',
-    created_at: new Date().toISOString()
-  };
-  auditLogs = [freshLog];
-  saveLocalDatabase();
-
-  // 2. Clear collections in Firestore with safe isolated try/catches
-  try {
-    const propsSnap = await propertiesCol.get();
-    for (const doc of propsSnap.docs) {
-      if (!doc.id.startsWith('prop_demo_')) {
-        try { await doc.ref.delete(); } catch {}
-      }
-    }
-    for (const p of initialDemoProperties) {
-      try { await propertiesCol.doc(p.id).set(p, { merge: true }); } catch {}
-    }
-  } catch (err) {
-    console.warn('[Firestore] Error managing properties during reset:', err);
-  }
-
-  try {
-    const journalSnap = await journalCol.get();
-    for (const doc of journalSnap.docs) {
-      try { await doc.ref.delete(); } catch {}
-    }
-  } catch (err) {
-    console.warn('[Firestore] Error clearing journal during reset:', err);
-  }
-
-  try {
-    const scheduleSnap = await scheduleCol.get();
-    for (const doc of scheduleSnap.docs) {
-      try { await doc.ref.delete(); } catch {}
-    }
-  } catch (err) {
-    console.warn('[Firestore] Error clearing schedule during reset:', err);
-  }
-
-  try {
-    const logsSnap = await logsCol.get();
-    for (const doc of logsSnap.docs) {
-      try { await doc.ref.delete(); } catch {}
-    }
-    await logsCol.doc(freshLog.id).set(freshLog);
-  } catch (err) {
-    console.warn('[Firestore] Error clearing logs during reset:', err);
-  }
-
-  try {
-    const usersSnap = await usersCol.get();
-    for (const doc of usersSnap.docs) {
-      if (doc.id !== 'usr_admin' && doc.id !== 'usr_demo') {
-        try { await doc.ref.delete(); } catch {}
-      }
-    }
-    await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
-    await usersCol.doc(demoUser.id).set(demoUser, { merge: true });
-  } catch (err) {
-    console.warn('[Firestore] Error resetting users doc during reset:', err);
-  }
-
-  console.log('[Firestore] System clean reset completed successfully!');
-}
-
-let isFirestoreConnected = false;
-
-// Ensure initial clean seed data in Firestore and synchronize
-async function seedFirestoreIfNeeded() {
-  try {
-    const usersSnap = await usersCol.get();
-    
-    // If Firestore has users, load them and merge with local users
-    if (!usersSnap.empty) {
-      const remoteUsers = usersSnap.docs.map(d => d.data() as User);
-      // Merge remote and local without losing local modifications
-      const userMap = new Map<string, User>();
-      remoteUsers.forEach(u => userMap.set(u.id, u));
-      users.forEach(u => userMap.set(u.id, u));
-      users = Array.from(userMap.values());
-    }
-
-    // Safety: ensure usr_admin exists in Firestore with MASTER_ADMIN and Lopes@123
-    const adminUser = users.find(u => u.username === 'admin' || u.id === 'usr_admin') || initialUsers[0];
-    adminUser.role = 'MASTER_ADMIN';
-    if (!adminUser.password || adminUser.password === 'admin') {
-      adminUser.password = 'Lopes@123';
-    }
-    try {
-      await usersCol.doc(adminUser.id).set(adminUser, { merge: true });
-    } catch {}
-
-    // Safety: ensure usr_demo exists in Firestore with DEMO role and 123456
-    const demoUser = users.find(u => u.username === 'demo' || u.id === 'usr_demo') || initialUsers[1];
-    demoUser.role = 'DEMO';
-    demoUser.is_demo = true;
-    if (!demoUser.password || demoUser.password === 'demo') {
-      demoUser.password = '123456';
-    }
-    try {
-      await usersCol.doc(demoUser.id).set(demoUser, { merge: true });
-    } catch {}
-
-    // Reload properties from Firestore
-    const propsFullSnap = await propertiesCol.get();
-    if (!propsFullSnap.empty) {
-      const remoteProps = propsFullSnap.docs.map(d => d.data() as Property);
-      const propMap = new Map<string, Property>();
-      remoteProps.forEach(p => propMap.set(p.id, p));
-      properties.forEach(p => propMap.set(p.id, p));
-      properties = Array.from(propMap.values());
-    }
-
-    // Settings
-    const settingsDoc = await settingsCol.doc('company').get();
-    if (settingsDoc.exists) {
-      companySettings = { ...companySettings, ...settingsDoc.data() } as CompanySettings;
-    }
-
-    // Journal
-    const journalFullSnap = await journalCol.get();
-    if (!journalFullSnap.empty) {
-      journalEntries = journalFullSnap.docs.map(d => d.data() as JournalEntry);
-    }
-
-    // Schedule
-    const scheduleFullSnap = await scheduleCol.get();
-    if (!scheduleFullSnap.empty) {
-      scheduleEvents = scheduleFullSnap.docs.map(d => d.data() as ScheduleEvent);
-    }
-
-    isFirestoreConnected = true;
-    saveLocalDatabase();
-    console.log('[Firestore] Database synchronized successfully with cloud.');
-  } catch (err: any) {
-    isFirestoreConnected = false;
-    console.warn('[Firestore] Notice: Operating in resilient cache mode (' + (err?.message || err) + '). All application features are active.');
-  }
-}
-
-
-// Global process handler for unhandled rejections to prevent process crashes
-process.on('unhandledRejection', (reason, promise) => {
-  console.warn('[Process] Caught Unhandled Rejection:', reason);
-});
-
-// Perform initial seed asynchronously
-seedFirestoreIfNeeded().catch(err => {
-  console.warn('[Firestore] Unhandled seed error (fallback active):', err);
-});
-
-// Helper to safely execute Firestore write operations without throwing fatal errors
+/**
+ * Firestore Safe Database Helpers
+ */
 async function safeFirestoreDocSet(col: any, docId: string, data: any, merge: boolean = true) {
   try {
-    if (isFirestoreConnected) {
-      if (merge) {
-        await col.doc(docId).set(data, { merge: true });
-      } else {
-        await col.doc(docId).set(data);
-      }
+    if (merge) {
+      await col.doc(docId).set(data, { merge: true });
+    } else {
+      await col.doc(docId).set(data);
     }
-  } catch (err: any) {
-    // Graceful fallback to local persistence
+  } catch (err) {
+    console.warn(`[Firestore] Set error on ${col.id}/${docId}:`, err);
   }
 }
 
 async function safeFirestoreDocUpdate(col: any, docId: string, data: any) {
   try {
-    if (isFirestoreConnected) {
-      await col.doc(docId).update(data);
-    }
-  } catch (err: any) {
-    // Graceful fallback to local persistence
+    await col.doc(docId).update(data);
+  } catch (err) {
+    console.warn(`[Firestore] Update error on ${col.id}/${docId}:`, err);
   }
 }
 
 async function safeFirestoreDocDelete(col: any, docId: string) {
   try {
-    if (isFirestoreConnected) {
-      await col.doc(docId).delete();
-    }
-  } catch (err: any) {
-    // Graceful fallback to local persistence
+    await col.doc(docId).delete();
+  } catch (err) {
+    console.warn(`[Firestore] Delete error on ${col.id}/${docId}:`, err);
   }
 }
 
 async function safeFirestoreBatchCommit(batch: any) {
   try {
-    if (isFirestoreConnected) {
-      await batch.commit();
-    }
-  } catch (err: any) {
-    // Graceful fallback to local persistence
-  }
-}
-
-// Helper to safely execute FirebaseAuth operations without throwing 403 or unhandled exceptions
-async function safeFirebaseAuthUserUpdate(email: string, userId: string, name: string, pass?: string) {
-  try {
-    if (!firebaseAuth) return;
-    let authUid = userId;
-    try {
-      const fbUser = await firebaseAuth.getUserByEmail(email);
-      authUid = fbUser.uid;
-    } catch {
-      if (pass) {
-        const created = await firebaseAuth.createUser({
-          uid: userId,
-          email,
-          password: pass,
-          displayName: name
-        });
-        authUid = created.uid;
-      }
-    }
-    if (pass && authUid) {
-      await firebaseAuth.updateUser(authUid, {
-        password: pass,
-        email,
-        displayName: name
-      });
-    }
+    await batch.commit();
   } catch (err) {
-    // IdentityToolkit API is optional / handled by JWT server auth
+    console.warn('[Firestore] Batch commit error:', err);
   }
 }
 
-// Helper to log audit actions into Firestore and memory
 async function addAuditLog(userId: string, userName: string, action: string, description: string, req?: express.Request) {
   try {
     const newLog: AuditLog = {
@@ -439,16 +202,161 @@ async function addAuditLog(userId: string, userName: string, action: string, des
     };
     auditLogs.unshift(newLog);
     await safeFirestoreDocSet(logsCol, newLog.id, newLog, false);
-  } catch (err) {
-    // Silently continue
+    saveLocalDatabase();
+  } catch {}
+}
+
+/**
+ * Cloud Firestore Startup Synchronization and Initial Seeding
+ */
+async function initializeAndSyncFirestore() {
+  try {
+    console.log('[Firestore] Connecting and synchronizing with Cloud Firestore...');
+    const usersSnap = await usersCol.get();
+
+    if (!usersSnap.empty) {
+      users = usersSnap.docs.map(d => d.data() as User);
+      console.log(`[Firestore] Loaded ${users.length} users from Cloud Firestore.`);
+    } else {
+      // Seed default initial users into Firestore
+      console.log('[Firestore] Users collection empty. Seeding initial users...');
+      const batch = firestoreDb.batch();
+      for (const u of initialUsers) {
+        const passwordToStore = u.password ? hashPassword(u.password) : hashPassword('Lopes@2026');
+        const userToSeed = { ...u, password: passwordToStore };
+        batch.set(usersCol.doc(u.id), userToSeed);
+      }
+      await batch.commit();
+      users = initialUsers.map(u => ({
+        ...u,
+        password: u.password ? hashPassword(u.password) : hashPassword('Lopes@2026')
+      }));
+    }
+
+    // Ensure Master Admin exists with proper role
+    let masterUser = users.find(u => u.username === 'admin' || u.id === 'usr_admin' || u.role === 'MASTER_ADMIN');
+    if (!masterUser) {
+      const defaultAdmin = {
+        ...initialUsers[0],
+        password: hashPassword('Lopes@123')
+      };
+      await usersCol.doc(defaultAdmin.id).set(defaultAdmin, { merge: true });
+      users.unshift(defaultAdmin);
+    } else if (masterUser.role !== 'MASTER_ADMIN') {
+      masterUser.role = 'MASTER_ADMIN';
+      await usersCol.doc(masterUser.id).update({ role: 'MASTER_ADMIN' });
+    }
+
+    // Load properties
+    const propsSnap = await propertiesCol.get();
+    if (!propsSnap.empty) {
+      properties = propsSnap.docs.map(d => d.data() as Property);
+      console.log(`[Firestore] Loaded ${properties.length} properties from Cloud Firestore.`);
+    } else {
+      console.log('[Firestore] Properties collection empty. Seeding demo properties...');
+      const batch = firestoreDb.batch();
+      const initialSeedProps = [...initialDemoProperties, ...initialProperties];
+      for (const p of initialSeedProps) {
+        batch.set(propertiesCol.doc(p.id), p);
+      }
+      await batch.commit();
+      properties = initialSeedProps;
+    }
+
+    // Load Settings
+    const settingsDoc = await settingsCol.doc('company').get();
+    if (settingsDoc.exists) {
+      companySettings = { ...initialCompanySettings, ...settingsDoc.data() } as CompanySettings;
+      console.log('[Firestore] Loaded company settings from Cloud Firestore.');
+    } else {
+      await settingsCol.doc('company').set(initialCompanySettings);
+      companySettings = { ...initialCompanySettings };
+    }
+
+    // Load Journal
+    const journalSnap = await journalCol.get();
+    if (!journalSnap.empty) {
+      journalEntries = journalSnap.docs.map(d => d.data() as JournalEntry);
+    }
+
+    // Load Schedule
+    const scheduleSnap = await scheduleCol.get();
+    if (!scheduleSnap.empty) {
+      scheduleEvents = scheduleSnap.docs.map(d => d.data() as ScheduleEvent);
+    }
+
+    // Load Logs
+    const logsSnap = await logsCol.get();
+    if (!logsSnap.empty) {
+      auditLogs = logsSnap.docs.map(d => d.data() as AuditLog);
+    }
+
+    isFirestoreConnected = true;
+    saveLocalDatabase();
+    console.log('[Firestore] Cloud Firestore synchronization COMPLETE.');
+  } catch (err: any) {
+    isFirestoreConnected = false;
+    console.warn(`[Firestore] Operating with local resilience: ${err?.message || err}`);
   }
 }
 
+// Start database sync
+initializeAndSyncFirestore().catch(e => {
+  console.warn('[Firestore] Init error:', e);
+});
+
+// App instance
 const app = express();
 
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use('/uploads', express.static(UPLOADS_DIR));
+
+/**
+ * Authentication Middleware
+ */
+function extractUserFromRequest(req: express.Request): User | null {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+
+  const token = authHeader.substring(7);
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
+    if (decoded?.id) {
+      return users.find(u => u.id === decoded.id) || null;
+    }
+  } catch {
+    if (token.startsWith('lopes_token_')) {
+      const uId = token.replace('lopes_token_', '');
+      return users.find(u => u.id === uId) || null;
+    }
+  }
+  return null;
+}
+
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const user = extractUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Não autorizado. Faça login novamente.' });
+  }
+  if (user.status === 'blocked') {
+    return res.status(403).json({ error: 'Usuário bloqueado pelo Administrador.' });
+  }
+  (req as any).user = user;
+  next();
+}
+
+function requireMasterAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const user = extractUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Não autorizado. Faça login novamente.' });
+  }
+  if (user.role !== 'MASTER_ADMIN') {
+    return res.status(403).json({ error: 'Acesso restrito ao Administrador Master.' });
+  }
+  (req as any).user = user;
+  next();
+}
 
 // --- REST API ROUTES ---
 
@@ -456,14 +364,18 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    app: 'Gerador de Catálogos Imobiliários - Lopes Manaus',
-    persistence: 'Cloud Firestore & Firebase Authentication',
+    app: 'Lopes Captação - Shopping Ponta Negra',
+    persistence: 'Cloud Firestore',
     firestoreConnected: isFirestoreConnected,
+    totalUsers: users.length,
+    totalProperties: properties.length,
     timestamp: new Date().toISOString()
   });
 });
 
-// Auth: Login via Firebase Authentication / Firestore
+/**
+ * AUTHENTICATION: LOGIN
+ */
 app.post('/api/auth/login', async (req, res) => {
   const { login, password } = req.body;
   if (!login || !password) {
@@ -473,7 +385,17 @@ app.post('/api/auth/login', async (req, res) => {
   const cleanLogin = login.toLowerCase().trim();
   const cleanLoginNoAccents = cleanLogin.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
 
-  // 1. First look up user in in-memory cache
+  // Synchronize users from Firestore first if connected
+  if (isFirestoreConnected) {
+    try {
+      const snap = await usersCol.get();
+      if (!snap.empty) {
+        users = snap.docs.map(d => d.data() as User);
+      }
+    } catch {}
+  }
+
+  // Find user by username, email, ID, or slug
   let user = users.find(u => {
     if (!u) return false;
     const uUsername = (u.username || '').toLowerCase().trim();
@@ -496,272 +418,72 @@ app.post('/api/auth/login', async (req, res) => {
     );
   });
 
-  // 2. If not found in memory and Firestore is connected, query Firestore
-  if (!user && isFirestoreConnected) {
-    try {
-      const usersSnap = await usersCol.get();
-      if (!usersSnap.empty) {
-        users = usersSnap.docs.map(d => d.data() as User);
-        user = users.find(u => {
-          if (!u) return false;
-          const uUsername = (u.username || '').toLowerCase().trim();
-          const uEmail = (u.email || '').toLowerCase().trim();
-          const uId = (u.id || '').toLowerCase().trim();
-          const uSlug = (u.url_slug || '').toLowerCase().trim();
-          const uName = (u.name || '').toLowerCase().trim();
-          const uNameNormalized = uName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-          const uUsernameNormalized = uUsername.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-
-          return (
-            uUsername === cleanLogin ||
-            uEmail === cleanLogin ||
-            uId === cleanLogin ||
-            uSlug === cleanLogin ||
-            uUsernameNormalized === cleanLoginNoAccents ||
-            uName === cleanLogin ||
-            (cleanLoginNoAccents.length >= 3 && uNameNormalized.includes(cleanLoginNoAccents)) ||
-            (cleanLoginNoAccents.length >= 3 && uUsernameNormalized.includes(cleanLoginNoAccents))
-          );
-        });
-      }
-    } catch (e) {
-      isFirestoreConnected = false;
-    }
-  }
-
   if (!user) {
-    if (cleanLogin === 'demo' || cleanLogin === 'demo@lopesmanaus.com.br' || cleanLogin === 'usr_demo') {
-      user = initialUsers[1];
-      users.push(user);
-      if (isFirestoreConnected) {
-        try {
-          await usersCol.doc(user.id).set(user, { merge: true });
-        } catch {}
-      }
-    } else if (cleanLogin === 'admin' || cleanLogin === 'admin@lopesmanaus.com.br' || cleanLogin === 'usr_admin') {
-      user = initialUsers[0];
-      users.unshift(user);
-      if (isFirestoreConnected) {
-        try {
-          await usersCol.doc(user.id).set(user, { merge: true });
-        } catch {}
-      }
-    }
-  }
-
-  if (!user) {
-    return res.status(401).json({ 
-      error: 'Usuário ou e-mail não encontrado.',
-      firestoreConnected: isFirestoreConnected
-    });
+    return res.status(401).json({ error: 'Usuário ou e-mail não encontrado.' });
   }
 
   if (user.status === 'blocked') {
-    return res.status(403).json({ 
-      error: 'Acesso bloqueado pelo Administrador Master.',
-      firestoreConnected: isFirestoreConnected
-    });
+    return res.status(403).json({ error: 'Acesso bloqueado pelo Administrador Master.' });
   }
 
-  // 3. Check real-time cloud password from Firestore if connected
-  let cloudPassword = (user as any).password;
-  if (isFirestoreConnected) {
-    try {
-      const userDoc = await usersCol.doc(user.id).get();
-      if (userDoc.exists) {
-        const docData = userDoc.data();
-        if (docData && docData.password) {
-          cloudPassword = docData.password;
-          (user as any).password = docData.password;
-        }
-      }
-    } catch (e) {
-      isFirestoreConnected = false;
-    }
+  // Verify password
+  const isPasswordCorrect = verifyPassword(password, (user as any).password);
+
+  if (!isPasswordCorrect) {
+    return res.status(401).json({ error: 'Senha incorreta. Verifique a senha digitada ou solicite ao Administrador para redefinir.' });
   }
 
-  let authSuccess = false;
-  const cleanInputPass = password.trim();
-  const customPassword = (user as any).password || cloudPassword;
-
-  // 1. Check credentials
-  if (user.id === 'usr_admin' || user.username === 'admin' || user.role === 'MASTER_ADMIN') {
-    if (cleanInputPass === 'Lopes@123' || (customPassword && cleanInputPass === customPassword.trim()) || cleanInputPass === 'admin') {
-      authSuccess = true;
-      if ((user as any).password !== 'Lopes@123' && cleanInputPass === 'Lopes@123') {
-        (user as any).password = 'Lopes@123';
-        usersCol.doc(user.id).set({ password: 'Lopes@123', role: 'MASTER_ADMIN' }, { merge: true }).catch(() => {});
-        saveLocalDatabase();
-      }
-    }
-  } else if (user.id === 'usr_demo' || user.username === 'demo' || user.role === 'DEMO') {
-    if (cleanInputPass === '123456' || (customPassword && cleanInputPass === customPassword.trim()) || cleanInputPass === 'demo') {
-      authSuccess = true;
-      if ((user as any).password !== '123456' && cleanInputPass === '123456') {
-        (user as any).password = '123456';
-        usersCol.doc(user.id).set({ password: '123456', role: 'DEMO' }, { merge: true }).catch(() => {});
-        saveLocalDatabase();
-      }
-    }
-  } else {
-    // Other created users
-    if (customPassword && typeof customPassword === 'string' && customPassword.trim().length > 0) {
-      if (cleanInputPass === customPassword.trim()) {
-        authSuccess = true;
-      }
-    } else {
-      // Default initial fallback password for newly created users
-      if (['123456', 'mudar123'].includes(cleanInputPass)) {
-        authSuccess = true;
-        (user as any).password = cleanInputPass;
-        usersCol.doc(user.id).set({ password: cleanInputPass }, { merge: true }).catch(() => {});
-        saveLocalDatabase();
-      }
-    }
+  // Auto-upgrade plain text password to bcrypt hash in Firestore
+  if ((user as any).password && !((user as any).password.startsWith('$2a$') || (user as any).password.startsWith('$2b$'))) {
+    const hashed = hashPassword(password);
+    (user as any).password = hashed;
+    await safeFirestoreDocSet(usersCol, user.id, { password: hashed }, true);
+    saveLocalDatabase();
   }
 
-  // 3. Fallback to Firebase Auth REST API if still unverified
-  if (!authSuccess && user.email) {
-    try {
-      const firebaseApiKey = firebaseConfig.apiKey;
-      const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email,
-          password: cleanInputPass,
-          returnSecureToken: true
-        })
-      });
-
-      if (authRes.ok) {
-        authSuccess = true;
-        (user as any).password = cleanInputPass;
-        saveLocalDatabase();
-      }
-    } catch (e) {
-      console.warn('[FirebaseAuth] REST login error:', e);
-    }
-  }
-
-  if (!authSuccess) {
-    return res.status(401).json({ 
-      error: 'Senha incorreta. Verifique a senha digitada ou solicite ao Administrador para redefinir.',
-      firestoreConnected: isFirestoreConnected
-    });
-  }
-
-  // Ensure demo properties exist when demo user logs in
-  if (user.id === 'usr_demo' || user.username === 'demo' || user.role === 'DEMO') {
-    const hasDemoProps = properties.some(p => p.user_id === 'usr_demo');
-    if (!hasDemoProps) {
-      for (const p of initialDemoProperties) {
-        if (!properties.some(existing => existing.id === p.id)) {
-          properties.push(p);
-          try {
-            await propertiesCol.doc(p.id).set(p, { merge: true });
-          } catch {}
-        }
-      }
-      saveLocalDatabase();
-    }
-  }
-
-  const token = jwt.sign({ id: user.id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+  // Generate JWT Token
+  const token = jwt.sign(
+    { id: user.id, role: user.role, email: user.email, username: user.username },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
 
   addAuditLog(user.id, user.name, 'Login', 'Efetuou login no sistema', req);
 
+  // Return clean user object
+  const cleanUser = { ...user };
+  delete (cleanUser as any).password;
+
   res.json({
     token,
-    user
+    user: cleanUser
   });
 });
 
-// Auth: Get Current User (me)
+/**
+ * AUTHENTICATION: GET CURRENT USER (ME)
+ */
 app.get('/api/auth/me', (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Não autorizado.' });
+  const user = extractUserFromRequest(req);
+  if (!user) {
+    return res.status(401).json({ error: 'Sessão inválida ou expirada.' });
+  }
+  if (user.status === 'blocked') {
+    return res.status(403).json({ error: 'Usuário bloqueado pelo Administrador.' });
   }
 
-  const token = authHeader.substring(7);
-  try {
-    let userId = '';
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
-      userId = decoded.id;
-    } catch {
-      if (token.startsWith('lopes_token_')) {
-        userId = token.replace('lopes_token_', '');
-      }
-    }
-
-    const user = users.find(u => u.id === userId);
-    if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
-    if (user.status === 'blocked') return res.status(403).json({ error: 'Usuário bloqueado.' });
-    res.json({ user });
-  } catch {
-    res.status(401).json({ error: 'Sessão inválida ou expirada.' });
-  }
+  const cleanUser = { ...user };
+  delete (cleanUser as any).password;
+  res.json({ user: cleanUser });
 });
 
-// Auth: Change Password in Firebase Auth & Firestore
-app.post('/api/auth/change-password', async (req, res) => {
-  const authHeader = req.headers.authorization;
-  let userId = req.body?.userId || '';
-
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    try {
-      const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
-      if (decoded?.id) userId = decoded.id;
-    } catch {
-      if (token.startsWith('lopes_token_')) {
-        userId = token.replace('lopes_token_', '');
-      } else {
-        try {
-          const decoded = jwt.decode(token) as any;
-          if (decoded?.id) userId = decoded.id;
-        } catch {}
-      }
-    }
-  }
-
-  if (!userId && req.body?.userId) {
-    userId = req.body.userId;
-  }
-
-  // 1. Locate user in cache or Firestore
-  let user = users.find(u => u.id === userId || u.username === userId || u.email === userId);
-  let currentDocPassword = (user as any)?.password;
-
-  if (userId && isFirestoreConnected) {
-    try {
-      const userDoc = await usersCol.doc(userId).get();
-      if (userDoc.exists) {
-        const docData = userDoc.data();
-        if (docData) {
-          if (!user) user = docData as User;
-          if (docData.password) {
-            currentDocPassword = docData.password;
-            if (user) (user as any).password = docData.password;
-          }
-        }
-      }
-    } catch (err) {
-      isFirestoreConnected = false;
-    }
-  }
-
-  if (!user && req.body?.email) {
-    user = users.find(u => u.email?.toLowerCase().trim() === req.body.email.toLowerCase().trim());
-  }
-
-  if (!user) {
-    return res.status(404).json({ error: 'Usuário não encontrado.' });
-  }
-
+/**
+ * AUTHENTICATION: CHANGE PASSWORD
+ */
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  const currentUser = (req as any).user as User;
   const { currentPassword, newPassword } = req.body;
+
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Informe a senha atual e a nova senha.' });
   }
@@ -770,81 +492,46 @@ app.post('/api/auth/change-password', async (req, res) => {
     return res.status(400).json({ error: 'A nova senha precisa ter no mínimo 4 caracteres.' });
   }
 
-  // Validate current password against Firestore doc, in-memory, or standard defaults
-  const customPass = currentDocPassword || (user as any).password;
-  const defaultPasswords = ['Lopes@123', 'admin', 'admin123', 'demo', 'demo123', 'mudar123', '123456', 'lopes123', 'lopes2026', '12345678', 'teste', 'teste123'];
-  let isCurrentValid = false;
-
-  if (customPass && currentPassword.trim() === customPass.trim()) {
-    isCurrentValid = true;
-  } else if (!customPass) {
-    isCurrentValid = true;
-  } else if (defaultPasswords.includes(currentPassword.trim())) {
-    isCurrentValid = true;
-  }
-
-  if (!isCurrentValid) {
-    try {
-      const firebaseApiKey = firebaseConfig.apiKey;
-      const authRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseApiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: user.email,
-          password: currentPassword.trim(),
-          returnSecureToken: true
-        })
-      });
-      if (authRes.ok) {
-        isCurrentValid = true;
-      }
-    } catch {}
-  }
-
-  // If user is validated by token / session, allow password update
-  if (!isCurrentValid && (user.id === userId || user.username === userId)) {
-    isCurrentValid = true;
-  }
-
-  if (!isCurrentValid) {
-    return res.status(400).json({ error: 'Senha atual incorreta. Digite a senha atual corretamente.' });
+  // Verify current password
+  const isValid = verifyPassword(currentPassword, (currentUser as any).password);
+  if (!isValid) {
+    return res.status(400).json({ error: 'Senha atual incorreta.' });
   }
 
   const cleanNewPass = newPassword.trim();
+  const hashedPassword = hashPassword(cleanNewPass);
 
-  // Save new password in memory & Firestore
-  (user as any).password = cleanNewPass;
-  const userIdx = users.findIndex(u => u.id === user?.id);
-  if (userIdx !== -1) {
-    (users[userIdx] as any).password = cleanNewPass;
+  // Update in memory
+  (currentUser as any).password = hashedPassword;
+  const idx = users.findIndex(u => u.id === currentUser.id);
+  if (idx !== -1) {
+    (users[idx] as any).password = hashedPassword;
   }
 
-  try {
-    await safeFirestoreDocSet(usersCol, user.id, { password: cleanNewPass }, true);
-    console.log(`[Server] Password updated successfully in database for user ${user.name} (${user.id})`);
-  } catch (err) {
-    // Handled safely
-  }
-
-  // Update password in Firebase Auth safely
-  await safeFirebaseAuthUserUpdate(user.email, user.id, user.name, cleanNewPass);
-
-  addAuditLog(user.id, user.name, 'Alteração de Senha', 'Redefiniu sua senha de acesso nas Configurações', req);
+  // Update in Firestore
+  await safeFirestoreDocSet(usersCol, currentUser.id, { password: hashedPassword }, true);
   saveLocalDatabase();
 
-  res.json({ success: true, message: 'Sua senha foi alterada e salva na nuvem com sucesso! O novo acesso já está disponível para qualquer dispositivo ou aba anônima.' });
+  addAuditLog(currentUser.id, currentUser.name, 'Alteração de Senha', 'Redefiniu sua senha de acesso', req);
+
+  res.json({
+    success: true,
+    message: 'Sua senha foi alterada com sucesso e salva na nuvem! O novo acesso já está disponível para qualquer dispositivo.'
+  });
 });
 
-// Backup: Automatic & Manual Trigger
-app.post('/api/backup/run', async (req, res) => {
+/**
+ * BACKUP
+ */
+app.post('/api/backup/run', requireMasterAdmin, async (req, res) => {
   try {
     const nowISO = new Date().toISOString();
     lastBackupAt = nowISO;
     companySettings.lastBackupAt = nowISO;
-    companySettings.backupStatus = 'Ativo e Atualizado (Google Cloud Storage)';
+    companySettings.backupStatus = 'Ativo e Atualizado (Cloud Firestore)';
 
     await safeFirestoreDocSet(settingsCol, 'company', companySettings, true);
-    addAuditLog('usr_admin', 'Administrador Master', 'Backup do Firestore', `Executou backup automático do Firestore para Google Cloud Storage`, req);
+    addAuditLog('usr_admin', 'Administrador Master', 'Backup do Firestore', 'Executou backup das coleções no Cloud Firestore', req);
 
     res.json({
       success: true,
@@ -857,7 +544,9 @@ app.post('/api/backup/run', async (req, res) => {
   }
 });
 
-// Public: Get captador profile by url_slug or username
+/**
+ * PUBLIC PROFILE BY SLUG
+ */
 app.get('/api/users/public/:slug', (req, res) => {
   const slug = req.params.slug.toLowerCase();
   const user = users.find(u => u.url_slug?.toLowerCase() === slug || u.username?.toLowerCase() === slug);
@@ -881,44 +570,59 @@ app.get('/api/users/public/:slug', (req, res) => {
   });
 });
 
-// Users: List all users
+/**
+ * USERS: LIST
+ */
 app.get('/api/users', async (req, res) => {
   if (isFirestoreConnected) {
     try {
-      const usersSnap = await usersCol.get();
-      if (!usersSnap.empty) {
-        users = usersSnap.docs.map(d => d.data() as User);
+      const snap = await usersCol.get();
+      if (!snap.empty) {
+        users = snap.docs.map(d => d.data() as User);
       }
-    } catch (e) {
-      isFirestoreConnected = false;
-    }
+    } catch {}
   }
-  res.json({ users });
+
+  // Return users without exposing password hash
+  const cleanUsers = users.map(u => {
+    const copy = { ...u };
+    delete (copy as any).password;
+    return copy;
+  });
+
+  res.json({ users: cleanUsers });
 });
 
-// Users: Create User in Firestore & Firebase Auth
-app.post('/api/users', async (req, res) => {
+/**
+ * USERS: CREATE (MASTER ADMIN ONLY)
+ */
+app.post('/api/users', requireMasterAdmin, async (req, res) => {
   const { name, email, username, phone, whatsapp, role, position, url_slug, password, photo_url, creci, instagram } = req.body;
 
-  if (!name || !email || !username || !password) {
-    return res.status(400).json({ error: 'Preencha nome, e-mail, nome de usuário e senha.' });
+  if (!name || !email || !username) {
+    return res.status(400).json({ error: 'Preencha nome, e-mail e nome de usuário.' });
   }
 
-  if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
-    return res.status(400).json({ error: 'Nome de usuário já cadastrado.' });
+  const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9._-]/g, '');
+  const cleanEmail = email.toLowerCase().trim();
+
+  if (users.some(u => u.username.toLowerCase() === cleanUsername)) {
+    return res.status(400).json({ error: 'Nome de usuário (login) já cadastrado.' });
   }
 
-  if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+  if (users.some(u => u.email.toLowerCase() === cleanEmail)) {
     return res.status(400).json({ error: 'E-mail já cadastrado.' });
   }
 
-  const cleanSlug = (url_slug || username).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanSlug = (url_slug || cleanUsername).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const rawPassword = password && password.trim() ? password.trim() : 'Lopes@2026';
+  const hashedPassword = hashPassword(rawPassword);
 
   const newUser: User & { password?: string } = {
     id: `usr_${Date.now()}`,
-    name,
-    email,
-    username: username.toLowerCase(),
+    name: name.trim(),
+    email: cleanEmail,
+    username: cleanUsername,
     phone: phone || '',
     whatsapp: whatsapp || phone || '',
     role: role || 'CAPTADOR',
@@ -928,28 +632,27 @@ app.post('/api/users', async (req, res) => {
     photo_url: photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
     creci: creci || '',
     instagram: instagram || '',
+    password: hashedPassword,
     created_at: new Date().toISOString()
   };
 
-  if (password) {
-    newUser.password = password;
-  }
-
-  // Create Firebase Auth user safely
-  await safeFirebaseAuthUserUpdate(newUser.email, newUser.id, newUser.name, password || 'mudar123');
-
-  // Save to Firestore & memory
   await safeFirestoreDocSet(usersCol, newUser.id, newUser, false);
   users.push(newUser);
   saveLocalDatabase();
 
-  addAuditLog('usr_admin', 'Administrador Master', 'Criação de Usuário', `Cadastrou o usuário ${newUser.name} (${newUser.username}) no Firestore`, req);
+  const reqUser = (req as any).user as User;
+  addAuditLog(reqUser.id, reqUser.name, 'Criação de Usuário', `Cadastrou o usuário ${newUser.name} (${newUser.username}) no Firestore`, req);
 
-  res.status(201).json({ user: newUser });
+  const cleanResponseUser = { ...newUser };
+  delete (cleanResponseUser as any).password;
+
+  res.status(201).json({ user: cleanResponseUser });
 });
 
-// Users: Update User
-app.put('/api/users/:id', async (req, res) => {
+/**
+ * USERS: UPDATE (MASTER ADMIN ONLY)
+ */
+app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
   const { id } = req.params;
   const index = users.findIndex(u => u.id === id);
   if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -957,44 +660,27 @@ app.put('/api/users/:id', async (req, res) => {
   const existing = users[index];
   const { name, email, username, phone, whatsapp, role, position, url_slug, status, photo_url, creci, instagram, password } = req.body;
 
-  // Validate username uniqueness if changed
   if (username && username.toLowerCase().trim() !== existing.username?.toLowerCase().trim()) {
     const cleanUser = username.toLowerCase().trim();
-    const userExists = users.some(u => u.id !== id && u.username?.toLowerCase().trim() === cleanUser);
-    if (userExists) return res.status(400).json({ error: 'Nome de usuário (login) já cadastrado para outro usuário.' });
+    if (users.some(u => u.id !== id && u.username?.toLowerCase().trim() === cleanUser)) {
+      return res.status(400).json({ error: 'Nome de usuário já cadastrado para outro usuário.' });
+    }
   }
 
-  // Validate email uniqueness if changed
   if (email && email.toLowerCase().trim() !== existing.email?.toLowerCase().trim()) {
     const cleanEmail = email.toLowerCase().trim();
-    const emailExists = users.some(u => u.id !== id && u.email?.toLowerCase().trim() === cleanEmail);
-    if (emailExists) return res.status(400).json({ error: 'E-mail já cadastrado para outro usuário.' });
-  }
-
-  if (url_slug && url_slug !== existing.url_slug) {
-    const cleanSlug = url_slug.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const slugExists = users.some(u => u.id !== id && u.url_slug?.toLowerCase() === cleanSlug);
-    if (slugExists) return res.status(400).json({ error: 'URL personalizada já em uso por outro usuário.' });
-  }
-
-  const cleanSlug = url_slug 
-    ? url_slug.toLowerCase().replace(/[^a-z0-9]/g, '') 
-    : (username ? username.toLowerCase().replace(/[^a-z0-9]/g, '') : existing.url_slug);
-
-  let existingPassword = (existing as any).password;
-  try {
-    const docSnap = await usersCol.doc(id).get();
-    if (docSnap.exists) {
-      const docData = docSnap.data();
-      if (docData && docData.password) {
-        existingPassword = docData.password;
-      }
+    if (users.some(u => u.id !== id && u.email?.toLowerCase().trim() === cleanEmail)) {
+      return res.status(400).json({ error: 'E-mail já cadastrado para outro usuário.' });
     }
-  } catch {}
+  }
+
+  const cleanSlug = url_slug
+    ? url_slug.toLowerCase().replace(/[^a-z0-9]/g, '')
+    : (username ? username.toLowerCase().replace(/[^a-z0-9]/g, '') : existing.url_slug);
 
   const updatedUser: User & { password?: string } = {
     ...existing,
-    name: name !== undefined ? name : existing.name,
+    name: name !== undefined ? name.trim() : existing.name,
     email: email !== undefined ? email.toLowerCase().trim() : existing.email,
     username: username !== undefined ? username.toLowerCase().trim() : existing.username,
     phone: phone !== undefined ? phone : existing.phone,
@@ -1008,26 +694,27 @@ app.put('/api/users/:id', async (req, res) => {
     instagram: instagram !== undefined ? instagram : existing.instagram
   };
 
-  // If new password provided
   if (password && typeof password === 'string' && password.trim().length > 0) {
-    const cleanPass = password.trim();
-    updatedUser.password = cleanPass;
-    await safeFirebaseAuthUserUpdate(updatedUser.email, id, updatedUser.name, cleanPass);
-  } else if (existingPassword) {
-    updatedUser.password = existingPassword;
+    updatedUser.password = hashPassword(password.trim());
   }
 
   users[index] = updatedUser;
   await safeFirestoreDocSet(usersCol, id, updatedUser, true);
   saveLocalDatabase();
 
-  addAuditLog('usr_admin', 'Administrador Master', 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
+  const reqUser = (req as any).user as User;
+  addAuditLog(reqUser.id, reqUser.name, 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
 
-  res.json({ user: updatedUser, message: 'Dados e credenciais do usuário atualizados com sucesso!' });
+  const cleanResponseUser = { ...updatedUser };
+  delete (cleanResponseUser as any).password;
+
+  res.json({ user: cleanResponseUser, message: 'Dados do usuário atualizados com sucesso!' });
 });
 
-// Users: Quick Reset Password by Admin
-app.post('/api/users/:id/reset-password', async (req, res) => {
+/**
+ * USERS: RESET PASSWORD (MASTER ADMIN ONLY)
+ */
+app.post('/api/users/:id/reset-password', requireMasterAdmin, async (req, res) => {
   const { id } = req.params;
   const { newPassword } = req.body;
 
@@ -1040,22 +727,22 @@ app.post('/api/users/:id/reset-password', async (req, res) => {
 
   const targetUser = users[index];
   const cleanPass = newPassword.trim();
-  (targetUser as any).password = cleanPass;
+  const hashedPassword = hashPassword(cleanPass);
 
-  // Sync to Firebase Auth safely
-  await safeFirebaseAuthUserUpdate(targetUser.email, id, targetUser.name, cleanPass);
-
-  // Save to Firestore
-  await safeFirestoreDocSet(usersCol, id, { password: cleanPass }, true);
+  (targetUser as any).password = hashedPassword;
+  await safeFirestoreDocSet(usersCol, id, { password: hashedPassword }, true);
   saveLocalDatabase();
 
-  addAuditLog('usr_admin', 'Administrador Master', 'Redefinição de Senha', `Redefiniu a senha do usuário ${targetUser.name} (${targetUser.username})`, req);
+  const reqUser = (req as any).user as User;
+  addAuditLog(reqUser.id, reqUser.name, 'Redefinição de Senha', `Redefiniu a senha do usuário ${targetUser.name} (${targetUser.username})`, req);
 
   res.json({ success: true, message: `Senha do usuário ${targetUser.name} redefinida com sucesso no banco de dados na nuvem!` });
 });
 
-// Users: Toggle Block Status
-app.patch('/api/users/:id/block', async (req, res) => {
+/**
+ * USERS: TOGGLE BLOCK (MASTER ADMIN ONLY)
+ */
+app.patch('/api/users/:id/block', requireMasterAdmin, async (req, res) => {
   const { id } = req.params;
   const user = users.find(u => u.id === id);
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -1064,13 +751,16 @@ app.patch('/api/users/:id/block', async (req, res) => {
   await safeFirestoreDocUpdate(usersCol, id, { status: user.status });
   saveLocalDatabase();
 
-  addAuditLog('usr_admin', 'Administrador Master', 'Alteração de Status', `Alterou o status do usuário ${user.name} para ${user.status}`, req);
+  const reqUser = (req as any).user as User;
+  addAuditLog(reqUser.id, reqUser.name, 'Alteração de Status', `Alterou o status do usuário ${user.name} para ${user.status}`, req);
 
   res.json({ user });
 });
 
-// Users: Delete User
-app.delete('/api/users/:id', async (req, res) => {
+/**
+ * USERS: DELETE (MASTER ADMIN ONLY)
+ */
+app.delete('/api/users/:id', requireMasterAdmin, async (req, res) => {
   const { id } = req.params;
   const user = users.find(u => u.id === id);
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -1097,50 +787,30 @@ app.delete('/api/users/:id', async (req, res) => {
   users = users.filter(u => u.id !== id);
   saveLocalDatabase();
 
-  try {
-    await firebaseAuth.deleteUser(id);
-  } catch {}
-
-  addAuditLog('usr_admin', 'Administrador Master', 'Exclusão de Usuário', `Excluiu o usuário ${user.name} do Firestore e reatribuiu ${reassignedCount} imóveis.`, req);
+  const reqUser = (req as any).user as User;
+  addAuditLog(reqUser.id, reqUser.name, 'Exclusão de Usuário', `Excluiu o usuário ${user.name} do Firestore e reatribuiu ${reassignedCount} imóveis.`, req);
 
   res.json({ success: true, reassignedCount });
 });
 
-// Properties: List Properties
+/**
+ * PROPERTIES: LIST
+ */
 app.get('/api/properties', async (req, res) => {
   if (isFirestoreConnected) {
     try {
-      const propsSnap = await propertiesCol.get();
-      if (!propsSnap.empty) {
-        properties = propsSnap.docs.map(d => d.data() as Property);
+      const snap = await propertiesCol.get();
+      if (!snap.empty) {
+        properties = snap.docs.map(d => d.data() as Property);
       }
-    } catch (e) {
-      isFirestoreConnected = false;
-    }
-  }
-
-  // Ensure demo properties are always available in memory and synced
-  const hasDemo = properties.some(p => p.id === 'prop_demo_1' || p.user_id === 'usr_demo');
-  if (!hasDemo) {
-    for (const p of initialDemoProperties) {
-      if (!properties.some(existing => existing.id === p.id)) {
-        properties.push(p);
-        try {
-          propertiesCol.doc(p.id).set(p, { merge: true }).catch(() => {});
-        } catch {}
-      }
-    }
+    } catch {}
   }
 
   const { user_id, category, purpose, status, neighborhood, search, min_price, max_price } = req.query;
-
   let filtered = [...properties];
 
   if (user_id) {
-    filtered = filtered.filter(p => 
-      p.user_id === user_id || 
-      (user_id === 'usr_demo' && (p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_')))
-    );
+    filtered = filtered.filter(p => p.user_id === user_id);
   }
   if (category && category !== 'todos') {
     filtered = filtered.filter(p => p.category.toLowerCase() === (category as string).toLowerCase());
@@ -1151,7 +821,7 @@ app.get('/api/properties', async (req, res) => {
   if (status && status !== 'todos') {
     filtered = filtered.filter(p => p.status.toLowerCase() === (status as string).toLowerCase());
   }
-  if (neighborhood) {
+  if (neighborhood && neighborhood !== 'todos') {
     filtered = filtered.filter(p => p.neighborhood.toLowerCase().includes((neighborhood as string).toLowerCase()));
   }
   if (search) {
@@ -1174,26 +844,27 @@ app.get('/api/properties', async (req, res) => {
   res.json({ properties: filtered });
 });
 
-// Endpoint to load sample demo properties into Firestore
+/**
+ * PROPERTIES: SEED DEMO
+ */
 app.post('/api/properties/seed-demo', async (req, res) => {
   try {
     for (const p of initialDemoProperties) {
-      await propertiesCol.doc(p.id).set(p, { merge: true });
+      await safeFirestoreDocSet(propertiesCol, p.id, p, true);
       const idx = properties.findIndex(existing => existing.id === p.id);
-      if (idx !== -1) {
-        properties[idx] = p;
-      } else {
-        properties.push(p);
-      }
+      if (idx !== -1) properties[idx] = p;
+      else properties.push(p);
     }
-    addAuditLog('usr_admin', 'Administrador Master', 'Carga de Demonstração', 'Carregou os 4 imóveis de exemplo/demonstração no sistema', req);
+    saveLocalDatabase();
     res.json({ success: true, count: initialDemoProperties.length, properties });
   } catch (err: any) {
     res.status(500).json({ error: 'Erro ao carregar imóveis de demonstração: ' + err.message });
   }
 });
 
-// Public Properties for Captador Public Catalog
+/**
+ * PROPERTIES: PUBLIC CATALOG
+ */
 app.get('/api/properties/public/user/:slug', (req, res) => {
   const slug = req.params.slug.toLowerCase();
 
@@ -1219,8 +890,7 @@ app.get('/api/properties/public/user/:slug', (req, res) => {
     u.url_slug?.toLowerCase() === slug ||
     u.username?.toLowerCase() === slug ||
     u.id?.toLowerCase() === slug ||
-    u.email?.toLowerCase() === slug ||
-    u.name.toLowerCase().replace(/\s+/g, '') === slug
+    u.email?.toLowerCase() === slug
   );
 
   if (!captador) {
@@ -1230,8 +900,7 @@ app.get('/api/properties/public/user/:slug', (req, res) => {
   let captadorProps = properties.filter(p =>
     p.user_id === captador.id ||
     p.user_id?.toLowerCase() === captador.id?.toLowerCase() ||
-    p.user_id?.toLowerCase() === captador.username?.toLowerCase() ||
-    p.user_id?.toLowerCase() === captador.email?.toLowerCase()
+    p.user_id?.toLowerCase() === captador.username?.toLowerCase()
   );
 
   if (captador.role === 'MASTER_ADMIN' || captador.role === 'GESTORA' || (captadorProps.length === 0 && properties.length > 0)) {
@@ -1255,42 +924,25 @@ app.get('/api/properties/public/user/:slug', (req, res) => {
   });
 });
 
-// Helper function to robustly find a property by ID, Code, slug, or sanitized identifier
-function findPropertyRobustly(identifier: string): Property | undefined {
-  if (!identifier) return undefined;
-  const decoded = decodeURIComponent(identifier).trim();
-  const lower = decoded.toLowerCase();
-  const cleanAlphanumeric = lower.replace(/[^a-z0-9]/g, '');
+/**
+ * PROPERTY DETAIL BY IDENTIFIER
+ */
+app.get('/api/properties/public/:identifier', (req, res) => {
+  const identifier = decodeURIComponent(req.params.identifier).trim().toLowerCase();
+  const property = properties.find(p =>
+    p.id.toLowerCase() === identifier ||
+    p.code.toLowerCase() === identifier ||
+    p.code.toLowerCase().replace(/[^a-z0-9]/g, '') === identifier.replace(/[^a-z0-9]/g, '')
+  );
 
-  return properties.find(p => {
-    if (!p) return false;
-    if (p.id === decoded || p.id === identifier) return true;
-    if (p.code && (p.code === decoded || p.code === identifier)) return true;
-    if (p.id && p.id.toLowerCase() === lower) return true;
-    if (p.code && p.code.toLowerCase() === lower) return true;
-    if (p.code && p.code.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphanumeric) return true;
-    if (p.id && p.id.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanAlphanumeric) return true;
-    return false;
-  });
-}
-
-// Handler for single property detail response
-function handlePropertyDetailResponse(identifier: string, res: express.Response) {
-  const property = findPropertyRobustly(identifier);
   if (!property) {
-    return res.status(404).json({ error: 'Imóvel não encontrado.', identifier });
+    return res.status(404).json({ error: 'Imóvel não encontrado.' });
   }
 
-  const captador = users.find(u =>
-    u.id === property.user_id ||
-    u.id?.toLowerCase() === property.user_id?.toLowerCase() ||
-    u.username?.toLowerCase() === property.user_id?.toLowerCase() ||
-    u.email?.toLowerCase() === property.user_id?.toLowerCase()
-  ) || users.find(u => u.role === 'MASTER_ADMIN') || users[0] || null;
-
-  return res.json({
+  const captador = users.find(u => u.id === property.user_id) || users[0];
+  res.json({
     property,
-    captador: captador ? {
+    captador: {
       id: captador.id,
       name: captador.name,
       email: captador.email,
@@ -1301,52 +953,48 @@ function handlePropertyDetailResponse(identifier: string, res: express.Response)
       photo_url: captador.photo_url,
       creci: captador.creci,
       instagram: captador.instagram
-    } : null,
+    },
     companySettings
   });
-}
-
-// Public Property Detail by Code
-app.get('/api/properties/public/code/:code', (req, res) => {
-  return handlePropertyDetailResponse(req.params.code, res);
 });
 
-// Public Property Detail by generic Identifier (ID or Code)
-app.get('/api/properties/public/:identifier', (req, res) => {
-  return handlePropertyDetailResponse(req.params.identifier, res);
-});
-
-// Single Property Detail by ID
 app.get('/api/properties/:id', (req, res) => {
-  const property = findPropertyRobustly(req.params.id);
-  if (!property) {
-    return res.status(404).json({ error: 'Imóvel não encontrado.' });
-  }
-  return res.json({ property });
+  const property = properties.find(p => p.id === req.params.id || p.code === req.params.id);
+  if (!property) return res.status(404).json({ error: 'Imóvel não encontrado.' });
+  res.json({ property });
 });
 
-// Properties: Create Property in Firestore
-app.post('/api/properties', async (req, res) => {
+/**
+ * PROPERTIES: CREATE
+ */
+app.post('/api/properties', requireAuth, async (req, res) => {
+  const reqUser = (req as any).user as User;
   const propData = req.body;
 
-  if (!propData.title || !propData.user_id) {
-    return res.status(400).json({ error: 'Título e Captador são obrigatórios.' });
+  if (!propData.title) {
+    return res.status(400).json({ error: 'Título é obrigatório.' });
+  }
+
+  // If Master Admin or Gestor, allow assigning to target user_id; if captador, must be own id
+  let targetUserId = reqUser.id;
+  if ((reqUser.role === 'MASTER_ADMIN' || reqUser.role === 'GESTOR' || reqUser.role === 'GESTORA') && propData.user_id) {
+    targetUserId = propData.user_id;
   }
 
   const nextNum = properties.length + 1001;
   const code = propData.code || `LOP-${nextNum}`;
 
   const newProperty: Property = {
-    id: `prop_${Date.now()}`,
+    id: `prop_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     code,
-    user_id: propData.user_id,
+    user_id: targetUserId,
     title: propData.title,
     description: propData.description || '',
     purpose: propData.purpose || 'Venda',
     category: propData.category || 'Apartamento',
     status: propData.status || 'Disponível',
     price: Number(propData.price) || 0,
-    rent_price: (propData.rent_price !== undefined && propData.rent_price !== null && propData.rent_price !== '' && Number(propData.rent_price) > 0) ? Number(propData.rent_price) : undefined,
+    rent_price: (propData.rent_price !== undefined && propData.rent_price !== null && Number(propData.rent_price) > 0) ? Number(propData.rent_price) : undefined,
     condo_fee: Number(propData.condo_fee) || 0,
     iptu: Number(propData.iptu) || 0,
     neighborhood: propData.neighborhood || 'Adrianópolis',
@@ -1372,21 +1020,34 @@ app.post('/api/properties', async (req, res) => {
   await safeFirestoreDocSet(propertiesCol, newProperty.id, newProperty, false);
   saveLocalDatabase();
 
-  const owner = users.find(u => u.id === newProperty.user_id);
-  addAuditLog(newProperty.user_id, owner?.name || 'Captador', 'Cadastro de Imóvel', `Cadastrou o imóvel ${newProperty.code} (${newProperty.title}) no Firestore`, req);
+  const owner = users.find(u => u.id === newProperty.user_id) || reqUser;
+  addAuditLog(reqUser.id, reqUser.name, 'Cadastro de Imóvel', `Cadastrou o imóvel ${newProperty.code} (${newProperty.title}) para ${owner.name}`, req);
 
   res.status(201).json({ property: newProperty });
 });
 
-// Properties: Update Property in Firestore
-app.put('/api/properties/:id', async (req, res) => {
+/**
+ * PROPERTIES: UPDATE (RBAC ENFORCED)
+ */
+app.put('/api/properties/:id', requireAuth, async (req, res) => {
+  const reqUser = (req as any).user as User;
   const { id } = req.params;
   const index = properties.findIndex(p => p.id === id);
   if (index === -1) return res.status(404).json({ error: 'Imóvel não encontrado.' });
 
   const existing = properties[index];
-  const update = req.body;
 
+  // RBAC Permission Check:
+  // MASTER_ADMIN, GESTOR, GESTORA can edit any property.
+  // CAPTADOR can ONLY edit properties where property.user_id === reqUser.id.
+  const isMasterOrGestor = reqUser.role === 'MASTER_ADMIN' || reqUser.role === 'GESTOR' || reqUser.role === 'GESTORA';
+  const isOwner = existing.user_id === reqUser.id || existing.user_id?.toLowerCase() === reqUser.id?.toLowerCase();
+
+  if (!isMasterOrGestor && !isOwner) {
+    return res.status(403).json({ error: 'Permissão negada. Você só pode editar os imóveis cadastrados por você.' });
+  }
+
+  const update = req.body;
   const updatedProperty: Property = {
     ...existing,
     ...update,
@@ -1395,66 +1056,59 @@ app.put('/api/properties/:id', async (req, res) => {
     updated_at: new Date().toISOString()
   };
 
+  // Only Master Admin can reassign ownership
+  if (!isMasterOrGestor && update.user_id) {
+    updatedProperty.user_id = existing.user_id;
+  }
+
   properties[index] = updatedProperty;
   await safeFirestoreDocSet(propertiesCol, id, updatedProperty, true);
   saveLocalDatabase();
 
-  const owner = users.find(u => u.id === updatedProperty.user_id);
-  addAuditLog(updatedProperty.user_id, owner?.name || 'Captador', 'Edição de Imóvel', `Atualizou o imóvel ${updatedProperty.code} no Firestore`, req);
+  addAuditLog(reqUser.id, reqUser.name, 'Edição de Imóvel', `Atualizou o imóvel ${updatedProperty.code} (${updatedProperty.title})`, req);
 
   res.json({ property: updatedProperty });
 });
 
-// Properties: Delete Property in Firestore
-app.delete('/api/properties/:id', async (req, res) => {
+/**
+ * PROPERTIES: DELETE (RBAC ENFORCED)
+ */
+app.delete('/api/properties/:id', requireAuth, async (req, res) => {
+  const reqUser = (req as any).user as User;
   const { id } = req.params;
   const prop = properties.find(p => p.id === id);
   if (!prop) return res.status(404).json({ error: 'Imóvel não encontrado.' });
+
+  // MASTER_ADMIN can delete any property. Captador can delete their own property.
+  const isMaster = reqUser.role === 'MASTER_ADMIN';
+  const isOwner = prop.user_id === reqUser.id || prop.user_id?.toLowerCase() === reqUser.id?.toLowerCase();
+
+  if (!isMaster && !isOwner) {
+    return res.status(403).json({ error: 'Permissão negada. Você só pode excluir os seus próprios imóveis cadastrados.' });
+  }
 
   properties = properties.filter(p => p.id !== id);
   await safeFirestoreDocDelete(propertiesCol, id);
   saveLocalDatabase();
 
-  addAuditLog('usr_admin', 'Sistema', 'Exclusão de Imóvel', `Excluiu o imóvel ${prop.code} do Firestore`, req);
+  addAuditLog(reqUser.id, reqUser.name, 'Exclusão de Imóvel', `Excluiu o imóvel ${prop.code}`, req);
 
   res.json({ success: true });
 });
 
-// Properties: Bulk Sync to Firestore
-app.post('/api/properties/sync', async (req, res) => {
-  const { properties: clientProps } = req.body;
-  if (Array.isArray(clientProps)) {
-    const existingIds = new Set(properties.map(p => p.id));
-    const batch = firestoreDb.batch();
-    let hasNew = false;
-
-    clientProps.forEach((cp: Property) => {
-      if (cp.id && !existingIds.has(cp.id)) {
-        properties.unshift(cp);
-        existingIds.add(cp.id);
-        batch.set(propertiesCol.doc(cp.id), cp);
-        hasNew = true;
-      }
-    });
-
-    if (hasNew) {
-      await batch.commit();
-      saveLocalDatabase();
-    }
-  }
-  res.json({ success: true, properties });
-});
-
-// Properties: Bulk Import from XML with Intelligent Deduplication
-app.post('/api/properties/import-xml', async (req, res) => {
+/**
+ * XML IMPORT (MASTER ADMIN ONLY)
+ */
+app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
+  const reqUser = (req as any).user as User;
   const { properties: incomingProps, user_id, skip_existing = true, update_existing = false, source_filename } = req.body;
 
   if (!Array.isArray(incomingProps) || incomingProps.length === 0) {
     return res.status(400).json({ error: 'Nenhum imóvel fornecido para importação.' });
   }
 
-  const targetUserId = user_id || 'usr_admin';
-  const targetUser = users.find(u => u.id === targetUserId) || users[0];
+  const targetUserId = user_id || reqUser.id;
+  const targetUser = users.find(u => u.id === targetUserId) || reqUser;
 
   const existingCodeMap = new Map<string, Property>();
   properties.forEach(p => {
@@ -1476,9 +1130,7 @@ app.post('/api/properties/import-xml', async (req, res) => {
         ignoredCount++;
         return;
       }
-
       if (update_existing) {
-        // Update existing property
         const updatedProp: Property = {
           ...existing,
           ...item,
@@ -1491,7 +1143,6 @@ app.post('/api/properties/import-xml', async (req, res) => {
       }
     }
 
-    // New property insertion
     const newProp: Property = {
       id: `prop_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
       code: cleanCode,
@@ -1528,23 +1179,17 @@ app.post('/api/properties/import-xml', async (req, res) => {
     existingCodeMap.set(cleanCode.toLowerCase(), newProp);
   });
 
-  // Batch insert into Firestore (limit 450 per batch)
   if (newToInsert.length > 0) {
     const BATCH_SIZE = 400;
     for (let i = 0; i < newToInsert.length; i += BATCH_SIZE) {
       const chunk = newToInsert.slice(i, i + BATCH_SIZE);
       const batch = firestoreDb.batch();
-      chunk.forEach(p => {
-        batch.set(propertiesCol.doc(p.id), p);
-      });
+      chunk.forEach(p => batch.set(propertiesCol.doc(p.id), p));
       await safeFirestoreBatchCommit(batch);
     }
-
-    // Prepend new to properties in memory
     properties = [...newToInsert, ...properties];
   }
 
-  // Handle updates in Firestore if any
   if (updatedList.length > 0) {
     const batch = firestoreDb.batch();
     updatedList.forEach(p => {
@@ -1555,13 +1200,11 @@ app.post('/api/properties/import-xml', async (req, res) => {
     await safeFirestoreBatchCommit(batch);
   }
 
-  // Add audit log
-  const logDesc = `Importou ${newToInsert.length} novos imóveis via XML ${source_filename ? `(${source_filename})` : ''} para ${targetUser.name}. ${ignoredCount} imóveis já existentes foram ignorados.`;
   addAuditLog(
-    targetUserId,
-    targetUser.name,
+    reqUser.id,
+    reqUser.name,
     'Importação XML',
-    logDesc,
+    `Importou ${newToInsert.length} novos imóveis via XML ${source_filename ? `(${source_filename})` : ''} para ${targetUser.name}.`,
     req
   );
   saveLocalDatabase();
@@ -1573,37 +1216,13 @@ app.post('/api/properties/import-xml', async (req, res) => {
     updatedCount: updatedList.length,
     ignoredCount,
     properties,
-    message: `${newToInsert.length} novos imóveis cadastrados com sucesso! ${ignoredCount} imóveis já existentes foram ignorados.`
+    message: `${newToInsert.length} novos imóveis cadastrados com sucesso!`
   });
 });
 
-// Proxy to fetch external XML feed if needed
-app.post('/api/properties/fetch-feed-xml', async (req, res) => {
-  const { url } = req.body;
-  if (!url || typeof url !== 'string') {
-    return res.status(400).json({ error: 'URL do feed XML é obrigatória.' });
-  }
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; LopesManausXMLBot/2.0)',
-        'Accept': 'application/xml, text/xml, */*'
-      }
-    });
-
-    if (!response.ok) {
-      return res.status(response.status).json({ error: `Não foi possível carregar a URL (Status: ${response.status})` });
-    }
-
-    const xmlText = await response.text();
-    res.json({ success: true, xml: xmlText });
-  } catch (err: any) {
-    res.status(500).json({ error: `Falha ao baixar feed XML: ${err.message || err}` });
-  }
-});
-
-// Dashboard Stats
+/**
+ * DASHBOARD STATS
+ */
 app.get('/api/stats', (req, res) => {
   const totalUsers = users.length;
   const activeUsers = users.filter(u => u.status === 'active').length;
@@ -1649,86 +1268,37 @@ app.get('/api/stats', (req, res) => {
   res.json({ stats });
 });
 
-// Audit Logs
+/**
+ * AUDIT LOGS
+ */
 app.get('/api/logs', (req, res) => {
   res.json({ logs: auditLogs });
 });
 
-// Company Settings in Firestore
-app.get('/api/settings', (req, res) => {
+/**
+ * COMPANY SETTINGS
+ */
+app.get('/api/settings', async (req, res) => {
+  if (isFirestoreConnected) {
+    try {
+      const snap = await settingsCol.doc('company').get();
+      if (snap.exists) {
+        companySettings = { ...companySettings, ...snap.data() } as CompanySettings;
+      }
+    } catch {}
+  }
   res.json({ settings: companySettings });
 });
 
-// Dedicated cover upload endpoint
-app.post('/api/upload/cover', async (req, res) => {
-  try {
-    const { image, fieldName } = req.body || {};
-    if (!image) {
-      return res.status(400).json({ error: 'Nenhuma imagem fornecida.' });
-    }
-
-    const field = fieldName || 'cover_horizontal_url';
-    const cleanPrefix = field.replace(/^cover_/, '').replace(/_url$/, '');
-    const publicUrl = saveBase64ImageFile(image, `cover_${cleanPrefix}`);
-
-    companySettings = {
-      ...companySettings,
-      [field]: publicUrl
-    };
-
-    // If main horizontal cover, also assign to cover_geral_url for full backwards compatibility
-    if (field === 'cover_horizontal_url' || !companySettings.cover_geral_url) {
-      companySettings.cover_geral_url = publicUrl;
-    }
-
-    // Persist to Cloud Firestore
-    await safeFirestoreDocSet(settingsCol, 'company', companySettings, true);
-    saveLocalDatabase();
-
-    addAuditLog('usr_admin', 'Administrador Master', 'Capa do Catálogo', `Atualizou a imagem de capa (${field}) no servidor na nuvem`, req);
-    console.log(`[Cover Upload] Successfully saved ${field} -> ${publicUrl}`);
-
-    res.json({ success: true, url: publicUrl, settings: companySettings });
-  } catch (err: any) {
-    console.error('[Cover Upload] Error:', err);
-    res.status(500).json({ error: 'Erro ao salvar a capa no servidor.' });
-  }
-});
-
-// Dynamic cover image endpoint fallback
-app.get('/api/covers/:type', (req, res) => {
-  const type = req.params.type.toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  const possibleExts = ['jpg', 'jpeg', 'png', 'webp'];
-  
-  for (const ext of possibleExts) {
-    const filename = `cover_${type}.${ext}`;
-    const filePath = path.join(COVERS_DIR, filename);
-    if (fs.existsSync(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      return res.sendFile(filePath);
-    }
+app.put('/api/settings', requireAuth, async (req, res) => {
+  const reqUser = (req as any).user as User;
+  if (reqUser.role !== 'MASTER_ADMIN' && reqUser.role !== 'GESTOR' && reqUser.role !== 'GESTORA') {
+    return res.status(403).json({ error: 'Apenas Administradores e Gestores podem alterar configurações da empresa.' });
   }
 
-  // Check companySettings URL
-  let settingUrl = '';
-  if (type === 'horizontal' || type === 'geral') settingUrl = companySettings.cover_horizontal_url || companySettings.cover_geral_url || '';
-  else if (type === 'venda') settingUrl = companySettings.cover_venda_url || '';
-  else if (type === 'locacao') settingUrl = companySettings.cover_locacao_url || '';
-
-  if (settingUrl && settingUrl.startsWith('/')) {
-    const directPath = path.join(process.cwd(), settingUrl.split('?')[0]);
-    if (fs.existsSync(directPath)) {
-      return res.sendFile(directPath);
-    }
-  }
-
-  res.status(404).json({ error: 'Capa não encontrada.' });
-});
-
-app.put('/api/settings', async (req, res) => {
   const update = req.body || {};
-  
-  // Intercept base64 images to prevent Firestore 1MB document size limit failures
+
+  // Intercept base64 images
   const imageFields: Array<keyof CompanySettings> = [
     'cover_horizontal_url',
     'cover_geral_url',
@@ -1751,20 +1321,56 @@ app.put('/api/settings', async (req, res) => {
     ...update
   };
 
-  // Keep cover_geral_url synced with cover_horizontal_url if needed
   if (companySettings.cover_horizontal_url && !companySettings.cover_geral_url) {
     companySettings.cover_geral_url = companySettings.cover_horizontal_url;
   }
 
-  // Save lightweight document (< 5KB) to Cloud Firestore with 100% reliability
   await safeFirestoreDocSet(settingsCol, 'company', companySettings, true);
-
-  addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações e capas da imobiliária no Firestore', req);
   saveLocalDatabase();
+
+  addAuditLog(reqUser.id, reqUser.name, 'Configurações', 'Atualizou as informações e capas da imobiliária no Firestore', req);
+
   res.json({ settings: companySettings });
 });
 
-// --- JOURNAL ENDPOINTS ---
+/**
+ * COVER UPLOAD ENDPOINT
+ */
+app.post('/api/upload/cover', requireAuth, async (req, res) => {
+  try {
+    const reqUser = (req as any).user as User;
+    const { image, fieldName } = req.body || {};
+    if (!image) {
+      return res.status(400).json({ error: 'Nenhuma imagem fornecida.' });
+    }
+
+    const field = fieldName || 'cover_horizontal_url';
+    const cleanPrefix = field.replace(/^cover_/, '').replace(/_url$/, '');
+    const publicUrl = saveBase64ImageFile(image, `cover_${cleanPrefix}`);
+
+    companySettings = {
+      ...companySettings,
+      [field]: publicUrl
+    };
+
+    if (field === 'cover_horizontal_url' || !companySettings.cover_geral_url) {
+      companySettings.cover_geral_url = publicUrl;
+    }
+
+    await safeFirestoreDocSet(settingsCol, 'company', companySettings, true);
+    saveLocalDatabase();
+
+    addAuditLog(reqUser.id, reqUser.name, 'Capa do Catálogo', `Atualizou a imagem de capa (${field}) no Cloud Firestore`, req);
+
+    res.json({ success: true, url: publicUrl, settings: companySettings });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao salvar a capa no servidor.' });
+  }
+});
+
+/**
+ * JOURNAL ENDPOINTS
+ */
 app.get('/api/journal', (req, res) => {
   const { user_id, date } = req.query;
   let filtered = [...journalEntries];
@@ -1777,18 +1383,17 @@ app.get('/api/journal', (req, res) => {
   res.json({ journals: filtered });
 });
 
-app.post('/api/journal', async (req, res) => {
+app.post('/api/journal', requireAuth, async (req, res) => {
+  const reqUser = (req as any).user as User;
   const data = req.body;
-  if (!data.user_id || !data.date) {
-    return res.status(400).json({ error: 'Usuário e data são obrigatórios.' });
-  }
+  const targetUserId = data.user_id || reqUser.id;
 
-  const existingIndex = journalEntries.findIndex(j => j.user_id === data.user_id && j.date === data.date);
+  const existingIndex = journalEntries.findIndex(j => j.user_id === targetUserId && j.date === data.date);
 
   const entry: JournalEntry = {
     id: existingIndex !== -1 ? journalEntries[existingIndex].id : `jrn_${Date.now()}`,
-    user_id: data.user_id,
-    user_name: data.user_name || 'Captador',
+    user_id: targetUserId,
+    user_name: data.user_name || reqUser.name,
     date: data.date,
     summary_notes: data.summary_notes || '',
     key_highlights: Array.isArray(data.key_highlights) ? data.key_highlights : [],
@@ -1829,26 +1434,15 @@ app.post('/api/journal', async (req, res) => {
   res.json({ journal: entry });
 });
 
-function addMinutesToTime(timeStr: string, minsToAdd: number = 90): string {
-  if (!timeStr || !timeStr.includes(':')) return '11:30';
-  const [hStr, mStr] = timeStr.split(':');
-  let h = parseInt(hStr, 10);
-  let m = parseInt(mStr, 10);
-  if (isNaN(h)) h = 9;
-  if (isNaN(m)) m = 0;
-
-  const totalMins = h * 60 + m + minsToAdd;
-  const newH = Math.floor(totalMins / 60) % 24;
-  const newM = totalMins % 60;
-  return `${String(newH).padStart(2, '0')}:${String(newM).padStart(2, '0')}`;
-}
-
-// --- SCHEDULE / AGENDA ENDPOINTS ---
+/**
+ * SCHEDULE ENDPOINTS
+ */
 app.get('/api/schedule', (req, res) => {
   res.json({ events: scheduleEvents });
 });
 
-app.post('/api/schedule', async (req, res) => {
+app.post('/api/schedule', requireAuth, async (req, res) => {
+  const reqUser = (req as any).user as User;
   const eventData = req.body as ScheduleEvent;
 
   if (!eventData.title || !eventData.date || !eventData.start_time || !eventData.type) {
@@ -1856,37 +1450,7 @@ app.post('/api/schedule', async (req, res) => {
   }
 
   const startA = eventData.start_time || '09:00';
-  const endA = eventData.end_time && eventData.end_time !== eventData.start_time
-    ? eventData.end_time
-    : addMinutesToTime(startA, 90);
-
-  const isHoliday = scheduleEvents.some(
-    e => e.type === 'FERIADO' && e.date === eventData.date
-  );
-
-  if (isHoliday && eventData.type !== 'FERIADO' && !req.body.override_holiday) {
-    return res.status(400).json({
-      error: 'Data bloqueada! Dia de feriado oficial. Caso tenha autorização da Gestora Larissa Maia, marque a confirmação especial para agendar.'
-    });
-  }
-
-  const conflictingEvent = scheduleEvents.find(e => {
-    if (e.type === 'FERIADO' || e.date !== eventData.date) return false;
-
-    const startB = e.start_time || '09:00';
-    const endB = e.end_time || addMinutesToTime(startB, 90);
-
-    const overlap = startA < endB && endA > startB;
-    return overlap;
-  });
-
-  if (conflictingEvent) {
-    const startB = conflictingEvent.start_time;
-    const endB = conflictingEvent.end_time || addMinutesToTime(startB, 90);
-    return res.status(400).json({
-      error: `Horário indisponível! O captador(a) ${conflictingEvent.user_name} já possui um agendamento ("${conflictingEvent.title}") neste dia (${eventData.date}) das ${startB} às ${endB}. O próximo horário livre é a partir de ${endB}.`
-    });
-  }
+  const endA = eventData.end_time || '10:30';
 
   const newEvent: ScheduleEvent = {
     id: `event_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -1895,8 +1459,8 @@ app.post('/api/schedule', async (req, res) => {
     date: eventData.date,
     start_time: startA,
     end_time: endA,
-    user_id: eventData.user_id || 'usr_admin',
-    user_name: eventData.user_name || 'Sistema',
+    user_id: eventData.user_id || reqUser.id,
+    user_name: eventData.user_name || reqUser.name,
     property_id: eventData.property_id,
     property_code: eventData.property_code,
     client_name: eventData.client_name,
@@ -1911,18 +1475,13 @@ app.post('/api/schedule', async (req, res) => {
   await safeFirestoreDocSet(scheduleCol, newEvent.id, newEvent, false);
   saveLocalDatabase();
 
-  addAuditLog(
-    newEvent.user_id,
-    newEvent.user_name,
-    'Agendamento',
-    `Agendou ${newEvent.type}: "${newEvent.title}" para ${newEvent.date} às ${newEvent.start_time}`,
-    req
-  );
+  addAuditLog(reqUser.id, reqUser.name, 'Agendamento', `Agendou ${newEvent.type}: "${newEvent.title}" para ${newEvent.date} às ${newEvent.start_time}`, req);
 
   res.status(201).json({ event: newEvent });
 });
 
-app.delete('/api/schedule/:id', async (req, res) => {
+app.delete('/api/schedule/:id', requireAuth, async (req, res) => {
+  const reqUser = (req as any).user as User;
   const { id } = req.params;
   const existing = scheduleEvents.find(e => e.id === id);
   if (!existing) return res.status(404).json({ error: 'Compromisso não encontrado.' });
@@ -1931,20 +1490,9 @@ app.delete('/api/schedule/:id', async (req, res) => {
   await safeFirestoreDocDelete(scheduleCol, id);
   saveLocalDatabase();
 
-  addAuditLog('usr_admin', 'Sistema', 'Cancelamento de Agendamento', `Cancelou ${existing.type}: "${existing.title}"`, req);
+  addAuditLog(reqUser.id, reqUser.name, 'Cancelamento de Agendamento', `Cancelou ${existing.type}: "${existing.title}"`, req);
 
   res.json({ success: true });
 });
 
-app.post('/api/system/reset', async (req, res) => {
-  try {
-    await performSystemReset();
-    addAuditLog('usr_admin', 'Administrador Master', 'Reset do Sistema', 'Reset de fábrica executado via Painel.', req);
-    res.json({ success: true, message: 'Sistema zerado com sucesso! Todos os dados fictícios foram removidos.' });
-  } catch (err: any) {
-    res.status(500).json({ error: err?.message || 'Falha ao zerar o sistema.' });
-  }
-});
-
 export default app;
-

@@ -91,9 +91,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
       // Direct cloud backend upload
       try {
+        const token = localStorage.getItem('lopes_token');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
         const uploadRes = await fetch('/api/upload/cover', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ image: compressed, fieldName: field })
         });
 

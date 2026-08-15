@@ -232,9 +232,13 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
     const assignedUser = users.find(u => u.id === selectedCaptadorId) || currentUser;
 
     try {
+      const token = localStorage.getItem('lopes_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/properties/import-xml', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           properties: comparison.all,
           user_id: selectedCaptadorId,

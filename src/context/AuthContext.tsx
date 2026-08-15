@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { getStoredCurrentUser, saveStoredCurrentUser, findUserByLogin, getStoredUsers, validateUserPassword, updateUserPassword } from '../lib/storage';
+import { getStoredCurrentUser, saveStoredCurrentUser } from '../lib/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -31,18 +31,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(data.user);
         saveStoredCurrentUser(data.user);
       } else {
-        // Static hosting fallback
-        const localUser = getStoredCurrentUser();
-        if (localUser) {
-          setUser(localUser);
-        } else {
-          localStorage.removeItem('lopes_token');
-          setToken(null);
-          setUser(null);
-        }
+        localStorage.removeItem('lopes_token');
+        setToken(null);
+        setUser(null);
+        saveStoredCurrentUser(null);
       }
-    } catch {
-      // Offline / Static hosting fallback
+    } catch (e) {
+      // If network offline, check stored user session
       const localUser = getStoredCurrentUser();
       if (localUser) {
         setUser(localUser);
@@ -60,11 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       fetchCurrentUser(token);
     } else {
-      const localUser = getStoredCurrentUser();
-      if (localUser) {
-        setUser(localUser);
-        setToken(`lopes_token_${localUser.id}`);
-      }
       setLoading(false);
     }
   }, [token]);
@@ -74,77 +64,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login: loginText, password: passText })
+        body: JSON.stringify({ login: loginText.trim(), password: passText.trim() })
       });
 
       const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
+      if (contentType.includes('application/json')) {
         const data = await res.json();
-        localStorage.setItem('lopes_token', data.token);
-        setToken(data.token);
-        setUser(data.user);
-        saveStoredCurrentUser(data.user);
-        updateUserPassword(data.user.id, passText);
-        return { success: true };
-      } else if (contentType.includes('application/json')) {
-        // Handle actual server non-200 responses strictly with json error
-        let errorMsg = 'Senha incorreta ou usuário não encontrado.';
-        try {
-          const data = await res.json();
-          if (data && data.error) {
-            errorMsg = data.error;
-          }
-        } catch {}
-
-        return { success: false, error: errorMsg };
+        if (res.ok && data.token && data.user) {
+          localStorage.setItem('lopes_token', data.token);
+          setToken(data.token);
+          setUser(data.user);
+          saveStoredCurrentUser(data.user);
+          return { success: true };
+        } else {
+          return { success: false, error: data.error || 'Credenciais inválidas.' };
+        }
       } else {
-        // If the server doesn't return JSON, it means the API is either not found (404 returning index.html)
-        // or there's a gateway error. We log it and fall through to client-side mode.
-        console.warn('Backend API returned non-JSON response, falling back to client auth mode.');
+        return { success: false, error: 'Falha ao comunicar com o servidor. Tente novamente.' };
       }
-    } catch (e) {
-      console.warn('Backend API connection failed, switching to client auth mode:', e);
+    } catch (e: any) {
+      return { success: false, error: 'Erro de conexão com o servidor. Verifique sua rede e tente novamente.' };
     }
-
-    // Client-side fallback for static servers or offline mode
-    const localUser = findUserByLogin(loginText);
-    if (localUser) {
-      if (localUser.status === 'blocked') {
-        return { success: false, error: 'Usuário bloqueado pelo administrador.' };
-      }
-
-      const isValid = validateUserPassword(localUser.id, passText);
-      if (!isValid) {
-        return { success: false, error: 'Senha incorreta.' };
-      }
-
-      saveStoredCurrentUser(localUser);
-      setToken(`lopes_token_${localUser.id}`);
-      setUser(localUser);
-      return { success: true };
-    }
-
-    return { success: false, error: 'Usuário não encontrado. Verifique suas credenciais.' };
   };
 
   const logout = () => {
+    localStorage.removeItem('lopes_token');
     saveStoredCurrentUser(null);
     setToken(null);
     setUser(null);
   };
 
   const refreshUser = async () => {
-    if (token) {
-      await fetchCurrentUser(token);
-    } else {
-      const localUser = getStoredCurrentUser();
-      if (localUser) setUser(localUser);
+    const currentToken = token || localStorage.getItem('lopes_token');
+    if (currentToken) {
+      await fetchCurrentUser(currentToken);
     }
   };
 
   const switchUserSimulated = async (userId: string) => {
     try {
-      const res = await fetch('/api/users');
+      const currentToken = token || localStorage.getItem('lopes_token');
+      const res = await fetch('/api/users', {
+        headers: currentToken ? { Authorization: `Bearer ${currentToken}` } : {}
+      });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
@@ -152,19 +114,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (targetUser) {
           setUser(targetUser);
           saveStoredCurrentUser(targetUser);
-          return;
         }
       }
     } catch (e) {
-      console.error(e);
-    }
-
-    // Local fallback
-    const users = getStoredUsers();
-    const targetUser = users.find((u: User) => u.id === userId);
-    if (targetUser) {
-      setUser(targetUser);
-      saveStoredCurrentUser(targetUser);
+      console.error('Error switching user:', e);
     }
   };
 
@@ -193,4 +146,3 @@ export function useAuth() {
   }
   return context;
 }
-

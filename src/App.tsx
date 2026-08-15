@@ -42,6 +42,14 @@ import {
   updateUserPassword
 } from './lib/storage';
 
+function getAuthHeaders(contentType: boolean = true): Record<string, string> {
+  const token = localStorage.getItem('lopes_token');
+  const headers: Record<string, string> = {};
+  if (contentType) headers['Content-Type'] = 'application/json';
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
 function MainApp() {
   const { user, loading, setUser } = useAuth();
   const [activeView, setActiveView] = useState('dashboard');
@@ -83,14 +91,15 @@ function MainApp() {
 
     if (healthy) {
       try {
+        const authHeaders = getAuthHeaders(false);
         const [propsRes, usersRes, settingsRes, logsRes, statsRes, journalsRes, scheduleRes] = await Promise.all([
-          fetch('/api/properties').catch(() => null),
-          fetch('/api/users').catch(() => null),
-          fetch('/api/settings').catch(() => null),
-          fetch('/api/logs').catch(() => null),
-          fetch('/api/stats').catch(() => null),
-          fetch('/api/journal').catch(() => null),
-          fetch('/api/schedule').catch(() => null)
+          fetch('/api/properties', { headers: authHeaders }).catch(() => null),
+          fetch('/api/users', { headers: authHeaders }).catch(() => null),
+          fetch('/api/settings', { headers: authHeaders }).catch(() => null),
+          fetch('/api/logs', { headers: authHeaders }).catch(() => null),
+          fetch('/api/stats', { headers: authHeaders }).catch(() => null),
+          fetch('/api/journal', { headers: authHeaders }).catch(() => null),
+          fetch('/api/schedule', { headers: authHeaders }).catch(() => null)
         ]);
 
         if (propsRes && propsRes.ok && (propsRes.headers.get('content-type') || '').includes('json')) {
@@ -243,7 +252,7 @@ function MainApp() {
         if (editingProperty) {
           const res = await fetch(`/api/properties/${editingProperty.id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ ...propData, user_id: targetUserId })
           });
           if (res.ok) {
@@ -253,7 +262,7 @@ function MainApp() {
         } else {
           const res = await fetch('/api/properties', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({ ...propData, user_id: targetUserId })
           });
           if (res.ok) {
@@ -344,7 +353,10 @@ function MainApp() {
     if (!confirm(`Deseja realmente excluir o imóvel ${prop.code}?`)) return;
     if (isBackendHealthy) {
       try {
-        await fetch(`/api/properties/${prop.id}`, { method: 'DELETE' });
+        await fetch(`/api/properties/${prop.id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(false)
+        });
       } catch (e) {
         console.warn('Backend API unavailable, deleting property locally:', e);
       }
@@ -381,7 +393,7 @@ function MainApp() {
       try {
         const res = await fetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(userData)
         });
         const contentType = res.headers.get('content-type') || '';
@@ -442,7 +454,7 @@ function MainApp() {
       try {
         const res = await fetch(`/api/users/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(userData)
         });
         const contentType = res.headers.get('content-type') || '';
@@ -488,7 +500,7 @@ function MainApp() {
       try {
         const res = await fetch(`/api/users/${id}/reset-password`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ newPassword: newPass })
         });
         if (!res.ok) {
@@ -510,7 +522,10 @@ function MainApp() {
     let updatedUserFromBackend: User | null = null;
     if (isBackendHealthy) {
       try {
-        const res = await fetch(`/api/users/${id}/block`, { method: 'PATCH' });
+        const res = await fetch(`/api/users/${id}/block`, {
+          method: 'PATCH',
+          headers: getAuthHeaders(false)
+        });
         if (res.ok) {
           const data = await res.json();
           if (data.user) updatedUserFromBackend = data.user;
@@ -538,7 +553,10 @@ function MainApp() {
     if (!confirm('Tem certeza que deseja excluir este usuário? Todos os imóveis captados por ele serão mantidos no sistema e transferidos para a administração master.')) return;
     if (isBackendHealthy) {
       try {
-        await fetch(`/api/users/${id}`, { method: 'DELETE' });
+        await fetch(`/api/users/${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(false)
+        });
       } catch (e) {
         console.warn('Backend API unavailable, deleting user locally:', e);
       }
@@ -566,7 +584,7 @@ function MainApp() {
       try {
         const res = await fetch('/api/settings', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(newSettings)
         });
         if (res.ok) {
@@ -592,7 +610,7 @@ function MainApp() {
       try {
         const res = await fetch('/api/journal', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(entryData)
         });
         if (res.ok) {
@@ -661,7 +679,7 @@ function MainApp() {
       try {
         const res = await fetch('/api/schedule', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(eventData)
         });
 
@@ -738,7 +756,10 @@ function MainApp() {
   const handleDeleteScheduleEvent = async (id: string) => {
     if (isBackendHealthy) {
       try {
-        await fetch(`/api/schedule/${id}`, { method: 'DELETE' });
+        await fetch(`/api/schedule/${id}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(false)
+        });
       } catch (e) {
         console.warn('Backend API unavailable, deleting event locally:', e);
       }
