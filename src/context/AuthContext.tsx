@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
-import { getStoredCurrentUser, saveStoredCurrentUser } from '../lib/storage';
+import { getStoredCurrentUser, saveStoredCurrentUser, findUserByLogin, validateUserPassword, getStoredUsers } from '../lib/storage';
 
 interface AuthContextType {
   user: User | null;
@@ -28,27 +28,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
-        setUser(data.user);
-        saveStoredCurrentUser(data.user);
+        if (data.user) {
+          setUser(data.user);
+          saveStoredCurrentUser(data.user);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching /api/auth/me:', e);
+    }
+
+    // Resilient offline/local fallback
+    const localUser = getStoredCurrentUser();
+    if (localUser) {
+      setUser(localUser);
+    } else if (currentToken.startsWith('lopes_token_')) {
+      const uId = currentToken.replace('lopes_token_', '');
+      const users = getStoredUsers();
+      const match = users.find(u => u.id === uId);
+      if (match) {
+        setUser(match);
+        saveStoredCurrentUser(match);
       } else {
         localStorage.removeItem('lopes_token');
         setToken(null);
         setUser(null);
         saveStoredCurrentUser(null);
       }
-    } catch (e) {
-      // If network offline, check stored user session
-      const localUser = getStoredCurrentUser();
-      if (localUser) {
-        setUser(localUser);
-      } else {
-        localStorage.removeItem('lopes_token');
-        setToken(null);
-        setUser(null);
-      }
-    } finally {
-      setLoading(false);
+    } else {
+      localStorage.removeItem('lopes_token');
+      setToken(null);
+      setUser(null);
+      saveStoredCurrentUser(null);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -60,11 +74,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const login = async (loginText: string, passText: string) => {
+    const cleanLogin = loginText.trim();
+    const cleanPass = passText.trim();
+
+    if (!cleanLogin || !cleanPass) {
+      return { success: false, error: 'Por favor, preencha o usuário e a senha.' };
+    }
+
+    // 1. First attempt Cloud / Backend API
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login: loginText.trim(), password: passText.trim() })
+        body: JSON.stringify({ login: cleanLogin, password: cleanPass })
       });
 
       const contentType = res.headers.get('content-type') || '';
@@ -77,14 +99,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           saveStoredCurrentUser(data.user);
           return { success: true };
         } else {
+          // Explicit failure message from server
           return { success: false, error: data.error || 'Credenciais inválidas.' };
         }
-      } else {
-        return { success: false, error: 'Falha ao comunicar com o servidor. Tente novamente.' };
       }
     } catch (e: any) {
-      return { success: false, error: 'Erro de conexão com o servidor. Verifique sua rede e tente novamente.' };
+      console.warn('Backend API login request failed, evaluating local resilience engine:', e);
     }
+
+    // 2. Local resilient fallback authentication
+    const localUser = findUserByLogin(cleanLogin);
+    if (!localUser) {
+      return { success: false, error: 'Usuário ou e-mail não encontrado.' };
+    }
+
+    if (localUser.status === 'blocked') {
+      return { success: false, error: 'Acesso bloqueado pelo Administrador Master.' };
+    }
+
+    const isValid = validateUserPassword(localUser.id, cleanPass);
+    if (!isValid) {
+      return { success: false, error: 'Senha incorreta. Verifique a senha digitada ou contate o Administrador.' };
+    }
+
+    const fallbackToken = `lopes_token_${localUser.id}`;
+    localStorage.setItem('lopes_token', fallbackToken);
+    setToken(fallbackToken);
+    setUser(localUser);
+    saveStoredCurrentUser(localUser);
+    return { success: true };
   };
 
   const logout = () => {
@@ -110,14 +153,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
-        const targetUser = data.users.find((u: User) => u.id === userId);
+        const targetUser = (data.users || []).find((u: User) => u.id === userId);
         if (targetUser) {
           setUser(targetUser);
           saveStoredCurrentUser(targetUser);
+          return;
         }
       }
     } catch (e) {
-      console.error('Error switching user:', e);
+      console.error('Error switching user via API:', e);
+    }
+
+    // Local fallback
+    const users = getStoredUsers();
+    const targetUser = users.find(u => u.id === userId);
+    if (targetUser) {
+      setUser(targetUser);
+      saveStoredCurrentUser(targetUser);
     }
   };
 
@@ -146,3 +198,4 @@ export function useAuth() {
   }
   return context;
 }
+

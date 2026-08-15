@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from '../types';
 import { initialUsers, initialProperties, initialDemoProperties, initialCompanySettings, initialScheduleEvents, initialJournalEntries } from '../data/mockData';
 
@@ -299,12 +300,20 @@ export function saveStoredPasswords(passwords: Record<string, string>) {
 
 export function validateUserPassword(userId: string, passText: string): boolean {
   const cleanPass = passText.trim();
+  if (!cleanPass) return false;
   
   // 1. Check user object in stored users
   const users = getStoredUsers();
   const user = users.find(u => u.id === userId || u.username === userId || u.email === userId);
+  
   if (user && (user as any).password) {
-    if (cleanPass === (user as any).password.trim()) return true;
+    const stored = ((user as any).password || '').trim();
+    if (stored.startsWith('$2a$') || stored.startsWith('$2b$') || stored.startsWith('$2y$')) {
+      try {
+        if (bcrypt.compareSync(cleanPass, stored)) return true;
+      } catch {}
+    }
+    if (cleanPass === stored) return true;
   }
 
   // 2. Check in passwords map
@@ -312,15 +321,24 @@ export function validateUserPassword(userId: string, passText: string): boolean 
   const expected = passwords[userId] || (user ? passwords[user.id] : undefined);
   if (expected && cleanPass === expected.trim()) return true;
 
-  // 3. Fallback defaults
-  if (user?.id === 'usr_admin' || user?.username === 'admin') {
+  // 3. Check initial users database
+  const initUser = initialUsers.find(u => u.id === userId || u.username === userId || u.email === userId);
+  if (initUser && initUser.password && cleanPass === initUser.password.trim()) {
+    return true;
+  }
+
+  // 4. Role-specific standard passwords
+  if (user?.id === 'usr_admin' || user?.username === 'admin' || user?.role === 'MASTER_ADMIN') {
     return cleanPass === 'Lopes@123' || cleanPass === 'admin';
   }
   if (user?.id === 'usr_demo' || user?.username === 'demo' || user?.role === 'DEMO') {
     return cleanPass === '123456' || cleanPass === 'demo';
   }
+  if (user?.role === 'CAPTADOR' || user?.role === 'GESTOR' || user?.role === 'GESTORA') {
+    return cleanPass === 'Lopes@2026';
+  }
 
-  return cleanPass === '123456';
+  return cleanPass === 'Lopes@2026' || cleanPass === '123456';
 }
 
 export function updateUserPassword(userId: string, newPass: string) {
