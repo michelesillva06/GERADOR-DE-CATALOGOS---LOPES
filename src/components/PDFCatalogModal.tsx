@@ -12,6 +12,8 @@ interface PDFCatalogModalProps {
   captadores: User[];
   currentCaptador: User;
   companySettings: CompanySettings;
+  initialScope?: 'meus' | 'todos';
+  initialSelectedProps?: Property[];
   onSaveSettings?: (newSettings: Partial<CompanySettings>) => Promise<void>;
   onClose: () => void;
 }
@@ -22,19 +24,23 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   captadores,
   currentCaptador,
   companySettings,
+  initialScope = 'meus',
+  initialSelectedProps,
   onSaveSettings,
   onClose
 }) => {
   const isManagerOrAdmin = currentCaptador.role === 'MASTER_ADMIN' || currentCaptador.role === 'GESTORA' || currentCaptador.role === 'MASTER' || currentCaptador.role === 'GESTOR';
   const isAdmin = currentCaptador.role === 'MASTER_ADMIN' || currentCaptador.role === 'MASTER';
 
-  // Scope: 'meus' (Apenas meus imóveis captados) vs 'todos' (Todos imóveis do sistema)
-  const [scope, setScope] = useState<'meus' | 'todos'>('meus');
+  // Scope: 'meus' (Apenas meus imóveis captados) vs 'todos' (Todos imóveis do sistema / Catálogo Geral)
+  const [scope, setScope] = useState<'meus' | 'todos'>(initialScope);
   const [selectedCaptadorId, setSelectedCaptadorId] = useState(currentCaptador.id);
 
   const selectedCaptador = (captadores.find(c => c.id === selectedCaptadorId) || currentCaptador);
 
-  const [catalogTitle, setCatalogTitle] = useState(`Catálogo Digital - ${selectedCaptador.name}`);
+  const [catalogTitle, setCatalogTitle] = useState(
+    scope === 'todos' ? 'Catálogo Geral de Imóveis - Lopes Manaus' : `Catálogo Digital - ${selectedCaptador.name}`
+  );
   const [purposeFilter, setPurposeFilter] = useState('todos');
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [selectedPropIds, setSelectedPropIds] = useState<string[]>([]);
@@ -53,13 +59,18 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
 
   const activeCoverImage = customCoverImage || officialCoverUrl;
 
-  // Update title and reset custom cover when selected captador changes or modal opens
+  // Sync initial scope on open
   useEffect(() => {
     if (isOpen) {
-      setCatalogTitle(`Catálogo Digital - ${selectedCaptador.name}`);
+      setScope(initialScope);
+      if (initialScope === 'todos') {
+        setCatalogTitle('Catálogo Geral de Imóveis - Lopes Manaus');
+      } else {
+        setCatalogTitle(`Catálogo Digital - ${selectedCaptador.name}`);
+      }
       setCustomCoverImage('');
     }
-  }, [isOpen, selectedCaptadorId]);
+  }, [isOpen, initialScope, selectedCaptadorId]);
 
   // Handle scope base properties
   const myProperties = properties.filter(p =>

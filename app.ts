@@ -19,10 +19,16 @@ const adminApp = getApps().length
       projectId: firebaseConfig.projectId,
     });
 
-// Get Firestore instance
+// Get Firestore instance and configure ignoreUndefinedProperties
 const firestoreDb = firebaseConfig.firestoreDatabaseId
   ? getFirestore(adminApp, firebaseConfig.firestoreDatabaseId)
   : getFirestore(adminApp);
+
+try {
+  firestoreDb.settings({ ignoreUndefinedProperties: true });
+} catch (e) {
+  console.warn('[Firestore] Settings warning:', e);
+}
 
 const firebaseAuth = getAuth();
 
@@ -55,6 +61,26 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 if (!fs.existsSync(COVERS_DIR)) {
   try { fs.mkdirSync(COVERS_DIR, { recursive: true }); } catch {}
+}
+
+/**
+ * Clean undefined properties recursively from objects before Firestore write
+ */
+function cleanFirestoreData(data: any): any {
+  if (data === null || data === undefined) return null;
+  if (Array.isArray(data)) {
+    return data.map(item => cleanFirestoreData(item));
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const clean: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        clean[key] = cleanFirestoreData(value);
+      }
+    }
+    return clean;
+  }
+  return data;
 }
 
 /**
@@ -155,10 +181,11 @@ loadLocalDatabase();
  */
 async function safeFirestoreDocSet(col: any, docId: string, data: any, merge: boolean = true) {
   try {
+    const cleaned = cleanFirestoreData(data);
     if (merge) {
-      await col.doc(docId).set(data, { merge: true });
+      await col.doc(docId).set(cleaned, { merge: true });
     } else {
-      await col.doc(docId).set(data);
+      await col.doc(docId).set(cleaned);
     }
   } catch (err) {
     console.warn(`[Firestore] Set error on ${col.id}/${docId}:`, err);
@@ -167,7 +194,8 @@ async function safeFirestoreDocSet(col: any, docId: string, data: any, merge: bo
 
 async function safeFirestoreDocUpdate(col: any, docId: string, data: any) {
   try {
-    await col.doc(docId).update(data);
+    const cleaned = cleanFirestoreData(data);
+    await col.doc(docId).update(cleaned);
   } catch (err) {
     console.warn(`[Firestore] Update error on ${col.id}/${docId}:`, err);
   }
@@ -865,8 +893,21 @@ app.post('/api/properties/seed-demo', async (req, res) => {
 /**
  * PROPERTIES: PUBLIC CATALOG
  */
-app.get('/api/properties/public/user/:slug', (req, res) => {
+app.get('/api/properties/public/user/:slug', async (req, res) => {
   const slug = req.params.slug.toLowerCase();
+
+  if (isFirestoreConnected) {
+    try {
+      const snap = await propertiesCol.get();
+      if (!snap.empty) {
+        properties = snap.docs.map(d => d.data() as Property);
+      }
+      const uSnap = await usersCol.get();
+      if (!uSnap.empty) {
+        users = uSnap.docs.map(d => d.data() as User);
+      }
+    } catch {}
+  }
 
   if (['geral', 'admin', 'lopes', 'lopesmanaus'].includes(slug)) {
     return res.json({
@@ -927,7 +968,16 @@ app.get('/api/properties/public/user/:slug', (req, res) => {
 /**
  * PROPERTY DETAIL BY IDENTIFIER
  */
-app.get('/api/properties/public/:identifier', (req, res) => {
+app.get('/api/properties/public/:identifier', async (req, res) => {
+  if (isFirestoreConnected) {
+    try {
+      const snap = await propertiesCol.get();
+      if (!snap.empty) {
+        properties = snap.docs.map(d => d.data() as Property);
+      }
+    } catch {}
+  }
+
   const identifier = decodeURIComponent(req.params.identifier).trim().toLowerCase();
   const property = properties.find(p =>
     p.id.toLowerCase() === identifier ||
@@ -984,10 +1034,13 @@ app.post('/api/properties', requireAuth, async (req, res) => {
   const nextNum = properties.length + 1001;
   const code = propData.code || `LOP-${nextNum}`;
 
+  const owner = users.find(u => u.id === targetUserId) || reqUser;
+
   const newProperty: Property = {
     id: `prop_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     code,
     user_id: targetUserId,
+    user_name: owner?.name || reqUser.name,
     title: propData.title,
     description: propData.description || '',
     purpose: propData.purpose || 'Venda',
@@ -1012,6 +1065,14 @@ app.post('/api/properties', requireAuth, async (req, res) => {
       ? propData.images
       : ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'],
     main_image: propData.main_image || (propData.images?.[0]) || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
+    client_name: propData.client_name || undefined,
+    client_cpf_cnpj: propData.client_cpf_cnpj || undefined,
+    client_phone: propData.client_phone || undefined,
+    client_email: propData.client_email || undefined,
+    client_type: propData.client_type || undefined,
+    transaction_date: propData.transaction_date || undefined,
+    transaction_value: propData.transaction_value !== undefined ? Number(propData.transaction_value) : undefined,
+    transaction_notes: propData.transaction_notes || undefined,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
@@ -1020,7 +1081,6 @@ app.post('/api/properties', requireAuth, async (req, res) => {
   await safeFirestoreDocSet(propertiesCol, newProperty.id, newProperty, false);
   saveLocalDatabase();
 
-  const owner = users.find(u => u.id === newProperty.user_id) || reqUser;
   addAuditLog(reqUser.id, reqUser.name, 'Cadastro de Imóvel', `Cadastrou o imóvel ${newProperty.code} (${newProperty.title}) para ${owner.name}`, req);
 
   res.status(201).json({ property: newProperty });

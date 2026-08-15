@@ -59,30 +59,49 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
       }
 
       if (!loadedCaptador) {
-        const users = getStoredUsers();
-        const foundUser = users.find(
-          u =>
-            u.url_slug.toLowerCase() === slug.toLowerCase() ||
-            u.username.toLowerCase() === slug.toLowerCase() ||
-            u.id.toLowerCase() === slug.toLowerCase()
-        );
-
-        if (foundUser) {
-          loadedCaptador = foundUser;
-          const allProps = getStoredProperties();
-          let filteredProps = allProps.filter(p =>
-            p.user_id === foundUser.id ||
-            p.user_id?.toLowerCase() === foundUser.id?.toLowerCase() ||
-            p.user_id?.toLowerCase() === foundUser.username?.toLowerCase() ||
-            p.user_id?.toLowerCase() === foundUser.email?.toLowerCase() ||
-            foundUser.role === 'MASTER_ADMIN' ||
-            foundUser.role === 'GESTOR' ||
-            foundUser.role === 'GESTORA'
+        const cleanSlug = slug.toLowerCase();
+        if (['geral', 'admin', 'lopes', 'lopesmanaus'].includes(cleanSlug)) {
+          loadedCaptador = {
+            id: 'usr_admin',
+            name: 'Lopes Manaus - Catálogo Geral',
+            email: companySettings.email,
+            phone: companySettings.phone,
+            whatsapp: companySettings.whatsapp,
+            position: 'Catálogo Geral de Imóveis',
+            url_slug: 'geral',
+            photo_url: companySettings.logo_url,
+            creci: companySettings.creci_j,
+            instagram: companySettings.instagram,
+            role: 'MASTER_ADMIN',
+            status: 'active'
+          } as User;
+          loadedProps = getStoredProperties();
+        } else {
+          const users = getStoredUsers();
+          const foundUser = users.find(
+            u =>
+              u.url_slug.toLowerCase() === cleanSlug ||
+              u.username.toLowerCase() === cleanSlug ||
+              u.id.toLowerCase() === cleanSlug
           );
-          if (filteredProps.length === 0 && allProps.length > 0) {
-            filteredProps = allProps;
+
+          if (foundUser) {
+            loadedCaptador = foundUser;
+            const allProps = getStoredProperties();
+            let filteredProps = allProps.filter(p =>
+              p.user_id === foundUser.id ||
+              p.user_id?.toLowerCase() === foundUser.id?.toLowerCase() ||
+              p.user_id?.toLowerCase() === foundUser.username?.toLowerCase() ||
+              p.user_id?.toLowerCase() === foundUser.email?.toLowerCase() ||
+              foundUser.role === 'MASTER_ADMIN' ||
+              foundUser.role === 'GESTOR' ||
+              foundUser.role === 'GESTORA'
+            );
+            if (filteredProps.length === 0 && allProps.length > 0) {
+              filteredProps = allProps;
+            }
+            loadedProps = filteredProps;
           }
-          loadedProps = filteredProps;
         }
       }
 

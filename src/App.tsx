@@ -67,6 +67,8 @@ function MainApp() {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [pdfModalScope, setPdfModalScope] = useState<'meus' | 'todos'>('meus');
+  const [pdfPrefilteredProps, setPdfPrefilteredProps] = useState<Property[] | undefined>(undefined);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -883,7 +885,11 @@ function MainApp() {
               properties={properties}
               users={users}
               companySettings={companySettings}
-              onOpenPdfCatalog={() => setIsPdfModalOpen(true)}
+              onOpenPdfCatalog={(prefiltered) => {
+                setPdfModalScope('todos');
+                setPdfPrefilteredProps(prefiltered);
+                setIsPdfModalOpen(true);
+              }}
               onViewProperty={handleViewPropertyDetails}
             />
           )}
@@ -922,7 +928,11 @@ function MainApp() {
                 Gere documentos PDF com capa, QR Code das páginas públicas dos imóveis e dados do captador.
               </p>
               <button
-                onClick={() => setIsPdfModalOpen(true)}
+                onClick={() => {
+                  setPdfModalScope('todos');
+                  setPdfPrefilteredProps(undefined);
+                  setIsPdfModalOpen(true);
+                }}
                 className="px-6 py-3 bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-lg transition"
               >
                 Abrir Gerador de Catálogo PDF
@@ -975,8 +985,13 @@ function MainApp() {
           captadores={users}
           currentCaptador={user}
           companySettings={companySettings}
+          initialScope={pdfModalScope}
+          initialSelectedProps={pdfPrefilteredProps}
           onSaveSettings={handleSaveSettings}
-          onClose={() => setIsPdfModalOpen(false)}
+          onClose={() => {
+            setIsPdfModalOpen(false);
+            setPdfPrefilteredProps(undefined);
+          }}
         />
       )}
 

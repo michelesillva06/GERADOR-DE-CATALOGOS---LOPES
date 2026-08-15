@@ -36,12 +36,13 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
     return properties.filter(p => {
       // Search term
       if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase();
-        const matchesCode = p.code?.toLowerCase().includes(q);
-        const matchesTitle = p.title?.toLowerCase().includes(q);
-        const matchesNeighborhood = p.neighborhood?.toLowerCase().includes(q);
-        const matchesAddress = p.address?.toLowerCase().includes(q);
-        if (!matchesCode && !matchesTitle && !matchesNeighborhood && !matchesAddress) {
+        const q = searchTerm.toLowerCase().trim();
+        const matchesCode = (p.code || '').toLowerCase().includes(q);
+        const matchesTitle = (p.title || '').toLowerCase().includes(q);
+        const matchesNeighborhood = (p.neighborhood || '').toLowerCase().includes(q);
+        const matchesAddress = (p.address || '').toLowerCase().includes(q);
+        const matchesCaptador = (p.user_name || '').toLowerCase().includes(q);
+        if (!matchesCode && !matchesTitle && !matchesNeighborhood && !matchesAddress && !matchesCaptador) {
           return false;
         }
       }
@@ -60,17 +61,23 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
 
       // Captador Responsável
       if (selectedCaptador !== 'todos') {
-        if (p.user_id !== selectedCaptador) return false;
+        const targetCaptador = users.find(u => u.id === selectedCaptador);
+        const matchesId = p.user_id === selectedCaptador || (p.user_id || '').toLowerCase() === selectedCaptador.toLowerCase();
+        const matchesName = targetCaptador && ((p.user_name || '').toLowerCase() === targetCaptador.name.toLowerCase() || (p.user_id || '').toLowerCase() === targetCaptador.username.toLowerCase());
+        if (!matchesId && !matchesName) return false;
       }
 
       // Status (Disponível, Reservado, Vendido, Alugado, Todos)
       if (selectedStatus !== 'todos') {
-        if ((p.status || '').toLowerCase() !== selectedStatus.toLowerCase()) return false;
+        const rawStatus = (p.status || 'Disponível').trim();
+        const normPStatus = rawStatus.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const normSelected = selectedStatus.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (normPStatus !== normSelected) return false;
       }
 
       return true;
     });
-  }, [properties, searchTerm, selectedPurpose, selectedCategory, selectedCaptador, selectedStatus]);
+  }, [properties, users, searchTerm, selectedPurpose, selectedCategory, selectedCaptador, selectedStatus]);
 
   const activeCaptadors = useMemo(() => {
     return users.filter(u => u.status === 'active');
@@ -231,7 +238,12 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProperties.map(property => {
-            const captador = users.find(u => u.id === property.user_id);
+            const captador = users.find(u =>
+              u.id === property.user_id ||
+              (property.user_id && u.id?.toLowerCase() === property.user_id.toLowerCase()) ||
+              (property.user_id && u.username?.toLowerCase() === property.user_id.toLowerCase()) ||
+              (property.user_name && u.name?.toLowerCase() === property.user_name.toLowerCase())
+            );
             const isRent = property.purpose?.toLowerCase().includes('loca') || property.purpose?.toLowerCase().includes('alugu');
 
             return (
