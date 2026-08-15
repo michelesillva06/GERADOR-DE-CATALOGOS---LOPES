@@ -60,7 +60,7 @@ export function exportControlPDF(
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(203, 213, 225);
-      doc.text(`Apresentação: Diretoria Geral | Relatório Gerado por: ${currentUser.name} (${currentUser.position || 'Gestora'}) | Data: ${dateFormatted} | Formato: A4 Horizontal`, 14, 25);
+      doc.text(`Apresentação: Diretoria Geral | Relatório Gerado por: ${currentUser.name} (${currentUser.position || 'Gestor'}) | Data: ${dateFormatted} | Formato: A4 Horizontal`, 14, 25);
     } else {
       doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');

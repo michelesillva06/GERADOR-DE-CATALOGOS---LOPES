@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { User, Property, AuditLog, JournalEntry, ScheduleEvent } from '../types';
 import {
   BookOpen,
@@ -49,7 +49,7 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
   journalEntries,
   onSaveJournal
 }) => {
-  const isMasterOrGestora = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'GESTORA';
+  const isMasterOrGestor = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
 
   // Selected Captador (Gestora can switch to view/edit any captador, captadores view their own)
   const [selectedUserId, setSelectedUserId] = useState<string>(currentUser.id);
@@ -99,6 +99,9 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Ref to track loaded user + date key to PREVENT periodic polling from zeroing user state
+  const lastLoadedKeyRef = useRef<string>('');
 
   // Compute Auto Metrics for selected user & selected date
   const autoMetrics = useMemo(() => {
@@ -156,10 +159,16 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
       status_changes: statusChanges,
       visits_count: visitsCount
     };
-  }, [logs, properties, scheduleEvents, selectedUserId, selectedUser, selectedDate]);
+  }, [logs, properties, scheduleEvents, selectedUserId, selectedUser.name, selectedDate]);
 
-  // Populate form when selected Date / User / Entry changes
+  // Populate form ONLY when selected Date or User changes
   useEffect(() => {
+    const currentKey = `${selectedUserId}_${selectedDate}`;
+    if (lastLoadedKeyRef.current === currentKey) {
+      return; // Keep existing active input state, do not overwrite on periodic 3s background sync
+    }
+    lastLoadedKeyRef.current = currentKey;
+
     if (existingEntry) {
       setLeadsProspectados(existingEntry.leads_prospectados ?? 0);
       setImoveisCaptados(existingEntry.imoveis_captados ?? autoMetrics.properties_created);
@@ -196,7 +205,7 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
         outros: 0
       });
     }
-  }, [existingEntry, selectedDate, selectedUserId, autoMetrics]);
+  }, [selectedDate, selectedUserId, existingEntry, autoMetrics.properties_created, autoMetrics.visits_count]);
 
   const handleAddHighlight = () => {
     setKeyHighlights(prev => [...prev, '']);
@@ -316,18 +325,18 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
         <div className="space-y-1.5 max-w-2xl">
           <div className="inline-flex items-center space-x-2 bg-rose-50 text-[#F10F4D] px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Diário de Trabalho & Captação</span>
+            <span>Diário de Captação</span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Diário de Atividades Diárias (Time de Imóveis Prontos)
+            Diário de Captação
           </h1>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Descreva o que foi realizado no dia, informe canais de prospecção, leads contatados e novos imóveis captados para alimentar o relatório semanal da gestão e diretoria.
+            Registro de atividades, canais de prospecção e novos leads para a gestão e relatórios.
           </p>
         </div>
 
-        {/* Captador Selector (if Gestora/Master) */}
-        {isMasterOrGestora && (
+        {/* Captador Selector (if Gestor/Master) */}
+        {isMasterOrGestor && (
           <div className="w-full md:w-auto bg-slate-50 p-3 rounded-2xl border border-slate-200 shrink-0">
             <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">
               Visualizar/Editar Diário de:
@@ -358,7 +367,7 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
           }`}
         >
           <Edit3 className="w-4 h-4" />
-          <span>Registrar / Editar Diário</span>
+          <span>Registrar Diário</span>
         </button>
 
         <button
@@ -370,10 +379,10 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
           }`}
         >
           <Clock className="w-4 h-4" />
-          <span>Meu Histórico ({userHistory.length})</span>
+          <span>Histórico ({userHistory.length})</span>
         </button>
 
-        {isMasterOrGestora && (
+        {isMasterOrGestor && (
           <button
             onClick={() => setActiveTab('team-feed')}
             className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition flex items-center space-x-2 cursor-pointer ${
@@ -383,7 +392,7 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Feed do Time ({teamFeed.length})</span>
+            <span>Feed da Equipe ({teamFeed.length})</span>
           </button>
         )}
       </div>
@@ -756,7 +765,7 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
                   className="px-6 py-3.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-rose-950/40 transition flex items-center space-x-2 cursor-pointer transform active:scale-95"
                 >
                   <Save className="w-4 h-4" />
-                  <span>{isSaving ? 'Salvando...' : 'Salvar Diário do Dia'}</span>
+                  <span>{isSaving ? 'Salvando...' : 'Salvar Diário'}</span>
                 </button>
               </div>
 
@@ -877,7 +886,7 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
       )}
 
       {/* TEAM FEED TAB */}
-      {activeTab === 'team-feed' && isMasterOrGestora && (
+      {activeTab === 'team-feed' && isMasterOrGestor && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
             <p className="font-bold text-slate-700">

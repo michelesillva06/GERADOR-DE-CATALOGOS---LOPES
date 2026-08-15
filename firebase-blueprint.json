@@ -1,63 +1,118 @@
 {
   "entities": {
-    "users": {
-      "usr_admin": {
-        "id": "usr_admin",
-        "name": "Administrador Lopes",
-        "email": "admin@lopesmanaus.com.br",
-        "username": "admin",
-        "phone": "(92) 99123-4567",
-        "whatsapp": "5592991234567",
-        "role": "ADMIN",
-        "position": "Diretor Geral",
-        "url_slug": "admin",
-        "status": "active",
-        "creci": "1234-J",
-        "instagram": "lopesmanaus"
+    "User": {
+      "title": "User",
+      "description": "System user including admin, gestor, captador",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "role": { "type": "string" },
+        "position": { "type": "string" },
+        "status": { "type": "string" },
+        "creci": { "type": "string" }
       },
-      "usr_larissa": {
-        "id": "usr_larissa",
-        "name": "Larissa Silva",
-        "email": "larissa@lopesmanaus.com.br",
-        "username": "larissa",
-        "phone": "(92) 98111-2233",
-        "whatsapp": "5592981112233",
-        "role": "CAPTADOR",
-        "position": "Corretora e Captadora",
-        "url_slug": "larissa-silva",
-        "status": "active",
-        "creci": "5678-F",
-        "instagram": "larissa.lopes"
-      },
-      "usr_michele": {
-        "id": "usr_michele",
-        "name": "Michele Silva",
-        "email": "michele.sillva06@gmail.com",
-        "username": "michele",
-        "phone": "(92) 99888-7766",
-        "whatsapp": "5592998887766",
-        "role": "GERENTE",
-        "position": "Gerente de Vendas",
-        "url_slug": "michele-silva",
-        "status": "active",
-        "creci": "9012-F",
-        "instagram": "michelesilva.lopes"
-      }
+      "required": ["id", "name", "username", "role"]
     },
-    "settings": {
-      "company": {
-        "id": "company",
-        "companyName": "Lopes Imobiliária - Shopping Ponta Negra",
-        "phone": "(92) 3000-0000",
-        "email": "contato@lopesmanaus.com.br",
-        "whatsapp": "5592991234567",
-        "address": "Av. Coronel Teixeira, 5705 - Ponta Negra, Manaus - AM",
-        "creci": "1234-J",
-        "instagram": "lopesmanaus",
-        "websiteUrl": "https://lopesmanaus.com.br",
-        "lastBackupAt": "2026-08-08T08:00:00.000Z",
-        "backupStatus": "Ativo (Diário no Google Cloud Storage)"
-      }
+    "Property": {
+      "title": "Property",
+      "description": "Real estate property listing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "title": { "type": "string" },
+        "price": { "type": "number" },
+        "user_id": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "code", "title", "user_id", "status"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "Daily captador activity journal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "date": { "type": "string" },
+        "summary_notes": { "type": "string" },
+        "leads_prospectados": { "type": "number" },
+        "imoveis_captados": { "type": "number" },
+        "visitas_realizadas": { "type": "number" }
+      },
+      "required": ["id", "user_id", "date"]
+    },
+    "ScheduleEvent": {
+      "title": "ScheduleEvent",
+      "description": "Calendar event or scheduled visit",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "start_time": { "type": "string" },
+        "user_id": { "type": "string" },
+        "type": { "type": "string" }
+      },
+      "required": ["id", "title", "date", "start_time", "type"]
+    },
+    "CompanySettings": {
+      "title": "CompanySettings",
+      "description": "Company global settings and branding",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "creci": { "type": "string" }
+      },
+      "required": ["companyName"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System activity audit trail",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "action": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "user_id", "action", "description"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/properties/{propertyId}": {
+      "schema": { "$ref": "#/entities/Property" },
+      "description": "Property listings"
+    },
+    "/journal/{entryId}": {
+      "schema": { "$ref": "#/entities/JournalEntry" },
+      "description": "Captador daily journals"
+    },
+    "/schedule/{eventId}": {
+      "schema": { "$ref": "#/entities/ScheduleEvent" },
+      "description": "Schedule events"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/CompanySettings" },
+      "description": "Settings"
+    },
+    "/logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Audit logs"
     }
   }
 }

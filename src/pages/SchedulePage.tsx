@@ -88,7 +88,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
   onAddEvent,
   onDeleteEvent
 }) => {
-  const isMasterOrGestora = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'GESTORA';
+  const isMasterOrGestor = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
 
   // Filters
   const [filterType, setFilterType] = useState<string>('todos');
@@ -214,7 +214,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
     setFormError(null);
 
     if (officialHolidayName && !holidayOverride && formData.type !== 'FERIADO') {
-      setFormError(`Data Bloqueada! Em feriados oficiais (${officialHolidayName}) não é permitido agendar sem autorização prévia da Gestora Larissa Maia. Confirme a caixa de autorização especial para prosseguir.`);
+      setFormError(`Data Bloqueada! Em feriados oficiais (${officialHolidayName}) não é permitido agendar sem autorização prévia da Gestão / Larissa Maia. Confirme a caixa de autorização especial para prosseguir.`);
       return;
     }
 
@@ -474,14 +474,14 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                     {!isHoliday && (
                       <div className="pt-1.5 flex items-center space-x-2 text-[11px] font-bold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60 w-fit">
                         <CheckCircle2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                        <span>Acompanhamento: <strong>Gestora Larissa Maia</strong></span>
+                        <span>Acompanhamento: <strong>Gestão Larissa Maia</strong></span>
                       </div>
                     )}
                   </div>
                 </div>
 
                 {/* Actions */}
-                {!isHoliday && (isMasterOrGestora || event.user_id === currentUser.id) && (
+                {!isHoliday && (isMasterOrGestor || event.user_id === currentUser.id) && (
                   <button
                     onClick={() => onDeleteEvent(event.id)}
                     className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer shrink-0 self-end md:self-center"
@@ -548,7 +548,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                     onChange={(e) => setHolidayOverride(e.target.checked)}
                     className="w-4 h-4 accent-[#F10F4D] rounded"
                   />
-                  <span className="text-[11px]">Confirmo autorização da Gestora Larissa Maia</span>
+                  <span className="text-[11px]">Confirmo autorização da Gestão / Larissa Maia</span>
                 </label>
               </div>
             )}
@@ -669,8 +669,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                 </div>
               )}
 
-              {/* Captador Responsável (Admin/Gestora) */}
-              {isMasterOrGestora && (
+              {/* Captador Responsável (Admin/Gestor) */}
+              {isMasterOrGestor && (
                 <div>
                   <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
                     Captador Responsável

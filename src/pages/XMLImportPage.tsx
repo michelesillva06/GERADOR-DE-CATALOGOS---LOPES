@@ -664,7 +664,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                 >
                   {users.map(u => (
                     <option key={u.id} value={u.id}>
-                      {u.name} ({u.role === 'MASTER_ADMIN' ? 'Admin Master' : u.role === 'GESTORA' ? 'Gestora' : 'Captador'})
+                      {u.name} ({u.role === 'MASTER_ADMIN' ? 'Admin Master' : (u.role === 'GESTOR' || u.role === 'GESTORA') ? 'Gestor' : 'Captador'})
                     </option>
                   ))}
                 </select>

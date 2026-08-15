@@ -34,13 +34,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   if (!user) return null;
 
-  const isMasterOrGestora = user.role === 'MASTER_ADMIN' || user.role === 'GESTORA';
+  const isMaster = user.role === 'MASTER_ADMIN';
+  const isMasterOrGestor = isMaster || user.role === 'GESTOR' || user.role === 'GESTORA';
 
   const secondaryMenuItems = [
-    { id: 'xml-import', label: 'Importar XML', icon: FileCode, show: isMasterOrGestora },
+    { id: 'xml-import', label: 'Importar XML', icon: FileCode, show: isMasterOrGestor },
     { id: 'schedule', label: 'Agenda & Visitas', icon: Calendar, show: true },
-    { id: 'users', label: 'Usuários & Captadores', icon: Users, show: isMasterOrGestora },
-    { id: 'logs', label: 'Histórico & Logs', icon: History, show: isMasterOrGestora },
+    { id: 'users', label: 'Usuários & Captadores', icon: Users, show: isMaster },
+    { id: 'logs', label: 'Histórico & Logs', icon: History, show: isMasterOrGestor },
     { id: 'settings', label: 'Configurações do Perfil', icon: Settings, show: true }
   ];
 

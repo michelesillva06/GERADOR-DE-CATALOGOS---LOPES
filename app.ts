@@ -322,7 +322,37 @@ async function safeFirestoreDocSet(col: any, docId: string, data: any, merge: bo
       }
     }
   } catch (err: any) {
-    // Graceful fallback to persistent JSON storage
+    // Graceful fallback to local persistence
+  }
+}
+
+async function safeFirestoreDocUpdate(col: any, docId: string, data: any) {
+  try {
+    if (isFirestoreConnected) {
+      await col.doc(docId).update(data);
+    }
+  } catch (err: any) {
+    // Graceful fallback to local persistence
+  }
+}
+
+async function safeFirestoreDocDelete(col: any, docId: string) {
+  try {
+    if (isFirestoreConnected) {
+      await col.doc(docId).delete();
+    }
+  } catch (err: any) {
+    // Graceful fallback to local persistence
+  }
+}
+
+async function safeFirestoreBatchCommit(batch: any) {
+  try {
+    if (isFirestoreConnected) {
+      await batch.commit();
+    }
+  } catch (err: any) {
+    // Graceful fallback to local persistence
   }
 }
 
@@ -992,11 +1022,7 @@ app.patch('/api/users/:id/block', async (req, res) => {
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   user.status = user.status === 'active' ? 'blocked' : 'active';
-  try {
-    await usersCol.doc(id).update({ status: user.status });
-  } catch (e) {
-    console.warn('[Firestore] Error updating user status:', e);
-  }
+  await safeFirestoreDocUpdate(usersCol, id, { status: user.status });
   saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Administrador Master', 'Alteração de Status', `Alterou o status do usuário ${user.name} para ${user.status}`, req);
@@ -1027,11 +1053,7 @@ app.delete('/api/users/:id', async (req, res) => {
   });
 
   batch.delete(usersCol.doc(id));
-  try {
-    await batch.commit();
-  } catch (e) {
-    console.warn('[Firestore] Error committing delete user batch:', e);
-  }
+  await safeFirestoreBatchCommit(batch);
 
   users = users.filter(u => u.id !== id);
   saveLocalDatabase();
@@ -1308,11 +1330,7 @@ app.post('/api/properties', async (req, res) => {
   };
 
   properties.unshift(newProperty);
-  try {
-    await propertiesCol.doc(newProperty.id).set(newProperty);
-  } catch (e) {
-    console.warn('[Firestore] Error saving property:', e);
-  }
+  await safeFirestoreDocSet(propertiesCol, newProperty.id, newProperty, false);
   saveLocalDatabase();
 
   const owner = users.find(u => u.id === newProperty.user_id);
@@ -1339,11 +1357,7 @@ app.put('/api/properties/:id', async (req, res) => {
   };
 
   properties[index] = updatedProperty;
-  try {
-    await propertiesCol.doc(id).set(updatedProperty, { merge: true });
-  } catch (e) {
-    console.warn('[Firestore] Error updating property:', e);
-  }
+  await safeFirestoreDocSet(propertiesCol, id, updatedProperty, true);
   saveLocalDatabase();
 
   const owner = users.find(u => u.id === updatedProperty.user_id);
@@ -1359,11 +1373,7 @@ app.delete('/api/properties/:id', async (req, res) => {
   if (!prop) return res.status(404).json({ error: 'Imóvel não encontrado.' });
 
   properties = properties.filter(p => p.id !== id);
-  try {
-    await propertiesCol.doc(id).delete();
-  } catch (e) {
-    console.warn('[Firestore] Error deleting property:', e);
-  }
+  await safeFirestoreDocDelete(propertiesCol, id);
   saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Sistema', 'Exclusão de Imóvel', `Excluiu o imóvel ${prop.code} do Firestore`, req);
@@ -1481,18 +1491,14 @@ app.post('/api/properties/import-xml', async (req, res) => {
 
   // Batch insert into Firestore (limit 450 per batch)
   if (newToInsert.length > 0) {
-    try {
-      const BATCH_SIZE = 400;
-      for (let i = 0; i < newToInsert.length; i += BATCH_SIZE) {
-        const chunk = newToInsert.slice(i, i + BATCH_SIZE);
-        const batch = firestoreDb.batch();
-        chunk.forEach(p => {
-          batch.set(propertiesCol.doc(p.id), p);
-        });
-        await batch.commit();
-      }
-    } catch (e) {
-      console.warn('[Firestore] Error saving imported properties batch:', e);
+    const BATCH_SIZE = 400;
+    for (let i = 0; i < newToInsert.length; i += BATCH_SIZE) {
+      const chunk = newToInsert.slice(i, i + BATCH_SIZE);
+      const batch = firestoreDb.batch();
+      chunk.forEach(p => {
+        batch.set(propertiesCol.doc(p.id), p);
+      });
+      await safeFirestoreBatchCommit(batch);
     }
 
     // Prepend new to properties in memory
@@ -1501,17 +1507,13 @@ app.post('/api/properties/import-xml', async (req, res) => {
 
   // Handle updates in Firestore if any
   if (updatedList.length > 0) {
-    try {
-      const batch = firestoreDb.batch();
-      updatedList.forEach(p => {
-        batch.set(propertiesCol.doc(p.id), p, { merge: true });
-        const idx = properties.findIndex(existing => existing.id === p.id);
-        if (idx !== -1) properties[idx] = p;
-      });
-      await batch.commit();
-    } catch (e) {
-      console.warn('[Firestore] Error updating existing properties batch:', e);
-    }
+    const batch = firestoreDb.batch();
+    updatedList.forEach(p => {
+      batch.set(propertiesCol.doc(p.id), p, { merge: true });
+      const idx = properties.findIndex(existing => existing.id === p.id);
+      if (idx !== -1) properties[idx] = p;
+    });
+    await safeFirestoreBatchCommit(batch);
   }
 
   // Add audit log
@@ -1624,11 +1626,7 @@ app.put('/api/settings', async (req, res) => {
     ...companySettings,
     ...update
   };
-  try {
-    await settingsCol.doc('company').set(companySettings, { merge: true });
-  } catch (e) {
-    console.warn('[Firestore] Error updating settings:', e);
-  }
+  await safeFirestoreDocSet(settingsCol, 'company', companySettings, true);
 
   addAuditLog('usr_admin', 'Administrador Master', 'Configurações', 'Atualizou as configurações da imobiliária no Firestore', req);
   saveLocalDatabase();
@@ -1665,6 +1663,19 @@ app.post('/api/journal', async (req, res) => {
     key_highlights: Array.isArray(data.key_highlights) ? data.key_highlights : [],
     next_day_goals: data.next_day_goals || '',
     rating: data.rating || 'Produtivo',
+    leads_prospectados: Number(data.leads_prospectados) || 0,
+    imoveis_captados: Number(data.imoveis_captados) || 0,
+    visitas_realizadas: Number(data.visitas_realizadas) || 0,
+    canais_captacao: data.canais_captacao || {
+      portal: 0,
+      placa_rua: 0,
+      indicacao: 0,
+      redes_sociais: 0,
+      telefone_ativo: 0,
+      parceria: 0,
+      outros: 0
+    },
+    canal_principal: data.canal_principal || 'Direto / Geral',
     auto_metrics: data.auto_metrics || {
       properties_created: 0,
       properties_updated: 0,
@@ -1681,11 +1692,7 @@ app.post('/api/journal', async (req, res) => {
     journalEntries.unshift(entry);
   }
 
-  try {
-    await journalCol.doc(entry.id).set(entry);
-  } catch (e) {
-    console.warn('[Firestore] Error saving journal entry:', e);
-  }
+  await safeFirestoreDocSet(journalCol, entry.id, entry, false);
   saveLocalDatabase();
 
   res.json({ journal: entry });
@@ -1770,11 +1777,7 @@ app.post('/api/schedule', async (req, res) => {
   };
 
   scheduleEvents.unshift(newEvent);
-  try {
-    await scheduleCol.doc(newEvent.id).set(newEvent);
-  } catch (e) {
-    console.warn('[Firestore] Error saving schedule event:', e);
-  }
+  await safeFirestoreDocSet(scheduleCol, newEvent.id, newEvent, false);
   saveLocalDatabase();
 
   addAuditLog(
@@ -1794,11 +1797,7 @@ app.delete('/api/schedule/:id', async (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Compromisso não encontrado.' });
 
   scheduleEvents = scheduleEvents.filter(e => e.id !== id);
-  try {
-    await scheduleCol.doc(id).delete();
-  } catch (e) {
-    console.warn('[Firestore] Error deleting schedule event:', e);
-  }
+  await safeFirestoreDocDelete(scheduleCol, id);
   saveLocalDatabase();
 
   addAuditLog('usr_admin', 'Sistema', 'Cancelamento de Agendamento', `Cancelou ${existing.type}: "${existing.title}"`, req);

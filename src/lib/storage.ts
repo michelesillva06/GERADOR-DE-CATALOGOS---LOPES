@@ -30,8 +30,8 @@ export function getStoredUsers(): User[] {
             if (!updated[idx].password || updated[idx].password === '123456' || updated[idx].password === 'mudar123') {
               updated[idx].password = initUser.password || 'Lopes@2026';
             }
-            if (initUser.role === 'GESTORA' && updated[idx].role !== 'GESTORA') {
-              updated[idx].role = 'GESTORA';
+            if ((initUser.role === 'GESTOR' || initUser.role === 'GESTORA') && updated[idx].role !== 'GESTOR' && updated[idx].role !== 'GESTORA') {
+              updated[idx].role = 'GESTOR';
             }
           }
         });

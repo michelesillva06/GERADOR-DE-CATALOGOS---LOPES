@@ -39,9 +39,9 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   const [loadingDemo, setLoadingDemo] = useState(false);
 
   const isMaster = currentUser.role === 'MASTER_ADMIN';
-  const isGestora = currentUser.role === 'GESTORA';
+  const isGestor = currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
   const isCaptador = currentUser.role === 'CAPTADOR' || currentUser.role === 'DEMO';
-  const isMasterOrGestora = isMaster || isGestora;
+  const isMasterOrGestor = isMaster || isGestor;
 
   const handleSeedDemoProperties = async () => {
     setLoadingDemo(true);
@@ -104,7 +104,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">
-            {isMaster ? 'Gestão de Imóveis do Sistema' : isGestora ? 'Visualização Geral de Imóveis (Gestora)' : 'Gestão e Catálogo de Imóveis'}
+            {isMaster ? 'Gestão de Imóveis do Sistema' : isGestor ? 'Visualização Geral de Imóveis (Gestor)' : 'Gestão e Catálogo de Imóveis'}
           </h1>
           <p className="text-xs text-slate-500">
             Exibindo {filteredProperties.length} de {baseProperties.length} imóveis cadastrados em Manaus
@@ -112,7 +112,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {isMasterOrGestora && onOpenXmlImport && (
+          {isMasterOrGestor && onOpenXmlImport && (
             <button
               onClick={onOpenXmlImport}
               className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center space-x-1.5 border border-slate-300/80 shadow-2xs transition"
@@ -131,7 +131,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
             <span>Gerar Catálogo PDF</span>
           </button>
 
-          {!isGestora && (
+          {!isGestor && (
             <button
               onClick={onOpenNewPropertyModal}
               className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-rose-900/30 transition transform active:scale-95"
@@ -200,7 +200,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
         {/* Dropdowns row */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
           
-          {isMasterOrGestora && (
+          {isMasterOrGestor && (
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Captador</label>
               <select
@@ -281,7 +281,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProperties.map(prop => {
             const owner = users.find(u => u.id === prop.user_id);
-            const canEdit = isMaster || (!isGestora && isOwnedByCurrentUser(prop));
+            const canEdit = isMaster || (!isGestor && isOwnedByCurrentUser(prop));
             return (
               <PropertyCard
                 key={prop.id}

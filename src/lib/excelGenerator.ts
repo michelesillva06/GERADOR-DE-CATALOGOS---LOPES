@@ -80,7 +80,7 @@ export function exportControlSpreadsheet(
   const resumoData = [
     ["PLANILHA DE CONTROLE E MOVIMENTAÇÃO DE CAPTAÇÃO - LOPES MANAUS"],
     [`Unidade / Imobiliária: ${companySettings.company_name || 'Lopes Manaus'} - ${companySettings.unit_name || 'Shopping Ponta Negra'}`],
-    [`Relatório Gerado por: ${currentUser.name} (${currentUser.position || 'Gestora'})`],
+    [`Relatório Gerado por: ${currentUser.name} (${currentUser.position || 'Gestor'})`],
     [`Destinatário: Diretoria Geral da Imobiliária`],
     [`Data e Hora de Emissão: ${dateFormatted}`],
     [""],

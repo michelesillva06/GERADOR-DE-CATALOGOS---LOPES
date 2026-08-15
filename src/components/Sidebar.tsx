@@ -30,8 +30,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
   if (!user) return null;
 
   const isMaster = user.role === 'MASTER_ADMIN';
-  const isGestora = user.role === 'GESTORA';
-  const isMasterOrGestora = isMaster || isGestora;
+  const isGestor = user.role === 'GESTOR' || user.role === 'GESTORA';
+  const isMasterOrGestor = isMaster || isGestor;
 
   const menuItems = [
     {
@@ -42,13 +42,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
     },
     {
       id: 'properties',
-      label: isMasterOrGestora ? 'Todos os Imóveis' : 'Meus Imóveis',
+      label: isMasterOrGestor ? 'Todos os Imóveis' : 'Meus Imóveis',
       icon: Building2,
       show: true
     },
     {
       id: 'journal',
-      label: 'Diário de Atividades (Dia a Dia)',
+      label: 'Diário de Captação',
       icon: CalendarCheck,
       show: true,
       badge: 'Diário'
@@ -57,14 +57,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       id: 'reports',
       label: 'Relatório Semanal & Diretor',
       icon: BarChart3,
-      show: true,
+      show: isMasterOrGestor,
       badge: 'Semanal'
     },
     {
       id: 'xml-import',
       label: 'Importar XML',
       icon: FileCode,
-      show: isMasterOrGestora,
+      show: isMasterOrGestor,
       badge: 'XML'
     },
     {

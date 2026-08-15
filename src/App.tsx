@@ -629,6 +629,19 @@ function MainApp() {
       key_highlights: entryData.key_highlights || [],
       next_day_goals: entryData.next_day_goals || '',
       rating: entryData.rating || 'Produtivo',
+      leads_prospectados: Number(entryData.leads_prospectados) || 0,
+      imoveis_captados: Number(entryData.imoveis_captados) || 0,
+      visitas_realizadas: Number(entryData.visitas_realizadas) || 0,
+      canais_captacao: entryData.canais_captacao || {
+        portal: 0,
+        placa_rua: 0,
+        indicacao: 0,
+        redes_sociais: 0,
+        telefone_ativo: 0,
+        parceria: 0,
+        outros: 0
+      },
+      canal_principal: entryData.canal_principal || 'Direto / Geral',
       auto_metrics: entryData.auto_metrics || { properties_created: 0, properties_updated: 0, status_changes: 0, visits_count: 0 },
       created_at: idx !== -1 ? currentList[idx].created_at : new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -748,8 +761,8 @@ function MainApp() {
   };
 
   const isMaster = user.role === 'MASTER_ADMIN';
-  const isGestora = user.role === 'GESTORA';
-  const isMasterOrGestora = isMaster || isGestora;
+  const isGestor = user.role === 'GESTOR' || user.role === 'GESTORA';
+  const isMasterOrGestor = isMaster || isGestor;
   const captadorOwner = viewingProperty ? users.find(u => u.id === viewingProperty.user_id) || user : user;
 
   return (
@@ -770,7 +783,7 @@ function MainApp() {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-20 md:pb-8 max-w-7xl mx-auto w-full overflow-x-hidden">
           
           {activeView === 'dashboard' && (
-            isMasterOrGestora ? (
+            isMasterOrGestor ? (
               <MasterDashboard
                 stats={stats}
                 properties={properties}
@@ -833,7 +846,7 @@ function MainApp() {
             />
           )}
 
-          {activeView === 'xml-import' && isMasterOrGestora && (
+          {activeView === 'xml-import' && isMasterOrGestor && (
             <XMLImportPage
               currentUser={user}
               users={users}
@@ -867,7 +880,7 @@ function MainApp() {
             />
           )}
 
-          {activeView === 'reports' && isMasterOrGestora && (
+          {activeView === 'reports' && isMasterOrGestor && (
             <ReportsPage
               properties={properties}
               users={users}

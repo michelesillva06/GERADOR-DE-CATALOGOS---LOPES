@@ -76,6 +76,7 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
             p.user_id?.toLowerCase() === foundUser.username?.toLowerCase() ||
             p.user_id?.toLowerCase() === foundUser.email?.toLowerCase() ||
             foundUser.role === 'MASTER_ADMIN' ||
+            foundUser.role === 'GESTOR' ||
             foundUser.role === 'GESTORA'
           );
           if (filteredProps.length === 0 && allProps.length > 0) {

@@ -71,7 +71,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
   currentUser,
   journalEntries = []
 }) => {
-  const isMasterOrGestora = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'GESTORA';
+  const isMasterOrGestor = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
 
   // Navigation tab in Reports: 'weekly-director' | 'portfolio-strategy' | 'audit-logs'
   const [activeReportTab, setActiveReportTab] = useState<'weekly-director' | 'portfolio-strategy' | 'audit-logs'>('weekly-director');
@@ -491,7 +491,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
   };
 
-  if (!isMasterOrGestora) {
+  if (!isMasterOrGestor) {
     return (
       <div className="bg-white rounded-3xl p-12 border border-slate-200 shadow-xs max-w-xl mx-auto text-center space-y-4">
         <div className="w-16 h-16 rounded-2xl bg-rose-50 text-[#F10F4D] flex items-center justify-center mx-auto">
@@ -499,7 +499,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         </div>
         <h2 className="text-xl font-extrabold text-slate-900">Acesso Restrito à Gestão e Diretoria</h2>
         <p className="text-xs text-slate-500 leading-relaxed">
-          O relatório executivo para a diretoria e levantamento semanal de captação é exclusivo para a <strong>Gerente</strong> e <strong>Administrador Master</strong>.
+          O relatório executivo para a diretoria e levantamento semanal de captação é exclusivo para o <strong>Gestor / Gerente</strong> e <strong>Administrador Master</strong>.
         </p>
       </div>
     );

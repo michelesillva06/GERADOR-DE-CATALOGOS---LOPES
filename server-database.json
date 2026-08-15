@@ -43,14 +43,99 @@
       "phone": "92995046734",
       "whatsapp": "5592995046734",
       "role": "CAPTADOR",
-      "position": "Corretor de Imóveis",
+      "position": "Captadora de Imóveis Prontos",
       "url_slug": "michelesilva",
       "status": "active",
       "photo_url": "",
       "creci": "1234-F/AM",
       "instagram": "",
       "created_at": "2026-08-14T16:22:09.369Z",
-      "password": "123456"
+      "password": "Lopes@2026"
+    },
+    {
+      "id": "usr_larissa",
+      "name": "Larissa Maia",
+      "email": "larissa.maia@lopesmanaus.com.br",
+      "username": "larissamaia",
+      "phone": "(92) 98555-5005",
+      "whatsapp": "5592985555005",
+      "role": "GESTOR",
+      "position": "Gestora de Captação & Imóveis Prontos",
+      "url_slug": "larissamaia",
+      "status": "active",
+      "photo_url": "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=400&q=80",
+      "creci": "3990-F/AM",
+      "instagram": "@larissamaia.lopes",
+      "password": "Lopes@2026",
+      "created_at": "2026-08-15T01:03:33.560Z"
+    },
+    {
+      "id": "usr_tiago",
+      "name": "Tiago Bertges",
+      "email": "tiago.bertges@lopesmanaus.com.br",
+      "username": "tiagobertges",
+      "phone": "(92) 98666-6006",
+      "whatsapp": "5592986666006",
+      "role": "GESTOR",
+      "position": "Gestor de Captação & Imóveis Prontos",
+      "url_slug": "tiagobertges",
+      "status": "active",
+      "photo_url": "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80",
+      "creci": "4120-F/AM",
+      "instagram": "@tiagobertges.lopes",
+      "password": "Lopes@2026",
+      "created_at": "2026-08-15T01:03:33.560Z"
+    },
+    {
+      "id": "usr_martins",
+      "name": "Martins Junior",
+      "email": "martins.junior@lopesmanaus.com.br",
+      "username": "martinsjunior",
+      "phone": "(92) 98222-2002",
+      "whatsapp": "5592982222002",
+      "role": "CAPTADOR",
+      "position": "Captador de Imóveis Prontos",
+      "url_slug": "martinsjunior",
+      "status": "active",
+      "photo_url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80",
+      "creci": "5190-F/AM",
+      "instagram": "@martinsjunior.lopes",
+      "password": "Lopes@2026",
+      "created_at": "2026-08-15T01:03:33.560Z"
+    },
+    {
+      "id": "usr_karine",
+      "name": "Karine Corrêa",
+      "email": "karine.correa@lopesmanaus.com.br",
+      "username": "karinecorrea",
+      "phone": "(92) 98333-3003",
+      "whatsapp": "5592983333003",
+      "role": "CAPTADOR",
+      "position": "Captadora de Imóveis Prontos",
+      "url_slug": "karinecorrea",
+      "status": "active",
+      "photo_url": "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80",
+      "creci": "5340-F/AM",
+      "instagram": "@karinecorrea.lopes",
+      "password": "Lopes@2026",
+      "created_at": "2026-08-15T01:03:33.560Z"
+    },
+    {
+      "id": "usr_rosi",
+      "name": "Rosi Oliveira",
+      "email": "rosi.oliveira@lopesmanaus.com.br",
+      "username": "rosioliveira",
+      "phone": "(92) 98444-4004",
+      "whatsapp": "5592984444004",
+      "role": "CAPTADOR",
+      "position": "Captadora de Imóveis Prontos",
+      "url_slug": "rosioliveira",
+      "status": "active",
+      "photo_url": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80",
+      "creci": "5512-F/AM",
+      "instagram": "@rosioliveira.lopes",
+      "password": "Lopes@2026",
+      "created_at": "2026-08-15T01:03:33.560Z"
     }
   ],
   "properties": [
@@ -336,7 +421,214 @@
       "created_at": "2026-08-14T15:56:32.080Z"
     }
   ],
-  "journalEntries": [],
+  "journalEntries": [
+    {
+      "id": "jrn_1786759104441",
+      "user_id": "usr_1786724529369",
+      "user_name": "Michele Silva",
+      "date": "2026-08-15",
+      "summary_notes": "",
+      "key_highlights": [],
+      "next_day_goals": "",
+      "rating": "Produtivo",
+      "leads_prospectados": 3,
+      "imoveis_captados": 1,
+      "visitas_realizadas": 2,
+      "canais_captacao": {
+        "portal": 0,
+        "placa_rua": 0,
+        "indicacao": 0,
+        "redes_sociais": 0,
+        "telefone_ativo": 0,
+        "parceria": 0,
+        "outros": 0
+      },
+      "canal_principal": "Redes Sociais",
+      "auto_metrics": {
+        "properties_created": 0,
+        "properties_updated": 0,
+        "status_changes": 0,
+        "visits_count": 0
+      },
+      "created_at": "2026-08-15T01:58:24.441Z",
+      "updated_at": "2026-08-15T02:24:44.685Z"
+    },
+    {
+      "id": "jrn_michele_today",
+      "user_id": "usr_michele",
+      "user_name": "Michele Silva",
+      "date": "2026-08-15",
+      "summary_notes": "Prospecção ativa nos condomínios da Ponta Negra e Reserva das Praias. Contato com 8 proprietários e captação de 1 novo apartamento.",
+      "key_highlights": [
+        "Captação de apto de 3 dorms no Reserva das Praias",
+        "8 ligações ativas para proprietários da orla",
+        "Agendamento de 2 visitas de avaliação para amanhã"
+      ],
+      "next_day_goals": "Realizar fotos do apto no Reserva das Praias e contatar carteira de clientes compradores do Adrianópolis.",
+      "rating": "Excelente",
+      "leads_prospectados": 8,
+      "imoveis_captados": 1,
+      "visitas_realizadas": 2,
+      "canais_captacao": {
+        "portal": 0,
+        "placa_rua": 3,
+        "indicacao": 2,
+        "redes_sociais": 1,
+        "telefone_ativo": 2,
+        "parceria": 0,
+        "outros": 0
+      },
+      "canal_principal": "Placa / Prospecção de Rua",
+      "auto_metrics": {
+        "properties_created": 1,
+        "properties_updated": 0,
+        "status_changes": 0,
+        "visits_count": 2
+      },
+      "created_at": "2026-08-15T01:03:33.560Z",
+      "updated_at": "2026-08-15T01:03:33.560Z"
+    },
+    {
+      "id": "jrn_martins_today",
+      "user_id": "usr_martins",
+      "user_name": "Martins Junior",
+      "date": "2026-08-15",
+      "summary_notes": "Trabalho de campo no Adrianópolis e Vieiralves. Abordagem de proprietários em condomínios fechados (Renaissance e Ephigênio Salles).",
+      "key_highlights": [
+        "Captação de casa de alto padrão no Renaissance (R$ 2.4M)",
+        "12 proprietários contatados via telefone e indicações de zeladoria",
+        "1 visita realizada com cliente investidor"
+      ],
+      "next_day_goals": "Pegar documentação da casa do Renaissance e cadastrar na plataforma.",
+      "rating": "Produtivo",
+      "leads_prospectados": 12,
+      "imoveis_captados": 1,
+      "visitas_realizadas": 1,
+      "canais_captacao": {
+        "portal": 2,
+        "placa_rua": 4,
+        "indicacao": 4,
+        "redes_sociais": 0,
+        "telefone_ativo": 2,
+        "parceria": 0,
+        "outros": 0
+      },
+      "canal_principal": "Indicação / Parceiros",
+      "auto_metrics": {
+        "properties_created": 1,
+        "properties_updated": 0,
+        "status_changes": 0,
+        "visits_count": 1
+      },
+      "created_at": "2026-08-15T01:03:33.560Z",
+      "updated_at": "2026-08-15T01:03:33.560Z"
+    },
+    {
+      "id": "jrn_karine_today",
+      "user_id": "usr_karine",
+      "user_name": "Karine Corrêa",
+      "date": "2026-08-15",
+      "summary_notes": "Campanha de captação no Instagram e portais para imóveis no Vieiralves e Dom Pedro. Captação de apartamento no Jardim das Américas.",
+      "key_highlights": [
+        "10 novos leads recebidos pelo Instagram da unidade",
+        "Captação de apartamento reformado no Vieiralves",
+        "3 visitas de avaliação realizadas"
+      ],
+      "next_day_goals": "Publicar tour em vídeo no Instagram e enviar catálogo em PDF para 5 clientes interessados.",
+      "rating": "Excelente",
+      "leads_prospectados": 10,
+      "imoveis_captados": 1,
+      "visitas_realizadas": 3,
+      "canais_captacao": {
+        "portal": 1,
+        "placa_rua": 1,
+        "indicacao": 2,
+        "redes_sociais": 5,
+        "telefone_ativo": 1,
+        "parceria": 0,
+        "outros": 0
+      },
+      "canal_principal": "Instagram / Redes Sociais",
+      "auto_metrics": {
+        "properties_created": 1,
+        "properties_updated": 0,
+        "status_changes": 0,
+        "visits_count": 3
+      },
+      "created_at": "2026-08-15T01:03:33.560Z",
+      "updated_at": "2026-08-15T01:03:33.560Z"
+    },
+    {
+      "id": "jrn_rosi_today",
+      "user_id": "usr_rosi",
+      "user_name": "Rosi Oliveira",
+      "date": "2026-08-15",
+      "summary_notes": "Prospecção ativa no bairro Aleixo e Parque 10. Contato com 7 proprietários e captação de 1 casa térrea.",
+      "key_highlights": [
+        "Captação de casa térrea próxima à Ephigênio Salles",
+        "7 proprietários contatados via telefone ativo e WhatsApp",
+        "Elaboração de avaliação mercadológica para proprietário"
+      ],
+      "next_day_goals": "Concluir captação de 1 sala comercial no Adrianópolis.",
+      "rating": "Produtivo",
+      "leads_prospectados": 7,
+      "imoveis_captados": 1,
+      "visitas_realizadas": 1,
+      "canais_captacao": {
+        "portal": 1,
+        "placa_rua": 2,
+        "indicacao": 1,
+        "redes_sociais": 1,
+        "telefone_ativo": 2,
+        "parceria": 0,
+        "outros": 0
+      },
+      "canal_principal": "Telefone / WhatsApp Ativo",
+      "auto_metrics": {
+        "properties_created": 1,
+        "properties_updated": 0,
+        "status_changes": 0,
+        "visits_count": 1
+      },
+      "created_at": "2026-08-15T01:03:33.560Z",
+      "updated_at": "2026-08-15T01:03:33.560Z"
+    },
+    {
+      "id": "jrn_larissa_today",
+      "user_id": "usr_larissa",
+      "user_name": "Larissa Maia",
+      "date": "2026-08-15",
+      "summary_notes": "Alinhamento matinal com a equipe de Imóveis Prontos. Revisão das metas de prospecção da semana e acompanhamento das captações em andamento.",
+      "key_highlights": [
+        "Reunião de alinhamento com os 4 captadores",
+        "Revisão da precificação de 6 novos imóveis",
+        "Consolidação dos dados para o relatório da Diretoria"
+      ],
+      "next_day_goals": "Gerar o relatório semanal de desempenho e enviar ao Diretor.",
+      "rating": "Excelente",
+      "leads_prospectados": 15,
+      "imoveis_captados": 4,
+      "visitas_realizadas": 7,
+      "canais_captacao": {
+        "portal": 4,
+        "placa_rua": 10,
+        "indicacao": 9,
+        "redes_sociais": 7,
+        "telefone_ativo": 7,
+        "parceria": 0,
+        "outros": 0
+      },
+      "canal_principal": "Supervisão Geral do Time",
+      "auto_metrics": {
+        "properties_created": 4,
+        "properties_updated": 2,
+        "status_changes": 1,
+        "visits_count": 7
+      },
+      "created_at": "2026-08-15T01:03:33.560Z",
+      "updated_at": "2026-08-15T01:03:33.560Z"
+    }
+  ],
   "scheduleEvents": [],
-  "updated_at": "2026-08-14T16:24:47.245Z"
+  "updated_at": "2026-08-15T02:24:44.685Z"
 }

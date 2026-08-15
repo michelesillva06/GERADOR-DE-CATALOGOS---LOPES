@@ -1,4 +1,4 @@
-export type UserRole = 'MASTER_ADMIN' | 'GESTORA' | 'CAPTADOR' | 'DEMO';
+export type UserRole = 'MASTER_ADMIN' | 'GESTOR' | 'GESTORA' | 'CAPTADOR' | 'DEMO';
 export type UserStatus = 'active' | 'blocked';
 
 export interface User {

@@ -258,7 +258,13 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     if (!isMasterUser && (u.role === 'MASTER_ADMIN' || u.username === 'admin')) {
       return false;
     }
-    if (roleFilter !== 'todos' && u.role !== roleFilter) return false;
+    if (roleFilter !== 'todos') {
+      if (roleFilter === 'GESTOR' || roleFilter === 'GESTORA') {
+        if (u.role !== 'GESTOR' && u.role !== 'GESTORA') return false;
+      } else if (u.role !== roleFilter) {
+        return false;
+      }
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       return (
@@ -325,7 +331,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         >
           <option value="todos">Todos os Níveis</option>
           {isMasterUser && <option value="MASTER_ADMIN">Master Admin</option>}
-          <option value="GESTORA">Gestora</option>
+          <option value="GESTOR">Gestor</option>
           <option value="CAPTADOR">Captadores</option>
         </select>
       </div>
@@ -375,9 +381,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                   <td className="p-4">
                     <span className="font-semibold block">{u.position}</span>
                     <span className={`inline-block mt-0.5 text-[10px] font-extrabold px-2 py-0.5 rounded ${
-                      u.role === 'MASTER_ADMIN' ? 'bg-rose-100 text-rose-700' : u.role === 'GESTORA' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'
+                      u.role === 'MASTER_ADMIN' ? 'bg-rose-100 text-rose-700' : (u.role === 'GESTOR' || u.role === 'GESTORA') ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'
                     }`}>
-                      {u.role === 'MASTER_ADMIN' ? 'Master Admin' : u.role === 'GESTORA' ? 'Gestora' : 'Captador'}
+                      {u.role === 'MASTER_ADMIN' ? 'Master Admin' : (u.role === 'GESTOR' || u.role === 'GESTORA') ? 'Gestor' : 'Captador'}
                     </span>
                   </td>
 
@@ -690,14 +696,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRole('GESTORA')}
+                    onClick={() => setRole('GESTOR')}
                     className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold border transition cursor-pointer ${
-                      role === 'GESTORA'
+                      role === 'GESTOR' || role === 'GESTORA'
                         ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow'
                         : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                     }`}
                   >
-                    Gestora
+                    Gestor
                   </button>
                   {isMasterUser && (
                     <button

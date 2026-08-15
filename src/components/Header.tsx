@@ -104,7 +104,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView }) => 
                 <div className="text-left hidden sm:block pr-1">
                   <p className="text-xs font-bold text-slate-900 leading-tight">{user.name}</p>
                   <p className="text-[10px] font-extrabold text-[#F10F4D]">
-                    {user.role === 'MASTER_ADMIN' ? 'Master Admin' : user.role === 'GESTORA' ? 'Gestora' : 'Captador'}
+                    {user.role === 'MASTER_ADMIN' ? 'Master Admin' : (user.role === 'GESTOR' || user.role === 'GESTORA') ? 'Gestor' : 'Captador'}
                   </p>
                 </div>
               </button>
