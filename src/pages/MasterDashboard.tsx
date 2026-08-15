@@ -1,6 +1,7 @@
 import React from 'react';
 import { DashboardStats, Property, User, AuditLog } from '../types';
 import { Users, Building2, CheckCircle2, ShoppingBag, Award, ExternalLink } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface MasterDashboardProps {
   stats: DashboardStats | null;
@@ -21,6 +22,9 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
   onOpenNewUserModal,
   setActiveView
 }) => {
+  const { user } = useAuth();
+  const isMaster = user?.role === 'MASTER_ADMIN';
+
   return (
     <div className="space-y-6">
       
@@ -34,13 +38,15 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setActiveView('xml-import')}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-2 cursor-pointer"
-          >
-            <Building2 className="w-4 h-4 text-[#F10F4D]" />
-            <span>Importar Imóveis (XML)</span>
-          </button>
+          {isMaster && (
+            <button
+              onClick={() => setActiveView('xml-import')}
+              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition flex items-center space-x-2 cursor-pointer"
+            >
+              <Building2 className="w-4 h-4 text-[#F10F4D]" />
+              <span>Importar Imóveis (XML)</span>
+            </button>
+          )}
           <button
             onClick={onOpenNewPropertyModal}
             className="px-4 py-2.5 bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5 cursor-pointer"

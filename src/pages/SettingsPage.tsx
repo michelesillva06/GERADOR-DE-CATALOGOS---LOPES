@@ -19,7 +19,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 }) => {
   // Company Form State
   const [companyForm, setCompanyForm] = useState<CompanySettings>(settings);
-  const isAdmin = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'MASTER' || currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
+  const [isCompanyFormDirty, setIsCompanyFormDirty] = useState(false);
+  const isAdmin = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'MASTER';
   
   // User Profile Form State
   const [name, setName] = useState(currentUser.name || '');
@@ -35,12 +36,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [loading, setLoading] = useState(false);
   const [uploadingCoverField, setUploadingCoverField] = useState<string | null>(null);
 
-  // Sync settings when loaded from cloud/backend
+  // Sync settings when loaded from cloud/backend ONLY if user has NOT modified the form
   React.useEffect(() => {
-    if (settings) {
+    if (settings && !isCompanyFormDirty) {
       setCompanyForm(settings);
     }
-  }, [settings]);
+  }, [settings, isCompanyFormDirty]);
+
+  const updateCompanyField = (field: keyof CompanySettings, value: any) => {
+    setIsCompanyFormDirty(true);
+    setCompanyForm(prev => ({ ...prev, [field]: value }));
+  };
 
   // Re-sync form state ONLY when user ID changes (account switch)
   const currentUserId = currentUser?.id;
@@ -129,6 +135,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       // 1. Save company settings (ONLY if admin)
       if (isAdmin) {
         await onSaveSettings(companyForm);
+        setIsCompanyFormDirty(false);
       }
 
       // 2. Save user profile settings (always)
@@ -369,7 +376,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <input
                   type="text"
                   value={companyForm.company_name}
-                  onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })}
+                  onChange={(e) => updateCompanyField('company_name', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900"
                   required
                 />
@@ -380,7 +387,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <input
                   type="text"
                   value={companyForm.unit_name}
-                  onChange={(e) => setCompanyForm({ ...companyForm, unit_name: e.target.value })}
+                  onChange={(e) => updateCompanyField('unit_name', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                 />
               </div>
@@ -392,7 +399,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <input
                   type="text"
                   value={companyForm.phone}
-                  onChange={(e) => setCompanyForm({ ...companyForm, phone: e.target.value })}
+                  onChange={(e) => updateCompanyField('phone', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                 />
               </div>
@@ -402,7 +409,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <input
                   type="text"
                   value={companyForm.whatsapp}
-                  onChange={(e) => setCompanyForm({ ...companyForm, whatsapp: e.target.value })}
+                  onChange={(e) => updateCompanyField('whatsapp', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                 />
               </div>
@@ -412,7 +419,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <input
                   type="text"
                   value={companyForm.creci_j}
-                  onChange={(e) => setCompanyForm({ ...companyForm, creci_j: e.target.value })}
+                  onChange={(e) => updateCompanyField('creci_j', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                 />
               </div>
@@ -424,7 +431,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <input
                   type="email"
                   value={companyForm.email}
-                  onChange={(e) => setCompanyForm({ ...companyForm, email: e.target.value })}
+                  onChange={(e) => updateCompanyField('email', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                 />
               </div>
@@ -434,7 +441,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <input
                   type="text"
                   value={companyForm.instagram}
-                  onChange={(e) => setCompanyForm({ ...companyForm, instagram: e.target.value })}
+                  onChange={(e) => updateCompanyField('instagram', e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
                 />
               </div>
@@ -445,7 +452,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <input
                 type="text"
                 value={companyForm.address}
-                onChange={(e) => setCompanyForm({ ...companyForm, address: e.target.value })}
+                onChange={(e) => updateCompanyField('address', e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900"
               />
             </div>
