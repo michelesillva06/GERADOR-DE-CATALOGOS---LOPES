@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
 import { buildWhatsAppUrl, getEffectiveWhatsApp } from '../lib/whatsapp';
-import { Building2, PlusCircle, Share2, FileSpreadsheet, ExternalLink, CheckCircle2, Copy } from 'lucide-react';
+import { Building2, PlusCircle, Share2, FileSpreadsheet, ExternalLink, CheckCircle2, Copy, Check, Sparkles } from 'lucide-react';
 
 interface CaptadorDashboardProps {
   user: User;
@@ -27,6 +27,8 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
   onDeleteProperty,
   onShareWhatsApp
 }) => {
+  const [copied, setCopied] = useState(false);
+
   const isOwnedByCurrentUser = (p: Property) =>
     p.user_id === user.id ||
     p.user_id?.toLowerCase() === user.id?.toLowerCase() ||
@@ -43,7 +45,8 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(publicUrl);
-    alert('Link público copiado para a área de transferência!');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const handleShareCatalogWhatsApp = () => {
@@ -96,37 +99,47 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
         </div>
       </div>
 
-      {/* Public Catalog Link Box */}
-      <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Sua Página Pública de Vendas</span>
-          <p className="text-sm font-extrabold text-slate-900 mt-0.5">{publicUrl}</p>
-          <p className="text-xs text-slate-500">Qualquer cliente pode acessar seus imóveis e solicitar atendimento via WhatsApp</p>
+      {/* Public Catalog Action Box */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-[#F10F4D] shrink-0">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900">Catálogo Digital do Captador</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Sua vitrine online com seus imóveis exclusivos para envio a clientes</p>
+          </div>
         </div>
 
-        <div className="flex items-center space-x-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
           <button
             onClick={handleCopyLink}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center space-x-1.5 transition"
+            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition cursor-pointer ${
+              copied
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/90'
+            }`}
+            title="Copiar link da página pública"
           >
-            <Copy className="w-4 h-4" />
-            <span>Copiar Link</span>
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-slate-600" />}
+            <span>{copied ? 'Link Copiado!' : 'Copiar Link'}</span>
           </button>
 
           <button
             onClick={handleShareCatalogWhatsApp}
-            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow transition"
+            className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-xs transition cursor-pointer"
+            title="Enviar catálogo no WhatsApp"
           >
             <Share2 className="w-4 h-4" />
-            <span>Enviar no WhatsApp</span>
+            <span>Enviar via WhatsApp</span>
           </button>
 
           <a
             href={publicUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition"
-            title="Abrir página pública"
+            className="p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition flex items-center justify-center cursor-pointer"
+            title="Abrir página pública em nova aba"
           >
             <ExternalLink className="w-4 h-4" />
           </a>

@@ -13,6 +13,8 @@ import {
   Calendar,
   CalendarCheck,
   History,
+  Copy,
+  Check,
   Share2,
   ExternalLink,
   FileCode,
@@ -33,11 +35,25 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
   const { user } = useAuth();
   const [showDrawer, setShowDrawer] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   if (!user) return null;
 
   const isMaster = user.role === 'MASTER_ADMIN';
   const isMasterOrGestor = isMaster || user.role === 'GESTOR' || user.role === 'GESTORA';
+  const publicUrl = `${window.location.origin}/catalogo/${user.url_slug || user.username}`;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(publicUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleShareWhatsApp = () => {
+    const text = `Olá! Acesse meu catálogo digital de imóveis na Lopes Captação: ${publicUrl}`;
+    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(waUrl, '_blank');
+  };
 
   const menuItems = [
     { id: 'journal', label: 'Diário de Captação', icon: CalendarCheck, show: true, highlight: true },
@@ -134,21 +150,43 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </button>
             </div>
 
-            {/* Public Link Share Banner in Mobile Drawer */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-              <p className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
-                <Share2 className="w-3.5 h-3.5 text-[#F10F4D]" />
-                <span>Seu Catálogo Digital:</span>
-              </p>
-              <a
-                href={`/catalogo/${user.url_slug || user.username}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 text-xs font-extrabold text-[#F10F4D] hover:underline flex items-center space-x-1"
-              >
-                <span>/catalogo/{user.url_slug || user.username}</span>
-                <ExternalLink className="w-3 h-3 ml-1" />
-              </a>
+            {/* Public Link Share Card in Mobile Drawer */}
+            <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-800 flex items-center space-x-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#F10F4D]" />
+                  <span>Catálogo Digital</span>
+                </span>
+                <a
+                  href={`/catalogo/${user.url_slug || user.username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-bold text-[#F10F4D] hover:underline flex items-center space-x-1"
+                >
+                  <span>Abrir</span>
+                  <ExternalLink className="w-3 h-3 ml-0.5" />
+                </a>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <button
+                  onClick={handleCopyLink}
+                  className={`py-2 px-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 border transition cursor-pointer ${
+                    copied
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                  <span>{copied ? 'Copiado!' : 'Copiar Link'}</span>
+                </button>
+                <button
+                  onClick={handleShareWhatsApp}
+                  className="py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-xs transition cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>WhatsApp</span>
+                </button>
+              </div>
             </div>
 
             {/* Menu Buttons */}
