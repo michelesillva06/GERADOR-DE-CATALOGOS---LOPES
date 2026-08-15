@@ -15,15 +15,7 @@ import {
   deleteDoc,
   writeBatch
 } from 'firebase/firestore';
-import { v2 as cloudinary } from 'cloudinary';
 import firebaseConfig from './firebase-applet-config.json';
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-  secure: true
-});
 import { initialUsers, initialProperties, initialDemoProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData';
 import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types';
 
@@ -105,28 +97,28 @@ function verifyPassword(plain: string, storedHashOrPlain: string | undefined): b
 }
 
 /**
- * Saves base64 images to Cloudinary (cloud storage) and returns the permanent public URL.
- * IMPORTANT: never write uploaded images to local disk here — on Vercel (and any serverless
- * host) the filesystem is read-only/ephemeral, so a locally saved file is invisible to every
- * other request and disappears on the next cold start. Cloudinary gives one URL that works
- * for every user, every browser, every deploy.
+ * Saves base64 images to file storage and returns light URL
  */
-async function saveBase64ImageFile(base64Data: string, prefix: string): Promise<string> {
+function saveBase64ImageFile(base64Data: string, prefix: string): string {
   if (!base64Data || !base64Data.startsWith('data:image/')) {
     return base64Data;
   }
   try {
+    const matches = base64Data.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+    if (!matches || matches.length < 3) {
+      return base64Data;
+    }
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1].replace('+xml', '');
+    const dataBuffer = Buffer.from(matches[2], 'base64');
     const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
-    const result = await cloudinary.uploader.upload(base64Data, {
-      folder: 'lopes-catalogos',
-      public_id: safePrefix,
-      overwrite: true,
-      invalidate: true,
-      resource_type: 'image'
-    });
-    return result.secure_url;
+    const filename = `${safePrefix}.${ext}`;
+    const filePath = path.join(COVERS_DIR, filename);
+
+    fs.writeFileSync(filePath, dataBuffer);
+    const timestamp = Date.now();
+    return `/uploads/covers/${filename}?v=${timestamp}`;
   } catch (err) {
-    console.warn(`[Cloudinary] Error uploading image ${prefix}:`, err);
+    console.warn(`[Image Storage] Error saving image ${prefix}:`, err);
     return base64Data;
   }
 }
@@ -1398,7 +1390,7 @@ app.put('/api/settings', requireAuth, async (req, res) => {
   for (const field of imageFields) {
     if (update[field] && typeof update[field] === 'string' && update[field]!.startsWith('data:image/')) {
       const cleanPrefix = (field as string).replace(/^cover_/, '').replace(/_url$/, '');
-      const savedUrl = await saveBase64ImageFile(update[field]!, `cover_${cleanPrefix}`);
+      const savedUrl = saveBase64ImageFile(update[field]!, `cover_${cleanPrefix}`);
       update[field] = savedUrl;
     }
   }
@@ -1433,7 +1425,7 @@ app.post('/api/upload/cover', requireAuth, async (req, res) => {
 
     const field = fieldName || 'cover_horizontal_url';
     const cleanPrefix = field.replace(/^cover_/, '').replace(/_url$/, '');
-    const publicUrl = await saveBase64ImageFile(image, `cover_${cleanPrefix}`);
+    const publicUrl = saveBase64ImageFile(image, `cover_${cleanPrefix}`);
 
     companySettings = {
       ...companySettings,
