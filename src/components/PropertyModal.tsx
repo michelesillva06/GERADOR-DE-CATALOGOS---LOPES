@@ -17,7 +17,9 @@ import {
   Phone,
   Building,
   DollarSign,
-  User as UserIcon
+  User as UserIcon,
+  Edit3,
+  Trash2
 } from 'lucide-react';
 import { generateQRCodeDataUrl } from '../lib/qrCode';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
@@ -29,6 +31,9 @@ interface PropertyModalProps {
   property: Property | null;
   captador?: User | null;
   companySettings?: CompanySettings;
+  canEdit?: boolean;
+  onEdit?: (property: Property) => void;
+  onDelete?: (property: Property) => void;
   onClose: () => void;
 }
 
@@ -36,6 +41,9 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
   property,
   captador,
   companySettings,
+  canEdit = false,
+  onEdit,
+  onDelete,
   onClose
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -396,35 +404,68 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
           </div>
 
           {/* Action CTAs Bottom Bar */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-3">
-            <a
-              href={`/imovel/${encodeURIComponent(property.code || property.id)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center space-x-2 transition border border-slate-300"
-            >
-              <Share2 className="w-4 h-4 text-[#F10F4D]" />
-              <span>Ver Página Pública</span>
-            </a>
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 mt-2">
+            <div className="flex items-center gap-2">
+              {canEdit && onEdit && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onEdit(property);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center space-x-1.5 transition border border-slate-300 cursor-pointer"
+                  title="Editar dados deste imóvel"
+                >
+                  <Edit3 className="w-4 h-4 text-slate-700" />
+                  <span>Editar Imóvel</span>
+                </button>
+              )}
 
-            <button
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-              className="w-full sm:w-auto px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center space-x-2 transition border border-slate-700"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-[#F10F4D]" />
-              <span>{isGeneratingPdf ? 'Gerando PDF...' : 'Baixar Catálogo PDF'}</span>
-            </button>
+              {canEdit && onDelete && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDelete(property);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center space-x-1.5 transition border border-rose-200 cursor-pointer"
+                  title="Excluir este imóvel"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-600" />
+                  <span>Excluir</span>
+                </button>
+              )}
+            </div>
 
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-emerald-900/30 transition transform active:scale-95"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Solicitar Visita via WhatsApp</span>
-            </a>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <a
+                href={`/imovel/${encodeURIComponent(property.code || property.id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center space-x-1.5 transition border border-slate-300"
+              >
+                <Share2 className="w-4 h-4 text-[#F10F4D]" />
+                <span>Página Pública</span>
+              </a>
+
+              <button
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition border border-slate-700 cursor-pointer"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-[#F10F4D]" />
+                <span>{isGeneratingPdf ? 'Gerando PDF...' : 'Baixar PDF'}</span>
+              </button>
+
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-900/20 transition transform active:scale-95"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>WhatsApp</span>
+              </a>
+            </div>
           </div>
 
         </div>

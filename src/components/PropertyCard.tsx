@@ -147,10 +147,14 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
           </div>
 
           {/* Quick Action Buttons */}
-          <div className="flex items-center space-x-1.5">
+          <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
             <button
-              onClick={() => onView(property)}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onView(property);
+              }}
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
               title="Ver Detalhes do Imóvel"
             >
               <Eye className="w-4 h-4" />
@@ -158,8 +162,12 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
 
             {onShareWhatsApp && (
               <button
-                onClick={() => onShareWhatsApp(property)}
-                className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShareWhatsApp(property);
+                }}
+                className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition cursor-pointer"
                 title="Enviar por WhatsApp"
               >
                 <Share2 className="w-4 h-4" />
@@ -168,8 +176,12 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
 
             {canEdit && onEdit && (
               <button
-                onClick={() => onEdit(property)}
-                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 transition"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(property);
+                }}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 transition cursor-pointer"
                 title="Editar Imóvel"
               >
                 <Edit3 className="w-4 h-4" />
@@ -178,8 +190,12 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
 
             {canEdit && onDelete && (
               <button
-                onClick={() => onDelete(property)}
-                className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(property);
+                }}
+                className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
                 title="Excluir Imóvel"
               >
                 <Trash2 className="w-4 h-4" />

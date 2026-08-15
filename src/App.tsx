@@ -352,22 +352,54 @@ function MainApp() {
   };
 
   const handleDeleteProperty = async (prop: Property) => {
-    if (!confirm(`Deseja realmente excluir o imóvel ${prop.code}?`)) return;
+    if (!confirm(`Deseja realmente excluir o imóvel ${prop.code} (${prop.title})? Esta ação não pode ser desfeita.`)) return;
+
+    if (viewingProperty && (viewingProperty.id === prop.id || viewingProperty.code === prop.code)) {
+      setViewingProperty(null);
+    }
+
+    let backendFailed = false;
+    let backendErrorMsg = '';
+
     if (isBackendHealthy) {
       try {
-        await fetch(`/api/properties/${prop.id}`, {
+        const res = await fetch(`/api/properties/${encodeURIComponent(prop.id)}`, {
           method: 'DELETE',
           headers: getAuthHeaders(false)
         });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          backendErrorMsg = errData.error || `Erro ${res.status} ao excluir do servidor.`;
+          backendFailed = true;
+        }
       } catch (e) {
-        console.warn('Backend API unavailable, deleting property locally:', e);
+        console.warn('Backend API error during delete:', e);
       }
     }
 
-    const allProps = getStoredProperties().filter(p => p.id !== prop.id);
+    if (backendFailed && backendErrorMsg) {
+      alert(`Não foi possível excluir o imóvel: ${backendErrorMsg}`);
+      return;
+    }
+
+    const allProps = getStoredProperties().filter(p => p.id !== prop.id && p.code !== prop.code);
     saveStoredProperties(allProps);
     setProperties(allProps);
     setStats(calculateStats(allProps, users));
+
+    const newLog: AuditLog = {
+      id: `log_${Date.now()}`,
+      user_id: user?.id || 'unknown',
+      user_name: user?.name || 'Usuário',
+      action: 'Exclusão de Imóvel',
+      description: `Excluiu o imóvel ${prop.code} - ${prop.title}`,
+      created_at: new Date().toISOString()
+    };
+    const updatedLogs = [newLog, ...logs];
+    saveStoredLogs(updatedLogs);
+    setLogs(updatedLogs);
+
+    window.dispatchEvent(new Event('lopes_properties_updated'));
   };
 
   const handleViewPropertyDetails = (prop: Property) => {
@@ -962,6 +994,14 @@ function MainApp() {
           property={viewingProperty}
           captador={captadorOwner}
           companySettings={companySettings}
+          canEdit={isMaster || isGestor || viewingProperty.user_id === user.id || viewingProperty.user_id?.toLowerCase() === user.id?.toLowerCase() || viewingProperty.user_id?.toLowerCase() === user.username?.toLowerCase() || viewingProperty.user_id?.toLowerCase() === user.email?.toLowerCase()}
+          onEdit={(prop) => {
+            setViewingProperty(null);
+            handleEditProperty(prop);
+          }}
+          onDelete={(prop) => {
+            handleDeleteProperty(prop);
+          }}
           onClose={() => setViewingProperty(null)}
         />
       )}

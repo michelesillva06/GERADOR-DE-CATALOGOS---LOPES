@@ -20,7 +20,8 @@ export function getStoredUsers(): User[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        let updated = [...parsed];
+        // Exclude any demo user
+        let updated = parsed.filter((u: User) => u.id !== 'usr_demo' && u.username !== 'demo' && u.role !== 'DEMO');
         // Ensure all fixed initial users exist in storage
         initialUsers.forEach(initUser => {
           const idx = updated.findIndex((u: User) => u.id === initUser.id || u.username === initUser.username || u.email === initUser.email);
@@ -40,16 +41,18 @@ export function getStoredUsers(): User[] {
         return updated;
       }
     }
-    localStorage.setItem(KEYS.USERS, JSON.stringify(initialUsers));
-    return initialUsers;
+    const cleanInitials = initialUsers.filter(u => u.id !== 'usr_demo' && u.username !== 'demo');
+    localStorage.setItem(KEYS.USERS, JSON.stringify(cleanInitials));
+    return cleanInitials;
   } catch {
-    return initialUsers;
+    return initialUsers.filter(u => u.id !== 'usr_demo' && u.username !== 'demo');
   }
 }
 
 export function saveStoredUsers(users: User[]) {
   try {
-    localStorage.setItem(KEYS.USERS, JSON.stringify(users));
+    const sanitized = users.filter(u => u.id !== 'usr_demo' && u.username !== 'demo');
+    localStorage.setItem(KEYS.USERS, JSON.stringify(sanitized));
   } catch (e) {
     console.error('Failed to save users to localStorage', e);
   }
@@ -61,7 +64,12 @@ export function getStoredProperties(): Property[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        // Filter out demo properties
+        const sanitized = parsed.filter(p => p.user_id !== 'usr_demo' && !p.id.startsWith('prop_demo_') && !p.code?.startsWith('LOP-DEMO'));
+        if (sanitized.length !== parsed.length) {
+          localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(sanitized));
+        }
+        return sanitized;
       }
     }
     return [];
@@ -72,7 +80,8 @@ export function getStoredProperties(): Property[] {
 
 export function saveStoredProperties(properties: Property[]) {
   try {
-    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(properties));
+    const sanitized = properties.filter(p => p.user_id !== 'usr_demo' && !p.id.startsWith('prop_demo_') && !p.code?.startsWith('LOP-DEMO'));
+    localStorage.setItem(KEYS.PROPERTIES, JSON.stringify(sanitized));
   } catch (e) {
     console.error('Failed to save properties to localStorage', e);
   }
@@ -83,20 +92,9 @@ export function normalizePropertyOwners(properties: Property[], users: User[]): 
     return { properties: properties || [], changed: false };
   }
 
-  const activeCaptador = users.find(u => u.role === 'CAPTADOR' && u.status === 'active') || users.find(u => u.status === 'active') || users[0];
   let changed = false;
 
   const normalized = properties.map(p => {
-    // 0. Demo properties always stay with usr_demo
-    if (p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_')) {
-      const demoUser = users.find(u => u.id === 'usr_demo' || u.username === 'demo' || u.role === 'DEMO');
-      if (demoUser && p.user_id !== demoUser.id) {
-        changed = true;
-        return { ...p, user_id: demoUser.id };
-      }
-      return { ...p, user_id: 'usr_demo' };
-    }
-
     // 1. Direct match with user ID
     const directUser = users.find(u => u.id === p.user_id || u.id?.toLowerCase() === p.user_id?.toLowerCase());
     if (directUser) {

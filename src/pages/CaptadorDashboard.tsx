@@ -33,8 +33,7 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
     p.user_id === user.id ||
     p.user_id?.toLowerCase() === user.id?.toLowerCase() ||
     p.user_id?.toLowerCase() === user.username?.toLowerCase() ||
-    p.user_id?.toLowerCase() === user.email?.toLowerCase() ||
-    ((user.role === 'DEMO' || user.id === 'usr_demo') && (p.user_id === 'usr_demo' || p.id.startsWith('prop_demo_')));
+    p.user_id?.toLowerCase() === user.email?.toLowerCase();
 
   const myProperties = properties.filter(isOwnedByCurrentUser);
 

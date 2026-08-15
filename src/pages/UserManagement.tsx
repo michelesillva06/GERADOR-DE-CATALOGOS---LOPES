@@ -255,6 +255,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const isMasterUser = currentUser?.role === 'MASTER_ADMIN';
 
   const filteredUsers = users.filter(u => {
+    if (u.id === 'usr_demo' || u.username === 'demo' || u.role === 'DEMO') {
+      return false;
+    }
     if (!isMasterUser && (u.role === 'MASTER_ADMIN' || u.username === 'admin')) {
       return false;
     }

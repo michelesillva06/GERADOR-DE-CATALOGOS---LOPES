@@ -80,7 +80,7 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
   }, [properties, users, searchTerm, selectedPurpose, selectedCategory, selectedCaptador, selectedStatus]);
 
   const activeCaptadors = useMemo(() => {
-    return users.filter(u => u.status === 'active');
+    return users.filter(u => u.status === 'active' && u.id !== 'usr_demo' && u.username !== 'demo' && u.role !== 'DEMO');
   }, [users]);
 
   return (
