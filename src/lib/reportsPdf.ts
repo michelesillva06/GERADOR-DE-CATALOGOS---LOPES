@@ -363,44 +363,6 @@ export function exportControlPDF(
     currentY = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  // -------------------------------------------------------------
-  // SECTION 5: HISTÓRICO RECENTE DE AUDITORIA
-  // -------------------------------------------------------------
-  if (currentY > 150) {
-    doc.addPage();
-    drawHeader(false);
-    currentY = 24;
-  }
-
-  doc.setTextColor(15, 23, 42);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('5. REGISTRO RECENTE DE AUDITORIA E MOVIMENTAÇÕES DIVERSIFICADAS', 14, currentY);
-  currentY += 4;
-
-  const logsBody = logs.slice(0, 12).map(l => [
-    formatDate(l.created_at),
-    l.user_name || 'Sistema',
-    l.action || 'Atualização',
-    l.description || '-'
-  ]);
-
-  autoTable(doc, {
-    startY: currentY,
-    head: [['Data / Hora', 'Captador Responsável', 'Tipo de Ação', 'Descrição do Evento']],
-    body: logsBody.length > 0 ? logsBody : [['-', 'Sistema', 'Aviso', 'Nenhuma movimentação registrada recentemente']],
-    theme: 'striped',
-    headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7 },
-    bodyStyles: { fontSize: 6.5, textColor: [30, 41, 59] },
-    columnStyles: {
-      0: { cellWidth: 32 },
-      1: { cellWidth: 40, fontStyle: 'bold' },
-      2: { cellWidth: 35 },
-      3: { cellWidth: 'auto' }
-    },
-    margin: { left: 14, right: 14 }
-  });
-
   // Footer Signature & Page Numbering across all pages
   const totalPages = doc.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {

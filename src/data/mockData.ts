@@ -38,6 +38,108 @@ export const initialUsers: User[] = [
     created_at: new Date().toISOString()
   },
   {
+    id: 'usr_larissa',
+    name: 'Larissa Maia',
+    email: 'larissa.maia@lopesmanaus.com.br',
+    username: 'larissamaia',
+    phone: '(92) 98555-5005',
+    whatsapp: '5592985555005',
+    role: 'GESTORA',
+    position: 'Gerente de Captação & Imóveis Prontos',
+    url_slug: 'larissamaia',
+    status: 'active',
+    photo_url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=400&q=80',
+    creci: '3990-F/AM',
+    instagram: '@larissamaia.lopes',
+    password: 'Lopes@2026',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'usr_tiago',
+    name: 'Tiago Bertges',
+    email: 'tiago.bertges@lopesmanaus.com.br',
+    username: 'tiagobertges',
+    phone: '(92) 98666-6006',
+    whatsapp: '5592986666006',
+    role: 'GESTORA',
+    position: 'Gestor de Captação & Imóveis Prontos',
+    url_slug: 'tiagobertges',
+    status: 'active',
+    photo_url: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=400&q=80',
+    creci: '4120-F/AM',
+    instagram: '@tiagobertges.lopes',
+    password: 'Lopes@2026',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'usr_michele',
+    name: 'Michele Silva',
+    email: 'michele.silva@lopesmanaus.com.br',
+    username: 'michelesilva',
+    phone: '(92) 99504-6734',
+    whatsapp: '5592995046734',
+    role: 'CAPTADOR',
+    position: 'Captadora de Imóveis Prontos',
+    url_slug: 'michelesilva',
+    status: 'active',
+    photo_url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80',
+    creci: '4821-F/AM',
+    instagram: '@michelesilva.lopes',
+    password: 'Lopes@2026',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'usr_martins',
+    name: 'Martins Junior',
+    email: 'martins.junior@lopesmanaus.com.br',
+    username: 'martinsjunior',
+    phone: '(92) 98222-2002',
+    whatsapp: '5592982222002',
+    role: 'CAPTADOR',
+    position: 'Captador de Imóveis Prontos',
+    url_slug: 'martinsjunior',
+    status: 'active',
+    photo_url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=400&q=80',
+    creci: '5190-F/AM',
+    instagram: '@martinsjunior.lopes',
+    password: 'Lopes@2026',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'usr_karine',
+    name: 'Karine Corrêa',
+    email: 'karine.correa@lopesmanaus.com.br',
+    username: 'karinecorrea',
+    phone: '(92) 98333-3003',
+    whatsapp: '5592983333003',
+    role: 'CAPTADOR',
+    position: 'Captadora de Imóveis Prontos',
+    url_slug: 'karinecorrea',
+    status: 'active',
+    photo_url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=400&q=80',
+    creci: '5340-F/AM',
+    instagram: '@karinecorrea.lopes',
+    password: 'Lopes@2026',
+    created_at: new Date().toISOString()
+  },
+  {
+    id: 'usr_rosi',
+    name: 'Rosi Oliveira',
+    email: 'rosi.oliveira@lopesmanaus.com.br',
+    username: 'rosioliveira',
+    phone: '(92) 98444-4004',
+    whatsapp: '5592984444004',
+    role: 'CAPTADOR',
+    position: 'Captadora de Imóveis Prontos',
+    url_slug: 'rosioliveira',
+    status: 'active',
+    photo_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=400&q=80',
+    creci: '5512-F/AM',
+    instagram: '@rosioliveira.lopes',
+    password: 'Lopes@2026',
+    created_at: new Date().toISOString()
+  },
+  {
     id: 'usr_demo',
     name: 'Demonstração & Testes',
     email: 'demo@lopesmanaus.com.br',
@@ -192,7 +294,129 @@ export const initialDemoProperties: Property[] = [
   }
 ];
 
-export const initialProperties: Property[] = [];
+export const initialProperties: Property[] = [
+  {
+    id: 'prop_michele_1',
+    code: 'LOP-MC01',
+    user_id: 'usr_michele',
+    user_name: 'Michele Silva',
+    title: 'Apartamento Reserva das Praias Ponta Negra',
+    description: 'Excelente apartamento com 3 dormitórios, varanda com churrasqueira, vista para a orla da Ponta Negra e 2 vagas.',
+    purpose: 'Venda',
+    category: 'Apartamento',
+    status: 'Disponível',
+    price: 680000,
+    condo_fee: 650,
+    iptu: 1100,
+    neighborhood: 'Ponta Negra',
+    city: 'Manaus',
+    state: 'AM',
+    address: 'Av. Coronel Teixeira, Ponta Negra',
+    bedrooms: 3,
+    suites: 1,
+    bathrooms: 2,
+    parking_spaces: 2,
+    total_area: 85,
+    built_area: 85,
+    features: ['Piscina', 'Churrasqueira', 'Varanda Gourmet', 'Academia', 'Segurança 24h'],
+    main_image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+    images: ['https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80'],
+    views: 32,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'prop_martins_1',
+    code: 'LOP-MJ01',
+    user_id: 'usr_martins',
+    user_name: 'Martins Junior',
+    title: 'Casa Duplex no Condomínio Renaissance Adrianópolis',
+    description: 'Casa de alto padrão com 4 suítes, acabamento em porcelanato e granito, área gourmet completa e piscina privativa.',
+    purpose: 'Venda',
+    category: 'Casa em Condomínio',
+    status: 'Disponível',
+    price: 2400000,
+    condo_fee: 1400,
+    iptu: 2800,
+    neighborhood: 'Adrianópolis',
+    city: 'Manaus',
+    state: 'AM',
+    address: 'Rua Dom Pedro, Adrianópolis',
+    bedrooms: 4,
+    suites: 4,
+    bathrooms: 5,
+    parking_spaces: 4,
+    total_area: 360,
+    built_area: 320,
+    features: ['Piscina', 'Área Gourmet', 'Suíte Master', 'Condomínio Fechado'],
+    main_image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+    images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'],
+    views: 45,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'prop_karine_1',
+    code: 'LOP-KC01',
+    user_id: 'usr_karine',
+    user_name: 'Karine Corrêa',
+    title: 'Apartamento Jardim das Américas Vieiralves',
+    description: 'Apartamento reformado com 3 suítes, móveis planejados em todos os ambientes e varanda estendida.',
+    purpose: 'Venda e Locação',
+    category: 'Apartamento',
+    status: 'Disponível',
+    price: 950000,
+    rent_price: 6500,
+    condo_fee: 900,
+    iptu: 1500,
+    neighborhood: 'Nossa Senhora das Graças',
+    city: 'Manaus',
+    state: 'AM',
+    address: 'Rua Rio Mar, Vieiralves',
+    bedrooms: 3,
+    suites: 3,
+    bathrooms: 4,
+    parking_spaces: 2,
+    total_area: 135,
+    built_area: 135,
+    features: ['Mobiliado', 'Armários Planejados', 'Varanda Integrada', 'Piscina'],
+    main_image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
+    images: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'],
+    views: 29,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'prop_rosi_1',
+    code: 'LOP-RO01',
+    user_id: 'usr_rosi',
+    user_name: 'Rosi Oliveira',
+    title: 'Casa Térrea Residencial Ephigênio Salles Aleixo',
+    description: 'Excelente casa térrea com amplo quintal, 3 dormitórios sendo 2 suítes, área de lazer e garagem coberta.',
+    purpose: 'Venda',
+    category: 'Casa',
+    status: 'Disponível',
+    price: 1350000,
+    condo_fee: 0,
+    iptu: 1600,
+    neighborhood: 'Aleixo',
+    city: 'Manaus',
+    state: 'AM',
+    address: 'Próximo à Av. Ephigênio Salles',
+    bedrooms: 3,
+    suites: 2,
+    bathrooms: 3,
+    parking_spaces: 3,
+    total_area: 300,
+    built_area: 190,
+    features: ['Quintal Amplo', 'Churrasqueira', 'Garagem Coberta'],
+    main_image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
+    images: ['https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80'],
+    views: 38,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
 
 export const initialAuditLogs: AuditLog[] = [
   {
@@ -200,13 +424,189 @@ export const initialAuditLogs: AuditLog[] = [
     user_id: 'usr_admin',
     user_name: 'Administrador Master',
     action: 'Inicialização do Sistema',
-    description: 'Sistema inicializado e zerado. Pronto para início de cadastros em produção.',
+    description: 'Sistema inicializado com perfis de Gestores e Captadores de Imóveis Prontos.',
     created_at: new Date().toISOString()
   }
 ];
 
 export const initialScheduleEvents: any[] = [];
 
-export const initialJournalEntries: any[] = [];
+export const initialJournalEntries: any[] = [
+  {
+    id: 'jrn_michele_today',
+    user_id: 'usr_michele',
+    user_name: 'Michele Silva',
+    date: new Date().toISOString().split('T')[0],
+    summary_notes: 'Prospecção ativa nos condomínios da Ponta Negra e Reserva das Praias. Contato com 8 proprietários e captação de 1 novo apartamento.',
+    key_highlights: [
+      'Captação de apto de 3 dorms no Reserva das Praias',
+      '8 ligações ativas para proprietários da orla',
+      'Agendamento de 2 visitas de avaliação para amanhã'
+    ],
+    next_day_goals: 'Realizar fotos do apto no Reserva das Praias e contatar carteira de clientes compradores do Adrianópolis.',
+    rating: 'Excelente',
+    leads_prospectados: 8,
+    imoveis_captados: 1,
+    visitas_realizadas: 2,
+    canais_captacao: {
+      portal: 0,
+      placa_rua: 3,
+      indicacao: 2,
+      redes_sociais: 1,
+      telefone_ativo: 2,
+      parceria: 0,
+      outros: 0
+    },
+    canal_principal: 'Placa / Prospecção de Rua',
+    auto_metrics: {
+      properties_created: 1,
+      properties_updated: 0,
+      status_changes: 0,
+      visits_count: 2
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'jrn_martins_today',
+    user_id: 'usr_martins',
+    user_name: 'Martins Junior',
+    date: new Date().toISOString().split('T')[0],
+    summary_notes: 'Trabalho de campo no Adrianópolis e Vieiralves. Abordagem de proprietários em condomínios fechados (Renaissance e Ephigênio Salles).',
+    key_highlights: [
+      'Captação de casa de alto padrão no Renaissance (R$ 2.4M)',
+      '12 proprietários contatados via telefone e indicações de zeladoria',
+      '1 visita realizada com cliente investidor'
+    ],
+    next_day_goals: 'Pegar documentação da casa do Renaissance e cadastrar na plataforma.',
+    rating: 'Produtivo',
+    leads_prospectados: 12,
+    imoveis_captados: 1,
+    visitas_realizadas: 1,
+    canais_captacao: {
+      portal: 2,
+      placa_rua: 4,
+      indicacao: 4,
+      redes_sociais: 0,
+      telefone_ativo: 2,
+      parceria: 0,
+      outros: 0
+    },
+    canal_principal: 'Indicação / Parceiros',
+    auto_metrics: {
+      properties_created: 1,
+      properties_updated: 0,
+      status_changes: 0,
+      visits_count: 1
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'jrn_karine_today',
+    user_id: 'usr_karine',
+    user_name: 'Karine Corrêa',
+    date: new Date().toISOString().split('T')[0],
+    summary_notes: 'Campanha de captação no Instagram e portais para imóveis no Vieiralves e Dom Pedro. Captação de apartamento no Jardim das Américas.',
+    key_highlights: [
+      '10 novos leads recebidos pelo Instagram da unidade',
+      'Captação de apartamento reformado no Vieiralves',
+      '3 visitas de avaliação realizadas'
+    ],
+    next_day_goals: 'Publicar tour em vídeo no Instagram e enviar catálogo em PDF para 5 clientes interessados.',
+    rating: 'Excelente',
+    leads_prospectados: 10,
+    imoveis_captados: 1,
+    visitas_realizadas: 3,
+    canais_captacao: {
+      portal: 1,
+      placa_rua: 1,
+      indicacao: 2,
+      redes_sociais: 5,
+      telefone_ativo: 1,
+      parceria: 0,
+      outros: 0
+    },
+    canal_principal: 'Instagram / Redes Sociais',
+    auto_metrics: {
+      properties_created: 1,
+      properties_updated: 0,
+      status_changes: 0,
+      visits_count: 3
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'jrn_rosi_today',
+    user_id: 'usr_rosi',
+    user_name: 'Rosi Oliveira',
+    date: new Date().toISOString().split('T')[0],
+    summary_notes: 'Prospecção ativa no bairro Aleixo e Parque 10. Contato com 7 proprietários e captação de 1 casa térrea.',
+    key_highlights: [
+      'Captação de casa térrea próxima à Ephigênio Salles',
+      '7 proprietários contatados via telefone ativo e WhatsApp',
+      'Elaboração de avaliação mercadológica para proprietário'
+    ],
+    next_day_goals: 'Concluir captação de 1 sala comercial no Adrianópolis.',
+    rating: 'Produtivo',
+    leads_prospectados: 7,
+    imoveis_captados: 1,
+    visitas_realizadas: 1,
+    canais_captacao: {
+      portal: 1,
+      placa_rua: 2,
+      indicacao: 1,
+      redes_sociais: 1,
+      telefone_ativo: 2,
+      parceria: 0,
+      outros: 0
+    },
+    canal_principal: 'Telefone / WhatsApp Ativo',
+    auto_metrics: {
+      properties_created: 1,
+      properties_updated: 0,
+      status_changes: 0,
+      visits_count: 1
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'jrn_larissa_today',
+    user_id: 'usr_larissa',
+    user_name: 'Larissa Maia',
+    date: new Date().toISOString().split('T')[0],
+    summary_notes: 'Alinhamento matinal com a equipe de Imóveis Prontos. Revisão das metas de prospecção da semana e acompanhamento das captações em andamento.',
+    key_highlights: [
+      'Reunião de alinhamento com os 4 captadores',
+      'Revisão da precificação de 6 novos imóveis',
+      'Consolidação dos dados para o relatório da Diretoria'
+    ],
+    next_day_goals: 'Gerar o relatório semanal de desempenho e enviar ao Diretor.',
+    rating: 'Excelente',
+    leads_prospectados: 15,
+    imoveis_captados: 4,
+    visitas_realizadas: 7,
+    canais_captacao: {
+      portal: 4,
+      placa_rua: 10,
+      indicacao: 9,
+      redes_sociais: 7,
+      telefone_ativo: 7,
+      parceria: 0,
+      outros: 0
+    },
+    canal_principal: 'Supervisão Geral do Time',
+    auto_metrics: {
+      properties_created: 4,
+      properties_updated: 2,
+      status_changes: 1,
+      visits_count: 7
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
 
 

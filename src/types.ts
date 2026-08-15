@@ -154,6 +154,19 @@ export interface JournalEntry {
   key_highlights: string[];
   next_day_goals: string;
   rating?: 'Produtivo' | 'Excelente' | 'Desafiador' | 'Regular';
+  leads_prospectados?: number;
+  imoveis_captados?: number;
+  visitas_realizadas?: number;
+  canais_captacao?: {
+    portal?: number;
+    placa_rua?: number;
+    indicacao?: number;
+    redes_sociais?: number;
+    telefone_ativo?: number;
+    parceria?: number;
+    outros?: number;
+  };
+  canal_principal?: string;
   auto_metrics?: {
     properties_created: number;
     properties_updated: number;

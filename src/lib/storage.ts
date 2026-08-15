@@ -19,19 +19,23 @@ export function getStoredUsers(): User[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Ensure admin and demo exist
-        const hasAdmin = parsed.some((u: User) => u.id === 'usr_admin' || u.username === 'admin');
-        const hasDemo = parsed.some((u: User) => u.id === 'usr_demo' || u.username === 'demo');
         let updated = [...parsed];
-        if (!hasAdmin && initialUsers[0]) {
-          updated.unshift(initialUsers[0]);
-        }
-        if (!hasDemo && initialUsers[1]) {
-          updated.push(initialUsers[1]);
-        }
-        if (updated.length !== parsed.length) {
-          localStorage.setItem(KEYS.USERS, JSON.stringify(updated));
-        }
+        // Ensure all fixed initial users exist in storage
+        initialUsers.forEach(initUser => {
+          const idx = updated.findIndex((u: User) => u.id === initUser.id || u.username === initUser.username || u.email === initUser.email);
+          if (idx === -1) {
+            updated.push(initUser);
+          } else {
+            // Ensure correct role, password & status for fixed users
+            if (!updated[idx].password || updated[idx].password === '123456' || updated[idx].password === 'mudar123') {
+              updated[idx].password = initUser.password || 'Lopes@2026';
+            }
+            if (initUser.role === 'GESTORA' && updated[idx].role !== 'GESTORA') {
+              updated[idx].role = 'GESTORA';
+            }
+          }
+        });
+        localStorage.setItem(KEYS.USERS, JSON.stringify(updated));
         return updated;
       }
     }

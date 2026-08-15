@@ -76,11 +76,24 @@ function loadLocalDatabase() {
     console.warn('[Server DB] Error reading local database file:', e);
   }
 
-  // Ensure admin user exists with MASTER_ADMIN and Lopes@123
+  // Ensure all initial users exist with correct roles and passwords
+  initialUsers.forEach(initUser => {
+    const idx = users.findIndex(u => u.id === initUser.id || u.username === initUser.username || u.email === initUser.email);
+    if (idx === -1) {
+      users.push({ ...initUser });
+    } else {
+      if (initUser.role) users[idx].role = initUser.role;
+      if (initUser.password && (!users[idx].password || users[idx].password === '123456' || users[idx].password === 'mudar123')) {
+        users[idx].password = initUser.password;
+      }
+      if (initUser.position) users[idx].position = initUser.position;
+      if (initUser.name) users[idx].name = initUser.name;
+    }
+  });
+
+  // Ensure admin user exists with MASTER_ADMIN
   const adminIdx = users.findIndex(u => u.username === 'admin' || u.id === 'usr_admin');
-  if (adminIdx === -1) {
-    users.unshift(initialUsers[0]);
-  } else {
+  if (adminIdx !== -1) {
     users[adminIdx].role = 'MASTER_ADMIN';
     if (!users[adminIdx].password || users[adminIdx].password === 'admin') {
       users[adminIdx].password = 'Lopes@123';
@@ -89,9 +102,7 @@ function loadLocalDatabase() {
 
   // Ensure demo user exists with DEMO role and 123456
   const demoIdx = users.findIndex(u => u.username === 'demo' || u.id === 'usr_demo');
-  if (demoIdx === -1) {
-    users.push(initialUsers[1]);
-  } else {
+  if (demoIdx !== -1) {
     users[demoIdx].role = 'DEMO';
     users[demoIdx].is_demo = true;
     if (!users[demoIdx].password || users[demoIdx].password === 'demo') {
@@ -99,13 +110,17 @@ function loadLocalDatabase() {
     }
   }
 
-  // Ensure initial demo properties exist if property list is empty
+  // Ensure initial properties exist if property list is empty
   if (properties.length === 0) {
-    properties = [...initialDemoProperties];
+    properties = [...initialDemoProperties, ...initialProperties];
   }
   if (auditLogs.length === 0) {
     auditLogs = [...initialAuditLogs];
   }
+  if (journalEntries.length === 0) {
+    journalEntries = [...initialJournalEntries];
+  }
+  saveLocalDatabase();
 }
 
 function saveLocalDatabase() {

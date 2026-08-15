@@ -13,7 +13,9 @@ import {
   ExternalLink,
   BookOpen,
   Calendar,
-  FileCode
+  FileCode,
+  CalendarCheck,
+  BarChart3
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -45,6 +47,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       show: true
     },
     {
+      id: 'journal',
+      label: 'Diário de Atividades (Dia a Dia)',
+      icon: CalendarCheck,
+      show: true,
+      badge: 'Diário'
+    },
+    {
+      id: 'reports',
+      label: 'Relatório Semanal & Diretor',
+      icon: BarChart3,
+      show: true,
+      badge: 'Semanal'
+    },
+    {
       id: 'xml-import',
       label: 'Importar XML',
       icon: FileCode,
@@ -71,9 +87,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
     },
     {
       id: 'users',
-      label: 'Usuários & Captadores',
+      label: 'Usuários & Perfis',
       icon: Users,
-      show: isMasterOrGestora
+      show: isMaster // ONLY Master Admin can manage users
     },
     {
       id: 'logs',

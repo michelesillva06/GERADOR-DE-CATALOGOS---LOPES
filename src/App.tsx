@@ -854,7 +854,7 @@ function MainApp() {
             />
           )}
 
-          {activeView === 'users' && isMasterOrGestora && (
+          {activeView === 'users' && isMaster && (
             <UserManagement
               users={users}
               currentUser={user}
@@ -874,6 +874,7 @@ function MainApp() {
               logs={logs}
               companySettings={companySettings}
               currentUser={user}
+              journalEntries={journalEntries}
             />
           )}
 
