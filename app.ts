@@ -1080,6 +1080,29 @@ app.get('/api/properties/:id', (req, res) => {
 });
 
 /**
+ * Uploads every base64 property photo to Cloudinary and returns permanent URLs.
+ * IMPORTANT: property photos must never be stored as raw base64 inside the Firestore
+ * document. Firestore caps each document at 1 MiB, and a handful of compressed photos
+ * (150-400 KB each) blows past that easily — the write then fails silently, the property
+ * stays visible only to whoever created it (their own server instance still has it in
+ * memory) and never reaches Firestore, so no one else ever sees it.
+ */
+async function uploadPropertyImages(images: any, propertyCode: string): Promise<string[]> {
+  if (!Array.isArray(images)) return [];
+  const uploaded: string[] = [];
+  for (let i = 0; i < images.length; i++) {
+    const img = images[i];
+    if (typeof img === 'string' && img.startsWith('data:image/')) {
+      const url = await saveBase64ImageFile(img, `property_${propertyCode}_${i}_${Date.now()}`);
+      uploaded.push(url);
+    } else if (typeof img === 'string') {
+      uploaded.push(img);
+    }
+  }
+  return uploaded;
+}
+
+/**
  * PROPERTIES: CREATE (PERSISTED TO CLOUD FIRESTORE)
  */
 app.post('/api/properties', requireAuth, async (req, res) => {
@@ -1100,6 +1123,13 @@ app.post('/api/properties', requireAuth, async (req, res) => {
   const code = propData.code || `LOP-${nextNum}`;
 
   const owner = users.find(u => u.id === targetUserId) || reqUser;
+
+  const uploadedImages = await uploadPropertyImages(propData.images, code);
+  const fallbackImage = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80';
+  let uploadedMainImage = propData.main_image;
+  if (typeof uploadedMainImage === 'string' && uploadedMainImage.startsWith('data:image/')) {
+    uploadedMainImage = await saveBase64ImageFile(uploadedMainImage, `property_${code}_main_${Date.now()}`);
+  }
 
   const newProperty: Property = {
     id: `prop_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -1126,10 +1156,8 @@ app.post('/api/properties', requireAuth, async (req, res) => {
     bathrooms: Number(propData.bathrooms) || 0,
     parking_spaces: Number(propData.parking_spaces) || 0,
     features: Array.isArray(propData.features) ? propData.features : [],
-    images: Array.isArray(propData.images) && propData.images.length > 0
-      ? propData.images
-      : ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'],
-    main_image: propData.main_image || (propData.images?.[0]) || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
+    images: uploadedImages.length > 0 ? uploadedImages : [fallbackImage],
+    main_image: uploadedMainImage || uploadedImages[0] || fallbackImage,
     client_name: propData.client_name || undefined,
     client_cpf_cnpj: propData.client_cpf_cnpj || undefined,
     client_phone: propData.client_phone || undefined,
@@ -1171,6 +1199,14 @@ app.put('/api/properties/:id', requireAuth, async (req, res) => {
   }
 
   const update = req.body;
+
+  if (Array.isArray(update.images)) {
+    update.images = await uploadPropertyImages(update.images, existing.code);
+  }
+  if (typeof update.main_image === 'string' && update.main_image.startsWith('data:image/')) {
+    update.main_image = await saveBase64ImageFile(update.main_image, `property_${existing.code}_main_${Date.now()}`);
+  }
+
   const updatedProperty: Property = {
     ...existing,
     ...update,
