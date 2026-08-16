@@ -19,7 +19,14 @@ import {
   limit
 } from 'firebase/firestore';
 import { v2 as cloudinary } from 'cloudinary';
-import firebaseConfig from './firebase-applet-config.json';
+import { fileURLToPath } from 'url';
+
+// Read this JSON file manually at runtime instead of a static `import ... from '...json'`.
+// Newer Node.js versions require ESM JSON imports to carry an explicit `with { type: "json" }`
+// attribute; whether that syntax survives Vercel's build step has proven unreliable, so reading
+// the file directly with fs sidesteps the whole ESM-JSON-import-attribute requirement.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const firebaseConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'firebase-applet-config.json'), 'utf-8'));
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
