@@ -375,44 +375,72 @@ app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 /**
- * GLOBAL FRESHNESS MIDDLEWARE
- * Vercel can route each incoming request to a different, disposable serverless instance.
- * Every instance only loads users/properties/settings/journal/schedule/logs from Firestore
- * ONCE, at its own cold start (see initializeAndSyncFirestore below) — after that it trusts
- * its own in-memory copy. That means one browser's edit (a photo removal, a cover change, a
- * new property) can be saved correctly in Firestore yet stay invisible to every other
- * browser/device/instance, because THEIR in-memory copy was loaded before the edit happened
- * and nothing tells them to reload it.
+ * TARGETED FRESHNESS HELPERS
+ * Vercel can route each incoming request to a different, disposable serverless instance, and
+ * each instance only loads users/properties/settings/journal/schedule/logs from Firestore ONCE,
+ * at its own cold start — after that it trusts its own in-memory copy, which is how one
+ * browser's edit could stay invisible to everyone else.
  *
- * The fix: re-read every collection from Firestore at the start of every single request,
- * before any route or auth check runs, so every response — no matter which instance served
- * it — reflects the current database, not a stale snapshot from whenever that instance woke up.
- * Firestore reads are effectively free at this project's scale (well within the free tier),
- * so this is the reliable way to guarantee "same data on any browser, any device" everywhere.
- * (Audit logs are capped to the 300 most recent — that collection only grows, and no screen
- * needs the full history on every request.)
+ * The first fix for this re-read EVERY collection on EVERY single request, which was reliable
+ * but wasteful: with polling every few seconds, that adds up to well over a million Firestore
+ * reads a day even at small scale — enough to exhaust the free daily quota in hours. These
+ * helpers do the same job but scoped: each GET route calls only the one (or two) refresh
+ * functions for the data it actually returns, so a request for properties doesn't also re-read
+ * users, journal, schedule and logs it has no use for.
  */
-app.use(async (req, res, next) => {
+async function refreshUsers() {
   try {
-    const [usersSnap, propsSnap, settingsDoc, journalSnap, scheduleSnap, logsSnap] = await Promise.all([
-      getDocs(collection(firestoreDb, 'users')),
-      getDocs(collection(firestoreDb, 'properties')),
-      getDoc(doc(firestoreDb, 'settings', 'company')),
-      getDocs(collection(firestoreDb, 'journal')),
-      getDocs(collection(firestoreDb, 'schedule')),
-      getDocs(query(collection(firestoreDb, 'logs'), orderBy('created_at', 'desc'), limit(300)))
-    ]);
-    if (!usersSnap.empty) users = usersSnap.docs.map(d => d.data() as User);
-    if (!propsSnap.empty) properties = propsSnap.docs.map(d => d.data() as Property);
-    if (settingsDoc.exists()) companySettings = { ...companySettings, ...settingsDoc.data() } as CompanySettings;
-    if (!journalSnap.empty) journalEntries = journalSnap.docs.map(d => d.data() as JournalEntry);
-    if (!scheduleSnap.empty) scheduleEvents = scheduleSnap.docs.map(d => d.data() as ScheduleEvent);
-    if (!logsSnap.empty) auditLogs = logsSnap.docs.map(d => d.data() as AuditLog);
+    const snap = await getDocs(collection(firestoreDb, 'users'));
+    if (!snap.empty) users = snap.docs.map(d => d.data() as User);
   } catch (err) {
-    console.warn('[Freshness Middleware] Could not refresh from Firestore this request, serving last known in-memory data:', err);
+    console.warn('[Freshness] Could not refresh users:', err);
   }
-  next();
-});
+}
+
+async function refreshProperties() {
+  try {
+    const snap = await getDocs(collection(firestoreDb, 'properties'));
+    if (!snap.empty) properties = snap.docs.map(d => d.data() as Property);
+  } catch (err) {
+    console.warn('[Freshness] Could not refresh properties:', err);
+  }
+}
+
+async function refreshSettings() {
+  try {
+    const snap = await getDoc(doc(firestoreDb, 'settings', 'company'));
+    if (snap.exists()) companySettings = { ...companySettings, ...snap.data() } as CompanySettings;
+  } catch (err) {
+    console.warn('[Freshness] Could not refresh settings:', err);
+  }
+}
+
+async function refreshJournal() {
+  try {
+    const snap = await getDocs(collection(firestoreDb, 'journal'));
+    if (!snap.empty) journalEntries = snap.docs.map(d => d.data() as JournalEntry);
+  } catch (err) {
+    console.warn('[Freshness] Could not refresh journal:', err);
+  }
+}
+
+async function refreshSchedule() {
+  try {
+    const snap = await getDocs(collection(firestoreDb, 'schedule'));
+    if (!snap.empty) scheduleEvents = snap.docs.map(d => d.data() as ScheduleEvent);
+  } catch (err) {
+    console.warn('[Freshness] Could not refresh schedule:', err);
+  }
+}
+
+async function refreshLogs() {
+  try {
+    const snap = await getDocs(query(collection(firestoreDb, 'logs'), orderBy('created_at', 'desc'), limit(300)));
+    if (!snap.empty) auditLogs = snap.docs.map(d => d.data() as AuditLog);
+  } catch (err) {
+    console.warn('[Freshness] Could not refresh logs:', err);
+  }
+}
 
 /**
  * Authentication Middleware
@@ -564,6 +592,7 @@ app.post('/api/auth/login', async (req, res) => {
  * AUTHENTICATION: GET CURRENT USER (ME)
  */
 app.get('/api/auth/me', async (req, res) => {
+  await refreshUsers();
   const user = extractUserFromRequest(req);
   if (!user) {
     return res.status(401).json({ error: 'Sessão inválida ou expirada.' });
@@ -751,6 +780,7 @@ app.post('/api/users', requireMasterAdmin, async (req, res) => {
  * USERS: UPDATE (MASTER ADMIN ONLY)
  */
 app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
+  await refreshUsers();
   const { id } = req.params;
   const index = users.findIndex(u => u.id === id);
   if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -859,6 +889,7 @@ app.patch('/api/users/:id/block', requireMasterAdmin, async (req, res) => {
  * USERS: DELETE (MASTER ADMIN ONLY)
  */
 app.delete('/api/users/:id', requireMasterAdmin, async (req, res) => {
+  await Promise.all([refreshUsers(), refreshProperties()]);
   const { id } = req.params;
   const user = users.find(u => u.id === id);
   if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
@@ -1208,6 +1239,7 @@ app.post('/api/properties', requireAuth, async (req, res) => {
  * PROPERTIES: UPDATE (RBAC ENFORCED & CLOUD PERSISTED)
  */
 app.put('/api/properties/:id', requireAuth, async (req, res) => {
+  await refreshProperties();
   const reqUser = (req as any).user as User;
   const { id } = req.params;
   const index = properties.findIndex(p => p.id === id);
@@ -1264,6 +1296,7 @@ app.put('/api/properties/:id', requireAuth, async (req, res) => {
  * PROPERTIES: DELETE (RBAC ENFORCED & CLOUD PERSISTED)
  */
 app.delete('/api/properties/:id', requireAuth, async (req, res) => {
+  await refreshProperties();
   const reqUser = (req as any).user as User;
   const rawId = req.params.id;
   const targetId = decodeURIComponent(rawId).trim();
@@ -1433,7 +1466,8 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
 /**
  * DASHBOARD STATS
  */
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
+  await Promise.all([refreshUsers(), refreshProperties()]);
   const totalUsers = users.length;
   const activeUsers = users.filter(u => u.status === 'active').length;
   const totalProps = properties.length;
@@ -1481,7 +1515,8 @@ app.get('/api/stats', (req, res) => {
 /**
  * AUDIT LOGS
  */
-app.get('/api/logs', (req, res) => {
+app.get('/api/logs', async (req, res) => {
+  await refreshLogs();
   res.json({ logs: auditLogs });
 });
 
@@ -1589,7 +1624,8 @@ app.post('/api/upload/cover', requireAuth, async (req, res) => {
 /**
  * JOURNAL ENDPOINTS
  */
-app.get('/api/journal', (req, res) => {
+app.get('/api/journal', async (req, res) => {
+  await refreshJournal();
   const { user_id, date } = req.query;
   let filtered = [...journalEntries];
   if (user_id) {
@@ -1655,7 +1691,8 @@ app.post('/api/journal', requireAuth, async (req, res) => {
 /**
  * SCHEDULE ENDPOINTS
  */
-app.get('/api/schedule', (req, res) => {
+app.get('/api/schedule', async (req, res) => {
+  await refreshSchedule();
   res.json({ events: scheduleEvents });
 });
 
