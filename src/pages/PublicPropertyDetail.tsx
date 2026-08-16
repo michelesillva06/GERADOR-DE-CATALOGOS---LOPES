@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Property, User, CompanySettings } from '../types';
-import { getStoredProperties, getStoredUsers } from '../lib/storage';
+import { getStoredProperties, getStoredUsers, getStoredSettings } from '../lib/storage';
 import { LopesLogo } from '../components/LopesLogo';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { getPropertyImages, handleImageError } from '../lib/imageUtils';
@@ -46,25 +46,6 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
   const [visitTime, setVisitTime] = useState('10:00');
   const [visitNotes, setVisitNotes] = useState('');
   const [scheduleSuccess, setScheduleSuccess] = useState(false);
-
-  useEffect(() => {
-    // IMPORTANT: this is a PUBLIC page — a stranger with an empty browser can open it.
-    // Always fetch the live settings from the server as the source of truth, instead of
-    // trusting only whatever companySettings happened to ride along with the property
-    // lookup response (which can be stale on a cold backend instance).
-    const loadCompanySettings = async () => {
-      try {
-        const res = await fetch('/api/settings');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.settings) setCompanySettings(data.settings);
-        }
-      } catch (e) {
-        console.warn('Could not fetch live company settings, keeping default value:', e);
-      }
-    };
-    loadCompanySettings();
-  }, []);
 
   useEffect(() => {
     const loadProperty = async () => {
@@ -174,6 +155,7 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
           foundProp = matched;
           const allUsers = getStoredUsers();
           foundCaptador = allUsers.find(u => u.id === matched.user_id) || allUsers[0] || null;
+          setCompanySettings(getStoredSettings());
         }
       }
 
