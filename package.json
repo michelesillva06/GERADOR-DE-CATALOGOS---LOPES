@@ -31,7 +31,7 @@
     "recharts": "^3.10.1",
     "vite": "^6.2.3",
     "xlsx": "^0.18.5",
-    "cloudinary": "^2.5.1"
+    "cloudinary": "^2.10.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
