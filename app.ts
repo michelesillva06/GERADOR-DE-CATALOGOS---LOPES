@@ -1012,15 +1012,15 @@ app.get('/api/properties/public/user/:slug', async (req, res) => {
     return res.status(404).json({ error: 'Captador não encontrado.' });
   }
 
-  let captadorProps = properties.filter(p =>
-    p.user_id === captador.id ||
-    p.user_id?.toLowerCase() === captador.id?.toLowerCase() ||
-    p.user_id?.toLowerCase() === captador.username?.toLowerCase()
-  );
-
-  if (captador.role === 'MASTER_ADMIN' || captador.role === 'GESTOR' || captador.role === 'GESTORA' || (captadorProps.length === 0 && properties.length > 0)) {
-    captadorProps = properties;
-  }
+  // The public "vitrine" page is meant to always show the company's full ready-property
+  // inventory, no matter whose link it is — that's the whole point of it being shareable.
+  // This used to filter down to just this captador's own properties, with a fallback that
+  // only kicked in when they had zero properties of their own. That fallback is exactly backward:
+  // a captador who has captured nothing sees everyone else's listings, but the moment they
+  // capture their first property, the page narrows down to just that one — which is the
+  // opposite of what a shared public showcase should do. Every public link always shows every
+  // ready property; only the contact info shown (name, phone, photo) changes per captador.
+  const captadorProps = properties;
 
   res.json({
     captador: {
