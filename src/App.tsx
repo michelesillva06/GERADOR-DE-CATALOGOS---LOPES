@@ -206,10 +206,10 @@ function MainApp() {
       window.addEventListener('focus', handleFocus);
       window.addEventListener('lopes_properties_updated', handleCustomUpdate);
 
-      // Fast periodic sync every 3 seconds to detect server changes in real time
+      // Periodic sync every 15 seconds to detect server changes in background
       const interval = setInterval(() => {
         fetchData();
-      }, 3000);
+      }, 15000);
 
       return () => {
         window.removeEventListener('focus', handleFocus);

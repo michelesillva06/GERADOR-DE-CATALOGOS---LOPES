@@ -107,8 +107,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             finalUrl = uploadData.url;
           }
           if (uploadData.settings) {
+            // The /api/upload/cover call above already persisted the new cover to Firestore —
+            // calling onSaveSettings again here used to fire a second, redundant PUT /api/settings
+            // right on its heels. Two near-simultaneous writes to the same document is a race:
+            // whichever one's snapshot of the settings was a beat older could win and overwrite
+            // the cover that was just uploaded, making it look like the new image "reverted"
+            // itself a few seconds later. The upload endpoint's response is already the final,
+            // saved state — just reflect it in the UI, don't save it again.
             setCompanyForm(uploadData.settings);
-            await onSaveSettings(uploadData.settings);
             return;
           }
         }

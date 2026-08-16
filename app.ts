@@ -136,15 +136,25 @@ async function saveBase64ImageFile(base64Data: string, prefix: string): Promise<
     });
     return result.secure_url;
   } catch (err) {
-    console.warn(`[Cloudinary] Error uploading image ${prefix}:`, err);
-    return base64Data;
+    // IMPORTANT: never fall back to returning the raw base64 string here. A single failed
+    // upload used to silently get stored as-is inside the Firestore document, and one or two
+    // of those is enough to blow past Firestore's 1 MiB per-document limit — after which EVERY
+    // future write to that document fails, even ones that have nothing to do with images.
+    // Throwing here forces the caller to handle the failure explicitly instead of corrupting
+    // the document.
+    console.error(`[Cloudinary] Error uploading image ${prefix}:`, err);
+    throw new Error(`Falha ao enviar imagem para o Cloudinary (${prefix}): ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
 /**
  * Local Persistence Fallback & Backup
+ * Skipped entirely on Vercel (and any other read-only-filesystem host) — Firestore is the
+ * real source of truth now, and this write always fails there (EROFS), so attempting it just
+ * adds noise to the logs on every request.
  */
 function saveLocalDatabase() {
+  if (process.env.VERCEL) return;
   try {
     const data = {
       users,
@@ -1131,11 +1141,19 @@ app.post('/api/properties', requireAuth, async (req, res) => {
 
   const owner = users.find(u => u.id === targetUserId) || reqUser;
 
-  const uploadedImages = await uploadPropertyImages(propData.images, code);
+  let uploadedImages: string[];
   const fallbackImage = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80';
   let uploadedMainImage = propData.main_image;
-  if (typeof uploadedMainImage === 'string' && uploadedMainImage.startsWith('data:image/')) {
-    uploadedMainImage = await saveBase64ImageFile(uploadedMainImage, `property_${code}_main_${Date.now()}`);
+  try {
+    uploadedImages = await uploadPropertyImages(propData.images, code);
+    if (typeof uploadedMainImage === 'string' && uploadedMainImage.startsWith('data:image/')) {
+      uploadedMainImage = await saveBase64ImageFile(uploadedMainImage, `property_${code}_main_${Date.now()}`);
+    }
+  } catch (err) {
+    return res.status(502).json({
+      error: 'Não foi possível enviar as fotos do imóvel para o Cloudinary. Verifique as credenciais nas variáveis de ambiente da Vercel.',
+      detail: err instanceof Error ? err.message : String(err)
+    });
   }
 
   const newProperty: Property = {
@@ -1207,11 +1225,18 @@ app.put('/api/properties/:id', requireAuth, async (req, res) => {
 
   const update = req.body;
 
-  if (Array.isArray(update.images)) {
-    update.images = await uploadPropertyImages(update.images, existing.code);
-  }
-  if (typeof update.main_image === 'string' && update.main_image.startsWith('data:image/')) {
-    update.main_image = await saveBase64ImageFile(update.main_image, `property_${existing.code}_main_${Date.now()}`);
+  try {
+    if (Array.isArray(update.images)) {
+      update.images = await uploadPropertyImages(update.images, existing.code);
+    }
+    if (typeof update.main_image === 'string' && update.main_image.startsWith('data:image/')) {
+      update.main_image = await saveBase64ImageFile(update.main_image, `property_${existing.code}_main_${Date.now()}`);
+    }
+  } catch (err) {
+    return res.status(502).json({
+      error: 'Não foi possível enviar as fotos do imóvel para o Cloudinary. Verifique as credenciais nas variáveis de ambiente da Vercel.',
+      detail: err instanceof Error ? err.message : String(err)
+    });
   }
 
   const updatedProperty: Property = {
@@ -1494,8 +1519,14 @@ app.put('/api/settings', requireAuth, async (req, res) => {
   for (const field of imageFields) {
     if (update[field] && typeof update[field] === 'string' && update[field]!.startsWith('data:image/')) {
       const cleanPrefix = (field as string).replace(/^cover_/, '').replace(/_url$/, '');
-      const savedUrl = await saveBase64ImageFile(update[field]!, `cover_${cleanPrefix}`);
-      update[field] = savedUrl;
+      try {
+        update[field] = await saveBase64ImageFile(update[field]!, `cover_${cleanPrefix}`);
+      } catch (err) {
+        return res.status(502).json({
+          error: 'Não foi possível enviar a imagem para o Cloudinary. Verifique as credenciais (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET) nas variáveis de ambiente da Vercel.',
+          detail: err instanceof Error ? err.message : String(err)
+        });
+      }
     }
   }
 
@@ -1536,7 +1567,11 @@ app.post('/api/upload/cover', requireAuth, async (req, res) => {
       [field]: publicUrl
     };
 
-    if (field === 'cover_horizontal_url' || !companySettings.cover_geral_url) {
+    // Only the horizontal cover is meant to double as the general fallback cover. Previously
+    // this also fired whenever cover_geral_url happened to be empty, regardless of which cover
+    // was being uploaded — so uploading a Venda or Locação cover while cover_geral_url was blank
+    // would silently overwrite the general cover with that unrelated image.
+    if (field === 'cover_horizontal_url') {
       companySettings.cover_geral_url = publicUrl;
     }
 
@@ -1547,7 +1582,7 @@ app.post('/api/upload/cover', requireAuth, async (req, res) => {
 
     res.json({ success: true, url: publicUrl, settings: companySettings });
   } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao salvar a capa no servidor.' });
+    res.status(502).json({ error: 'Erro ao salvar a capa: falha no upload para o Cloudinary. Verifique as credenciais nas variáveis de ambiente da Vercel.', detail: err?.message });
   }
 });
 
