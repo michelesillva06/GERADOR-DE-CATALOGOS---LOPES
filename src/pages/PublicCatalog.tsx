@@ -28,7 +28,7 @@ interface PublicCatalogProps {
   companySettings: CompanySettings;
 }
 
-export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySettings: initialSettings }) => {
+export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySettings }) => {
   const [captador, setCaptador] = useState<User | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
@@ -39,26 +39,6 @@ export const PublicCatalog: React.FC<PublicCatalogProps> = ({ slug, companySetti
   const [purposeFilter, setPurposeFilter] = useState('todos');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
-  // IMPORTANT: this is a PUBLIC page — a stranger with an empty browser can open it.
-  // It must never depend on localStorage (that only has data for whoever last used
-  // THIS browser). Settings always come fresh from the server, which is the one
-  // place everyone's data actually lives.
-  const [companySettings, setCompanySettings] = useState<CompanySettings>(initialSettings);
-
-  useEffect(() => {
-    async function loadCompanySettings() {
-      try {
-        const res = await fetch('/api/settings');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.settings) setCompanySettings(data.settings);
-        }
-      } catch (e) {
-        console.warn('Could not fetch live company settings, keeping initial value:', e);
-      }
-    }
-    loadCompanySettings();
-  }, []);
 
   useEffect(() => {
     async function loadPublicData() {
