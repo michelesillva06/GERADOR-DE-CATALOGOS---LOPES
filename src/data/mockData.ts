@@ -1,4 +1,4 @@
-import { User, Property, CompanySettings, AuditLog } from '../types';
+import { User, Property, CompanySettings, AuditLog } from '../types.js';
 
 export const initialCompanySettings: CompanySettings = {
   company_name: 'Lopes Captação',
@@ -457,5 +457,3 @@ export const initialJournalEntries: any[] = [
     updated_at: new Date().toISOString()
   }
 ];
-
-
