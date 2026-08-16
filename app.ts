@@ -13,7 +13,10 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
-  writeBatch
+  writeBatch,
+  query,
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { v2 as cloudinary } from 'cloudinary';
 import firebaseConfig from './firebase-applet-config.json';
@@ -357,7 +360,7 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 /**
  * GLOBAL FRESHNESS MIDDLEWARE
  * Vercel can route each incoming request to a different, disposable serverless instance.
- * Every instance only loads users/properties/settings/journal/schedule from Firestore
+ * Every instance only loads users/properties/settings/journal/schedule/logs from Firestore
  * ONCE, at its own cold start (see initializeAndSyncFirestore below) — after that it trusts
  * its own in-memory copy. That means one browser's edit (a photo removal, a cover change, a
  * new property) can be saved correctly in Firestore yet stay invisible to every other
@@ -369,21 +372,25 @@ app.use('/uploads', express.static(UPLOADS_DIR));
  * it — reflects the current database, not a stale snapshot from whenever that instance woke up.
  * Firestore reads are effectively free at this project's scale (well within the free tier),
  * so this is the reliable way to guarantee "same data on any browser, any device" everywhere.
+ * (Audit logs are capped to the 300 most recent — that collection only grows, and no screen
+ * needs the full history on every request.)
  */
 app.use(async (req, res, next) => {
   try {
-    const [usersSnap, propsSnap, settingsDoc, journalSnap, scheduleSnap] = await Promise.all([
+    const [usersSnap, propsSnap, settingsDoc, journalSnap, scheduleSnap, logsSnap] = await Promise.all([
       getDocs(collection(firestoreDb, 'users')),
       getDocs(collection(firestoreDb, 'properties')),
       getDoc(doc(firestoreDb, 'settings', 'company')),
       getDocs(collection(firestoreDb, 'journal')),
-      getDocs(collection(firestoreDb, 'schedule'))
+      getDocs(collection(firestoreDb, 'schedule')),
+      getDocs(query(collection(firestoreDb, 'logs'), orderBy('created_at', 'desc'), limit(300)))
     ]);
     if (!usersSnap.empty) users = usersSnap.docs.map(d => d.data() as User);
     if (!propsSnap.empty) properties = propsSnap.docs.map(d => d.data() as Property);
     if (settingsDoc.exists()) companySettings = { ...companySettings, ...settingsDoc.data() } as CompanySettings;
     if (!journalSnap.empty) journalEntries = journalSnap.docs.map(d => d.data() as JournalEntry);
     if (!scheduleSnap.empty) scheduleEvents = scheduleSnap.docs.map(d => d.data() as ScheduleEvent);
+    if (!logsSnap.empty) auditLogs = logsSnap.docs.map(d => d.data() as AuditLog);
   } catch (err) {
     console.warn('[Freshness Middleware] Could not refresh from Firestore this request, serving last known in-memory data:', err);
   }
