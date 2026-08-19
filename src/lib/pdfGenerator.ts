@@ -635,26 +635,42 @@ export async function renderHorizontalPropertyCanvas(
   ctx.fill();
   ctx.stroke();
 
+  // Column 1: Código
+  const c1X = rightX + 40;
   ctx.fillStyle = '#64748B';
   ctx.font = '800 22px sans-serif';
-  ctx.fillText('CÓDIGO: ', rightX + 35, stripY + 44);
+  const c1Label = 'CÓDIGO:';
+  ctx.fillText(c1Label, c1X, stripY + 45);
+  const c1LabelW = ctx.measureText(c1Label).width;
+
   ctx.fillStyle = LOPES_RED;
   ctx.font = '900 24px sans-serif';
-  ctx.fillText(prop.code, rightX + 135, stripY + 44);
+  ctx.fillText(prop.code, c1X + c1LabelW + 16, stripY + 45);
 
+  // Column 2: Finalidade
+  const c2X = rightX + 460;
   ctx.fillStyle = '#64748B';
   ctx.font = '800 22px sans-serif';
-  ctx.fillText('FINALIDADE: ', rightX + 460, stripY + 44);
+  const c2Label = 'FINALIDADE:';
+  ctx.fillText(c2Label, c2X, stripY + 45);
+  const c2LabelW = ctx.measureText(c2Label).width;
+
   ctx.fillStyle = TEXT_DARK;
   ctx.font = '900 24px sans-serif';
-  ctx.fillText(prop.purpose.toUpperCase(), rightX + 610, stripY + 44);
+  ctx.fillText(prop.purpose.toUpperCase(), c2X + c2LabelW + 16, stripY + 45);
 
+  // Column 3: Local
+  const c3X = rightX + 940;
   ctx.fillStyle = '#64748B';
   ctx.font = '800 22px sans-serif';
-  ctx.fillText('LOCAL: ', rightX + 1040, stripY + 44);
+  const c3Label = 'LOCAL:';
+  ctx.fillText(c3Label, c3X, stripY + 45);
+  const c3LabelW = ctx.measureText(c3Label).width;
+
   ctx.fillStyle = TEXT_DARK;
   ctx.font = '900 24px sans-serif';
-  ctx.fillText(`${(prop.neighborhood || 'MANAUS').toUpperCase()} - MANAUS/AM`, rightX + 1125, stripY + 44);
+  const localVal = `${(prop.neighborhood || 'MANAUS').toUpperCase()} - MANAUS/AM`;
+  ctx.fillText(localVal, c3X + c3LabelW + 16, stripY + 45);
 
   // =========================================================================
   // LOWER GALLERY & VER MAIS DETALHES ROW
