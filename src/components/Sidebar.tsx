@@ -15,7 +15,8 @@ import {
   Calendar,
   FileCode,
   CalendarCheck,
-  BarChart3
+  BarChart3,
+  FileSignature
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -55,10 +56,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
     },
     {
       id: 'reports',
-      label: 'Relatórios',
+      label: 'Relatório Semanal & Diretor',
       icon: BarChart3,
       show: isMasterOrGestor,
-      badge: 'Gestão'
+      badge: 'Semanal'
     },
     {
       id: 'xml-import',
@@ -83,6 +84,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       id: 'schedule',
       label: 'Agenda & Visitas',
       icon: Calendar,
+      show: true
+    },
+    {
+      id: 'contracts',
+      label: 'Gerar Contratos',
+      icon: FileSignature,
       show: true
     },
     {

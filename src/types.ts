@@ -205,3 +205,44 @@ export interface PDFExportOptions {
   captador: User;
   companySettings: CompanySettings;
 }
+
+/**
+ * CONTRACT GENERATOR
+ * Structure only — the actual legal clause text is a placeholder until the gestora provides
+ * the reviewed wording for each clause. Never treat the placeholder text as a real contract.
+ */
+export type ContractType = 'VENDA' | 'LOCACAO';
+
+export interface ContractParty {
+  name: string;
+  cpf_cnpj: string;
+  rg?: string;
+  nationality?: string;
+  marital_status?: string;
+  profession?: string;
+  address: string;
+  phone?: string;
+  email?: string;
+}
+
+export interface ContractClauseToggle {
+  key: string; // matches a ContractClauseDefinition.key in contractTemplates.ts
+  enabled: boolean;
+  // Free-form values this clause needs (e.g. caução: { valor: '3000', meses: '2' })
+  values?: Record<string, string>;
+}
+
+export interface ContractFormData {
+  contract_type: ContractType;
+  property_id?: string; // if generated from an existing cadastro, for traceability
+  property_code?: string;
+  property_description: string; // full legal description of the property (address, matrícula, etc.)
+  property_value: string; // sale price or monthly rent, as the user typed it (formatted)
+  owner: ContractParty; // proprietário / vendedor / locador
+  counterparty: ContractParty; // comprador / inquilino
+  clauses: ContractClauseToggle[];
+  extra_notes?: string;
+  generated_at?: string;
+  generated_by_user_id?: string;
+  generated_by_user_name?: string;
+}

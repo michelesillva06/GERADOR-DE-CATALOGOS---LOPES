@@ -19,7 +19,8 @@ import {
   ExternalLink,
   FileCode,
   BarChart3,
-  Sparkles
+  Sparkles,
+  FileSignature
 } from 'lucide-react';
 
 interface MobileBottomNavProps {
@@ -58,11 +59,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const menuItems = [
     { id: 'journal', label: 'Diário de Captação', icon: CalendarCheck, show: true, highlight: true },
     { id: 'schedule', label: 'Agenda & Visitas', icon: Calendar, show: true, highlight: true },
+    { id: 'contracts', label: 'Gerar Contratos', icon: FileSignature, show: true },
     { id: 'properties', label: 'Lista de Imóveis', icon: Building2, show: true },
     { id: 'pdf-catalog', label: 'Gerar Catálogo PDF', icon: FileText, show: true },
     { id: 'general-catalog', label: 'Vitrine Geral', icon: BookOpen, show: true },
     { id: 'dashboard', label: 'Dashboard & Métricas', icon: LayoutDashboard, show: true },
-    { id: 'reports', label: 'Relatórios', icon: BarChart3, show: isMasterOrGestor },
+    { id: 'reports', label: 'Relatório Semanal', icon: BarChart3, show: isMasterOrGestor },
     { id: 'xml-import', label: 'Importar XML', icon: FileCode, show: isMaster },
     { id: 'users', label: 'Usuários & Perfis', icon: Users, show: isMaster },
     { id: 'logs', label: 'Histórico & Logs', icon: History, show: isMaster },

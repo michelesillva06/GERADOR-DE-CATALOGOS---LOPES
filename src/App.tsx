@@ -15,6 +15,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { CaptadorJournalPage } from './pages/CaptadorJournalPage';
 import { SchedulePage } from './pages/SchedulePage';
+import { ContractGeneratorPage } from './pages/ContractGeneratorPage';
 import { GeneralCatalogPage } from './pages/GeneralCatalogPage';
 import { XMLImportPage } from './pages/XMLImportPage';
 import { PropertyModal } from './components/PropertyModal';
@@ -871,6 +872,13 @@ function MainApp() {
               scheduleEvents={scheduleEvents}
               onAddEvent={handleAddScheduleEvent}
               onDeleteEvent={handleDeleteScheduleEvent}
+            />
+          )}
+
+          {activeView === 'contracts' && (
+            <ContractGeneratorPage
+              currentUser={user}
+              properties={properties}
             />
           )}
 
