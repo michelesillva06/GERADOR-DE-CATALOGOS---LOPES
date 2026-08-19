@@ -784,13 +784,22 @@ app.put('/api/users/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   const reqUser = (req as any).user as User;
   const isMaster = reqUser.role === 'MASTER_ADMIN';
-  const isSelf = reqUser.id === id;
+  const isGestor = reqUser.role === 'GESTOR' || reqUser.role === 'GESTORA';
+  const isSelf = 
+    reqUser.id === id || 
+    reqUser.id?.toLowerCase() === id?.toLowerCase() || 
+    reqUser.username?.toLowerCase() === id?.toLowerCase() ||
+    reqUser.url_slug?.toLowerCase() === id?.toLowerCase();
 
-  if (!isMaster && !isSelf) {
+  if (!isMaster && !isGestor && !isSelf) {
     return res.status(403).json({ error: 'Você não tem permissão para alterar dados de outro usuário.' });
   }
 
-  const index = users.findIndex(u => u.id === id);
+  const index = users.findIndex(u => 
+    u.id === id || 
+    u.id?.toLowerCase() === id?.toLowerCase() ||
+    u.username?.toLowerCase() === id?.toLowerCase()
+  );
   if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   const existing = users[index];

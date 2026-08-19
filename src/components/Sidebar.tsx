@@ -55,10 +55,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
     },
     {
       id: 'reports',
-      label: 'Relatório Semanal & Diretor',
+      label: 'Relatórios',
       icon: BarChart3,
       show: isMasterOrGestor,
-      badge: 'Semanal'
+      badge: 'Gestão'
     },
     {
       id: 'xml-import',

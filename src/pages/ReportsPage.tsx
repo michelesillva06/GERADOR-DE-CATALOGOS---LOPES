@@ -425,7 +425,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
   const handleDownloadXLSX = () => {
     setDownloadingFormat('xlsx');
     setTimeout(() => {
-      exportControlSpreadsheet(properties, users, logs, companySettings, currentUser);
+      exportControlSpreadsheet(properties, users, logs, companySettings, currentUser, journalEntries, datePeriodFilter);
       setDownloadingFormat(null);
     }, 400);
   };
@@ -433,7 +433,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
   const handleDownloadPDF = () => {
     setDownloadingFormat('pdf');
     setTimeout(() => {
-      exportControlPDF(properties, users, logs, companySettings, currentUser);
+      exportControlPDF(properties, users, logs, companySettings, currentUser, journalEntries, datePeriodFilter);
       setDownloadingFormat(null);
     }, 400);
   };

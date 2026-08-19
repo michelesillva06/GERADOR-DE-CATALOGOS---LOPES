@@ -62,7 +62,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     { id: 'pdf-catalog', label: 'Gerar Catálogo PDF', icon: FileText, show: true },
     { id: 'general-catalog', label: 'Vitrine Geral', icon: BookOpen, show: true },
     { id: 'dashboard', label: 'Dashboard & Métricas', icon: LayoutDashboard, show: true },
-    { id: 'reports', label: 'Relatório Semanal', icon: BarChart3, show: isMasterOrGestor },
+    { id: 'reports', label: 'Relatórios', icon: BarChart3, show: isMasterOrGestor },
     { id: 'xml-import', label: 'Importar XML', icon: FileCode, show: isMaster },
     { id: 'users', label: 'Usuários & Perfis', icon: Users, show: isMaster },
     { id: 'logs', label: 'Histórico & Logs', icon: History, show: isMaster },
