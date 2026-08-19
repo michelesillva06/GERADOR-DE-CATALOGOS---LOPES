@@ -162,9 +162,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
       setSavedSuccess(true);
       setTimeout(() => setSavedSuccess(false), 4000);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Erro ao salvar as configurações.');
+      alert(err?.message || 'Erro ao salvar as configurações.');
     } finally {
       setLoading(false);
     }

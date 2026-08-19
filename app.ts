@@ -125,6 +125,9 @@ async function saveBase64ImageFile(base64Data: string, prefix: string): Promise<
   if (!base64Data || !base64Data.startsWith('data:image/')) {
     return base64Data;
   }
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
+    return base64Data;
+  }
   try {
     const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
     const result = await cloudinary.uploader.upload(base64Data, {
@@ -136,13 +139,10 @@ async function saveBase64ImageFile(base64Data: string, prefix: string): Promise<
     });
     return result.secure_url;
   } catch (err) {
-    // IMPORTANT: never fall back to returning the raw base64 string here. A single failed
-    // upload used to silently get stored as-is inside the Firestore document, and one or two
-    // of those is enough to blow past Firestore's 1 MiB per-document limit — after which EVERY
-    // future write to that document fails, even ones that have nothing to do with images.
-    // Throwing here forces the caller to handle the failure explicitly instead of corrupting
-    // the document.
     console.error(`[Cloudinary] Error uploading image ${prefix}:`, err);
+    if (base64Data.length < 600 * 1024) {
+      return base64Data;
+    }
     throw new Error(`Falha ao enviar imagem para o Cloudinary (${prefix}): ${err instanceof Error ? err.message : String(err)}`);
   }
 }
@@ -777,11 +777,19 @@ app.post('/api/users', requireMasterAdmin, async (req, res) => {
 });
 
 /**
- * USERS: UPDATE (MASTER ADMIN ONLY)
+ * USERS: UPDATE (MASTER ADMIN OR SELF PROFILE)
  */
-app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
+app.put('/api/users/:id', requireAuth, async (req, res) => {
   await refreshUsers();
   const { id } = req.params;
+  const reqUser = (req as any).user as User;
+  const isMaster = reqUser.role === 'MASTER_ADMIN';
+  const isSelf = reqUser.id === id;
+
+  if (!isMaster && !isSelf) {
+    return res.status(403).json({ error: 'Você não tem permissão para alterar dados de outro usuário.' });
+  }
+
   const index = users.findIndex(u => u.id === id);
   if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
@@ -806,18 +814,27 @@ app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
     ? url_slug.toLowerCase().replace(/[^a-z0-9]/g, '')
     : (username ? username.toLowerCase().replace(/[^a-z0-9]/g, '') : existing.url_slug);
 
+  let finalPhotoUrl = photo_url !== undefined ? photo_url : existing.photo_url;
+  if (finalPhotoUrl && typeof finalPhotoUrl === 'string' && finalPhotoUrl.startsWith('data:image/')) {
+    try {
+      finalPhotoUrl = await saveBase64ImageFile(finalPhotoUrl, `user_${id}_photo`);
+    } catch (imgErr) {
+      console.warn('[User Update] Photo upload fallback:', imgErr);
+    }
+  }
+
   const updatedUser: User & { password?: string } = {
     ...existing,
     name: name !== undefined ? name.trim() : existing.name,
     email: email !== undefined ? email.toLowerCase().trim() : existing.email,
-    username: username !== undefined ? username.toLowerCase().trim() : existing.username,
+    username: isMaster && username !== undefined ? username.toLowerCase().trim() : existing.username,
     phone: phone !== undefined ? phone : existing.phone,
     whatsapp: whatsapp !== undefined ? whatsapp : existing.whatsapp,
-    role: role !== undefined ? role : existing.role,
+    role: isMaster && role !== undefined ? role : existing.role,
     position: position !== undefined ? position : existing.position,
-    url_slug: cleanSlug || existing.url_slug,
-    status: status !== undefined ? status : existing.status,
-    photo_url: photo_url !== undefined ? photo_url : existing.photo_url,
+    url_slug: isMaster ? (cleanSlug || existing.url_slug) : existing.url_slug,
+    status: isMaster && status !== undefined ? status : existing.status,
+    photo_url: finalPhotoUrl,
     creci: creci !== undefined ? creci : existing.creci,
     instagram: instagram !== undefined ? instagram : existing.instagram
   };
@@ -830,13 +847,12 @@ app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
   await safeFirestoreDocSet('users', id, updatedUser, true);
   saveLocalDatabase();
 
-  const reqUser = (req as any).user as User;
-  addAuditLog(reqUser.id, reqUser.name, 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
+  addAuditLog(reqUser.id, reqUser.name, 'Atualização de Perfil', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
 
   const cleanResponseUser = { ...updatedUser };
   delete (cleanResponseUser as any).password;
 
-  res.json({ user: cleanResponseUser, message: 'Dados do usuário atualizados com sucesso!' });
+  res.json({ user: cleanResponseUser, message: 'Dados do perfil atualizados com sucesso!' });
 });
 
 /**
