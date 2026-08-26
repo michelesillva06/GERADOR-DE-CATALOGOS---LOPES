@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  initializeFirestore,
   getFirestore,
   collection,
   doc,
@@ -39,11 +40,13 @@ import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
 
-// Initialize Firebase Web SDK for reliable cloud connection
+// Initialize Firebase Web SDK for reliable cloud connection with auto-detect long polling to avoid gRPC RST_STREAM errors
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const firestoreDb = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(firebaseApp);
+const firestoreDb = initializeFirestore(
+  firebaseApp,
+  { experimentalAutoDetectLongPolling: true },
+  firebaseConfig.firestoreDatabaseId || undefined
+);
 
 // Authoritative in-memory cache synchronized with Cloud Firestore
 let users: User[] = [];
@@ -125,9 +128,6 @@ async function saveBase64ImageFile(base64Data: string, prefix: string): Promise<
   if (!base64Data || !base64Data.startsWith('data:image/')) {
     return base64Data;
   }
-  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) {
-    return base64Data;
-  }
   try {
     const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
     const result = await cloudinary.uploader.upload(base64Data, {
@@ -139,10 +139,13 @@ async function saveBase64ImageFile(base64Data: string, prefix: string): Promise<
     });
     return result.secure_url;
   } catch (err) {
+    // IMPORTANT: never fall back to returning the raw base64 string here. A single failed
+    // upload used to silently get stored as-is inside the Firestore document, and one or two
+    // of those is enough to blow past Firestore's 1 MiB per-document limit — after which EVERY
+    // future write to that document fails, even ones that have nothing to do with images.
+    // Throwing here forces the caller to handle the failure explicitly instead of corrupting
+    // the document.
     console.error(`[Cloudinary] Error uploading image ${prefix}:`, err);
-    if (base64Data.length < 600 * 1024) {
-      return base64Data;
-    }
     throw new Error(`Falha ao enviar imagem para o Cloudinary (${prefix}): ${err instanceof Error ? err.message : String(err)}`);
   }
 }
@@ -523,7 +526,11 @@ app.post('/api/auth/login', async (req, res) => {
     }
   } catch {}
 
-  // Find user by username, email, ID, or slug
+  // Find user by username, email, ID, or slug — exact match only (with or without accents/
+  // punctuation, e.g. "michele.silva" and "michelesilva" both match the same account). No
+  // partial/substring matching: that used to let a short login like "ana" match any user whose
+  // full name merely contained those letters (e.g. "Mariana"), which could log someone into the
+  // wrong account entirely if two names happened to overlap.
   let user = users.find(u => {
     if (!u) return false;
     const uUsername = (u.username || '').toLowerCase().trim();
@@ -541,8 +548,7 @@ app.post('/api/auth/login', async (req, res) => {
       uSlug === cleanLogin ||
       uUsernameNormalized === cleanLoginNoAccents ||
       uName === cleanLogin ||
-      (cleanLoginNoAccents.length >= 3 && uNameNormalized.includes(cleanLoginNoAccents)) ||
-      (cleanLoginNoAccents.length >= 3 && uUsernameNormalized.includes(cleanLoginNoAccents))
+      uNameNormalized === cleanLoginNoAccents
     );
   });
 
@@ -777,29 +783,12 @@ app.post('/api/users', requireMasterAdmin, async (req, res) => {
 });
 
 /**
- * USERS: UPDATE (MASTER ADMIN OR SELF PROFILE)
+ * USERS: UPDATE (MASTER ADMIN ONLY)
  */
-app.put('/api/users/:id', requireAuth, async (req, res) => {
+app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
   await refreshUsers();
   const { id } = req.params;
-  const reqUser = (req as any).user as User;
-  const isMaster = reqUser.role === 'MASTER_ADMIN';
-  const isGestor = reqUser.role === 'GESTOR' || reqUser.role === 'GESTORA';
-  const isSelf = 
-    reqUser.id === id || 
-    reqUser.id?.toLowerCase() === id?.toLowerCase() || 
-    reqUser.username?.toLowerCase() === id?.toLowerCase() ||
-    reqUser.url_slug?.toLowerCase() === id?.toLowerCase();
-
-  if (!isMaster && !isGestor && !isSelf) {
-    return res.status(403).json({ error: 'Você não tem permissão para alterar dados de outro usuário.' });
-  }
-
-  const index = users.findIndex(u => 
-    u.id === id || 
-    u.id?.toLowerCase() === id?.toLowerCase() ||
-    u.username?.toLowerCase() === id?.toLowerCase()
-  );
+  const index = users.findIndex(u => u.id === id);
   if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   const existing = users[index];
@@ -823,27 +812,18 @@ app.put('/api/users/:id', requireAuth, async (req, res) => {
     ? url_slug.toLowerCase().replace(/[^a-z0-9]/g, '')
     : (username ? username.toLowerCase().replace(/[^a-z0-9]/g, '') : existing.url_slug);
 
-  let finalPhotoUrl = photo_url !== undefined ? photo_url : existing.photo_url;
-  if (finalPhotoUrl && typeof finalPhotoUrl === 'string' && finalPhotoUrl.startsWith('data:image/')) {
-    try {
-      finalPhotoUrl = await saveBase64ImageFile(finalPhotoUrl, `user_${id}_photo`);
-    } catch (imgErr) {
-      console.warn('[User Update] Photo upload fallback:', imgErr);
-    }
-  }
-
   const updatedUser: User & { password?: string } = {
     ...existing,
     name: name !== undefined ? name.trim() : existing.name,
     email: email !== undefined ? email.toLowerCase().trim() : existing.email,
-    username: isMaster && username !== undefined ? username.toLowerCase().trim() : existing.username,
+    username: username !== undefined ? username.toLowerCase().trim() : existing.username,
     phone: phone !== undefined ? phone : existing.phone,
     whatsapp: whatsapp !== undefined ? whatsapp : existing.whatsapp,
-    role: isMaster && role !== undefined ? role : existing.role,
+    role: role !== undefined ? role : existing.role,
     position: position !== undefined ? position : existing.position,
-    url_slug: isMaster ? (cleanSlug || existing.url_slug) : existing.url_slug,
-    status: isMaster && status !== undefined ? status : existing.status,
-    photo_url: finalPhotoUrl,
+    url_slug: cleanSlug || existing.url_slug,
+    status: status !== undefined ? status : existing.status,
+    photo_url: photo_url !== undefined ? photo_url : existing.photo_url,
     creci: creci !== undefined ? creci : existing.creci,
     instagram: instagram !== undefined ? instagram : existing.instagram
   };
@@ -856,12 +836,13 @@ app.put('/api/users/:id', requireAuth, async (req, res) => {
   await safeFirestoreDocSet('users', id, updatedUser, true);
   saveLocalDatabase();
 
-  addAuditLog(reqUser.id, reqUser.name, 'Atualização de Perfil', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
+  const reqUser = (req as any).user as User;
+  addAuditLog(reqUser.id, reqUser.name, 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
 
   const cleanResponseUser = { ...updatedUser };
   delete (cleanResponseUser as any).password;
 
-  res.json({ user: cleanResponseUser, message: 'Dados do perfil atualizados com sucesso!' });
+  res.json({ user: cleanResponseUser, message: 'Dados do usuário atualizados com sucesso!' });
 });
 
 /**
@@ -1315,6 +1296,40 @@ app.put('/api/properties/:id', requireAuth, async (req, res) => {
   addAuditLog(reqUser.id, reqUser.name, 'Edição de Imóvel', `Atualizou o imóvel ${updatedProperty.code} (${updatedProperty.title})`, req);
 
   res.json({ property: updatedProperty });
+});
+
+/**
+ * PROPERTIES: CONFIRM STATUS WITH OWNER (7-DAY NUDGE)
+ */
+app.post('/api/properties/:id/confirm-status', requireAuth, async (req, res) => {
+  await refreshProperties();
+  const reqUser = (req as any).user as User;
+  const { id } = req.params;
+  const index = properties.findIndex(p => p.id === id || p.code === id);
+  if (index === -1) return res.status(404).json({ error: 'Imóvel não encontrado.' });
+
+  const existing = properties[index];
+  const nowISO = new Date().toISOString();
+
+  const updatedProperty: Property = {
+    ...existing,
+    last_status_check: nowISO,
+    updated_at: nowISO
+  };
+
+  properties[index] = updatedProperty;
+  await safeFirestoreDocSet('properties', existing.id, updatedProperty, true);
+  saveLocalDatabase();
+
+  addAuditLog(
+    reqUser.id,
+    reqUser.name,
+    'Confirmação de Status do Imóvel',
+    `Confirmou status com o proprietário para o imóvel ${updatedProperty.code} (${updatedProperty.title})`,
+    req
+  );
+
+  res.json({ property: updatedProperty, message: 'Status do imóvel confirmado com sucesso!' });
 });
 
 /**

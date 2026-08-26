@@ -91,6 +91,7 @@ export interface Property {
   transaction_date?: string;
   transaction_value?: number;
   transaction_notes?: string;
+  last_status_check?: string;
   created_at: string;
   updated_at: string;
 }
