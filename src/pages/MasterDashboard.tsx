@@ -11,6 +11,7 @@ interface MasterDashboardProps {
   onOpenNewPropertyModal: () => void;
   onOpenNewUserModal: () => void;
   setActiveView: (view: string) => void;
+  onPropertyConfirmed: (property: Property) => void;
 }
 
 export const MasterDashboard: React.FC<MasterDashboardProps> = ({
@@ -20,14 +21,15 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
   logs,
   onOpenNewPropertyModal,
   onOpenNewUserModal,
-  setActiveView
+  setActiveView,
+  onPropertyConfirmed
 }) => {
   const { user } = useAuth();
   const isMaster = user?.role === 'MASTER_ADMIN';
 
   return (
     <div className="space-y-6">
-      
+
       {/* Welcome Banner */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

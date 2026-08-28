@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
-import { PropertyUpdateAlerts } from '../components/PropertyUpdateAlerts';
 import { buildWhatsAppUrl, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { Building2, PlusCircle, Share2, FileSpreadsheet, ExternalLink, CheckCircle2, Copy, Check, Sparkles } from 'lucide-react';
 
@@ -62,12 +61,6 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-
-      <PropertyUpdateAlerts
-        properties={myProperties}
-        currentUser={user}
-        onConfirmed={onPropertyConfirmed}
-      />
 
       {/* Welcome Banner */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
