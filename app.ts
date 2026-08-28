@@ -6,7 +6,6 @@ import path from 'path';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   initializeFirestore,
-  getFirestore,
   collection,
   doc,
   getDoc,
@@ -40,7 +39,11 @@ import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry
 
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
 
-// Initialize Firebase Web SDK for reliable cloud connection with auto-detect long polling to avoid gRPC RST_STREAM errors
+// Initialize Firebase Web SDK for reliable cloud connection.
+// experimentalAutoDetectLongPolling: Vercel's serverless network sometimes blocks Firestore's
+// default WebChannel/gRPC streaming connection, causing intermittent "client is offline" errors.
+// Auto-detecting long polling falls back to plain HTTP requests when that happens, which is
+// slightly slower per-call but far more reliable in this hosting environment.
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const firestoreDb = initializeFirestore(
   firebaseApp,
@@ -1299,37 +1302,33 @@ app.put('/api/properties/:id', requireAuth, async (req, res) => {
 });
 
 /**
- * PROPERTIES: CONFIRM STATUS WITH OWNER (7-DAY NUDGE)
+ * PROPERTIES: CONFIRM STATUS WITH OWNER
+ * Lightweight endpoint just for the "I checked in with the owner, status/price still accurate"
+ * button — resets the 7-day reminder clock without touching anything else about the property
+ * (and without needing the full RBAC-checked edit payload of PUT /api/properties/:id).
  */
 app.post('/api/properties/:id/confirm-status', requireAuth, async (req, res) => {
   await refreshProperties();
   const reqUser = (req as any).user as User;
   const { id } = req.params;
-  const index = properties.findIndex(p => p.id === id || p.code === id);
+  const index = properties.findIndex(p => p.id === id);
   if (index === -1) return res.status(404).json({ error: 'Imóvel não encontrado.' });
 
   const existing = properties[index];
-  const nowISO = new Date().toISOString();
+  const isMasterOrGestor = reqUser.role === 'MASTER_ADMIN' || reqUser.role === 'GESTOR' || reqUser.role === 'GESTORA';
+  const isOwner = existing.user_id === reqUser.id || existing.user_id?.toLowerCase() === reqUser.id?.toLowerCase();
+  if (!isMasterOrGestor && !isOwner) {
+    return res.status(403).json({ error: 'Você só pode confirmar o status de imóveis que você mesmo captou.' });
+  }
 
-  const updatedProperty: Property = {
-    ...existing,
-    last_status_check: nowISO,
-    updated_at: nowISO
-  };
-
+  const updatedProperty: Property = { ...existing, last_status_check: new Date().toISOString() };
   properties[index] = updatedProperty;
-  await safeFirestoreDocSet('properties', existing.id, updatedProperty, true);
+  await safeFirestoreDocSet('properties', id, updatedProperty, true);
   saveLocalDatabase();
 
-  addAuditLog(
-    reqUser.id,
-    reqUser.name,
-    'Confirmação de Status do Imóvel',
-    `Confirmou status com o proprietário para o imóvel ${updatedProperty.code} (${updatedProperty.title})`,
-    req
-  );
+  addAuditLog(reqUser.id, reqUser.name, 'Confirmação de Status', `Confirmou com o proprietário que o imóvel ${updatedProperty.code} continua atualizado`, req);
 
-  res.json({ property: updatedProperty, message: 'Status do imóvel confirmado com sucesso!' });
+  res.json({ property: updatedProperty });
 });
 
 /**
@@ -1393,6 +1392,63 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
   const targetUserId = user_id || reqUser.id;
   const targetUser = users.find(u => u.id === targetUserId) || reqUser;
 
+  // Auto-create-or-match captador per item: when the XML carries a broker name/email (fields
+  // the parser already extracts as broker_name/broker_email but nothing previously used), each
+  // property gets linked to THAT captador instead of the single admin-selected target. If no
+  // matching account exists yet, one gets created automatically — same defaults as manually
+  // creating a user (role CAPTADOR, password "Lopes@2026", must be changed on first login).
+  const newlyCreatedCaptadores: User[] = [];
+  const captadorCacheByKey = new Map<string, User>(); // avoids creating the same broker twice in one import
+
+  function findOrCreateCaptador(brokerName?: string, brokerEmail?: string): User | null {
+    const cleanEmail = (brokerEmail || '').toLowerCase().trim();
+    const cleanName = (brokerName || '').trim();
+    if (!cleanEmail && !cleanName) return null;
+
+    const cacheKey = cleanEmail || cleanName.toLowerCase();
+    if (captadorCacheByKey.has(cacheKey)) return captadorCacheByKey.get(cacheKey)!;
+
+    const normalizedName = cleanName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    let match = users.find(u =>
+      (cleanEmail && u.email?.toLowerCase().trim() === cleanEmail) ||
+      (normalizedName && u.name?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '') === normalizedName)
+    );
+
+    if (!match && cleanName) {
+      const baseUsername = normalizedName || `captador${Date.now()}`;
+      let uniqueUsername = baseUsername;
+      let suffix = 1;
+      while (users.some(u => u.username.toLowerCase() === uniqueUsername) || newlyCreatedCaptadores.some(u => u.username.toLowerCase() === uniqueUsername)) {
+        uniqueUsername = `${baseUsername}${suffix++}`;
+      }
+      const generatedEmail = cleanEmail || `${uniqueUsername}@lopescaptacao.local`;
+
+      match = {
+        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: cleanName,
+        email: generatedEmail,
+        username: uniqueUsername,
+        phone: '',
+        whatsapp: '',
+        role: 'CAPTADOR',
+        position: 'Corretor de Imóveis',
+        url_slug: uniqueUsername,
+        status: 'active',
+        photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+        creci: '',
+        instagram: '',
+        password: hashPassword('Lopes@2026'),
+        created_at: new Date().toISOString()
+      } as User & { password: string };
+
+      newlyCreatedCaptadores.push(match);
+      users.push(match);
+    }
+
+    if (match) captadorCacheByKey.set(cacheKey, match);
+    return match || null;
+  }
+
   const existingCodeMap = new Map<string, Property>();
   properties.forEach(p => {
     if (p.code) existingCodeMap.set(p.code.toLowerCase().trim(), p);
@@ -1407,6 +1463,8 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
   incomingProps.forEach((item: any, idx: number) => {
     const cleanCode = (item.code || `IMP-${Date.now()}-${idx}`).trim();
     const existing = existingCodeMap.get(cleanCode.toLowerCase());
+    const matchedCaptador = findOrCreateCaptador(item.broker_name, item.broker_email);
+    const propUserId = matchedCaptador ? matchedCaptador.id : targetUserId;
 
     if (existing) {
       if (skip_existing && !update_existing) {
@@ -1429,7 +1487,7 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
     const newProp: Property = {
       id: `prop_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
       code: cleanCode,
-      user_id: targetUserId,
+      user_id: propUserId,
       title: item.title || `Imóvel ${cleanCode}`,
       description: item.description || '',
       category: item.category || 'Apartamento',
@@ -1461,6 +1519,19 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
     newToInsert.push(newProp);
     existingCodeMap.set(cleanCode.toLowerCase(), newProp);
   });
+
+  if (newlyCreatedCaptadores.length > 0) {
+    const batch = writeBatch(firestoreDb);
+    newlyCreatedCaptadores.forEach(u => batch.set(doc(firestoreDb, 'users', u.id), u));
+    await batch.commit();
+    addAuditLog(
+      reqUser.id,
+      reqUser.name,
+      'Captador Criado via Importação',
+      `Criou automaticamente ${newlyCreatedCaptadores.length} captador(es) a partir do XML: ${newlyCreatedCaptadores.map(u => u.name).join(', ')}. Senha padrão: Lopes@2026.`,
+      req
+    );
+  }
 
   if (newToInsert.length > 0) {
     const BATCH_SIZE = 400;
@@ -1498,8 +1569,9 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
     importedCount: newToInsert.length,
     updatedCount: updatedList.length,
     ignoredCount,
+    newCaptadores: newlyCreatedCaptadores.map(u => ({ id: u.id, name: u.name, username: u.username, email: u.email })),
     properties,
-    message: `${newToInsert.length} novos imóveis cadastrados com sucesso!`
+    message: `${newToInsert.length} novos imóveis cadastrados com sucesso!${newlyCreatedCaptadores.length > 0 ? ` ${newlyCreatedCaptadores.length} novo(s) captador(es) criado(s) automaticamente (senha padrão: Lopes@2026).` : ''}`
   });
 });
 
