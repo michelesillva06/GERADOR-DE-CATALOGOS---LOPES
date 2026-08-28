@@ -91,9 +91,17 @@ export interface Property {
   transaction_date?: string;
   transaction_value?: number;
   transaction_notes?: string;
-  last_status_check?: string;
   created_at: string;
   updated_at: string;
+  // When the captador last confirmed with the owner that price/status/availability are still
+  // accurate. Separate from updated_at (which changes on any edit) so that touching an unrelated
+  // field doesn't silently reset the 7-day "time to check in with the owner" clock.
+  last_status_check?: string;
+  // Direct link to this property's page on the official Lopes site (manaus.lopes.com.br), pasted
+  // in manually by the captador since our internal code doesn't match the site's own reference
+  // number. When set, the catalog's "Ver mais detalhes" button points here instead of our own
+  // public catalog page.
+  official_site_url?: string;
 }
 
 export interface AuditLog {
