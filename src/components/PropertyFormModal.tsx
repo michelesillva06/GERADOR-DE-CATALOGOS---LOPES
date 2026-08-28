@@ -59,6 +59,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
   const [city, setCity] = useState('Manaus');
   const [state, setState] = useState('AM');
   const [address, setAddress] = useState('');
+  const [officialSiteUrl, setOfficialSiteUrl] = useState('');
   const [totalArea, setTotalArea] = useState<number | ''>('');
   const [builtArea, setBuiltArea] = useState<number | ''>('');
   const [bedrooms, setBedrooms] = useState<number>(3);
@@ -102,6 +103,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setCity(property.city || 'Manaus');
       setState(property.state || 'AM');
       setAddress(property.address || '');
+      setOfficialSiteUrl(property.official_site_url || '');
       setTotalArea(property.total_area || '');
       setBuiltArea(property.built_area || '');
       setBedrooms(property.bedrooms || 3);
@@ -254,6 +256,7 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
         city,
         state,
         address,
+        official_site_url: officialSiteUrl.trim() || undefined,
         total_area: Number(totalArea) || 0,
         built_area: Number(builtArea) || 0,
         bedrooms: Number(bedrooms),
@@ -489,6 +492,23 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                 onChange={(e) => setAddress(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 h-10"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Link no site oficial (manaus.lopes.com.br)
+                <span className="normal-case font-normal text-slate-400 ml-1">— opcional</span>
+              </label>
+              <input
+                type="url"
+                placeholder="https://www.lopes.com.br/imovel/..."
+                value={officialSiteUrl}
+                onChange={(e) => setOfficialSiteUrl(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 h-10"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Se preenchido, o botão "Ver mais detalhes" do catálogo leva direto pra essa página, em vez da vitrine interna.
+              </p>
             </div>
           </div>
 
