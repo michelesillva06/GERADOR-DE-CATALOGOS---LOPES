@@ -1,222 +1,169 @@
 import { Property, User, CompanySettings } from '../types';
-import { formatCurrencyBRL } from './priceUtils';
-import { getPropertyMainImage } from './imageUtils';
+import {
+  loadImageElement,
+  drawRoundedImage,
+  drawLopesHeart,
+  formatCurrency,
+  extractPropertyImages
+} from './pdfGenerator';
+import { getPropertyPriceInfo } from './priceUtils';
 
-/**
- * Loads an image from a URL as an HTMLImageElement with crossOrigin set.
- */
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      // Retry without CORS if CORS fails
-      const fallbackImg = new Image();
-      fallbackImg.onload = () => resolve(fallbackImg);
-      fallbackImg.onerror = (e) => reject(e);
-      fallbackImg.src = src;
-    };
-    img.src = src;
-  });
+const LOPES_RED = '#F10F4D';
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
 }
 
 /**
- * Generates an Instagram/Social Media post image (1080x1350 vertical/feed format)
- * with the property's main photo, title, price, key features, and captador branding,
- * and automatically initiates a browser download.
+ * Draws the shared bottom info panel (price, specs, neighborhood, logo, captador contact) used
+ * by both the feed post and the story. `panelY`/`panelH` let each format position it differently
+ * since a story is much taller than a feed post.
  */
-export async function generateAndDownloadSocialMedia(
-  property: Property,
+function drawInfoPanel(
+  ctx: CanvasRenderingContext2D,
+  prop: Property,
   captador: User,
-  companySettings: CompanySettings
-): Promise<void> {
+  companySettings: CompanySettings,
+  canvasW: number,
+  panelY: number,
+  panelH: number
+) {
+  const priceInfo = getPropertyPriceInfo(prop);
+  const pad = canvasW * 0.06;
+
+  // Gradient so text stays legible over any photo
+  const grad = ctx.createLinearGradient(0, panelY - panelH * 0.6, 0, panelY + panelH);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.88)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, panelY - panelH * 0.6, canvasW, panelH * 1.6);
+
+  let y = panelY + pad * 0.6;
+
+  // Purpose tag (VENDA / LOCAÇÃO)
+  ctx.font = `900 ${canvasW * 0.032}px sans-serif`;
+  ctx.fillStyle = LOPES_RED;
+  const tag = (prop.purpose || 'Venda').toUpperCase();
+  const tagW = ctx.measureText(tag).width + canvasW * 0.05;
+  ctx.beginPath();
+  ctx.roundRect(pad, y, tagW, canvasW * 0.06, canvasW * 0.03);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(tag, pad + canvasW * 0.025, y + canvasW * 0.042);
+  y += canvasW * 0.095;
+
+  // Price
+  ctx.font = `900 ${canvasW * 0.075}px sans-serif`;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(priceInfo.primaryFormatted, pad, y + canvasW * 0.06);
+  y += canvasW * 0.09;
+
+  // Title / neighborhood
+  ctx.font = `700 ${canvasW * 0.036}px sans-serif`;
+  ctx.fillStyle = '#F1F5F9';
+  const titleLines = wrapText(ctx, `${prop.title} — ${prop.neighborhood}, ${prop.city}`, canvasW - pad * 2);
+  titleLines.slice(0, 2).forEach(line => {
+    ctx.fillText(line, pad, y + canvasW * 0.03);
+    y += canvasW * 0.045;
+  });
+  y += canvasW * 0.015;
+
+  // Specs row
+  const specs = [
+    prop.bedrooms ? `${prop.bedrooms} quartos` : null,
+    prop.bathrooms ? `${prop.bathrooms} banheiros` : null,
+    prop.parking_spaces ? `${prop.parking_spaces} vagas` : null,
+    prop.total_area ? `${prop.total_area}m²` : null
+  ].filter(Boolean).join('   •   ');
+  ctx.font = `600 ${canvasW * 0.03}px sans-serif`;
+  ctx.fillStyle = '#CBD5E1';
+  ctx.fillText(specs, pad, y + canvasW * 0.03);
+  y += canvasW * 0.075;
+
+  // Divider
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad, y);
+  ctx.lineTo(canvasW - pad, y);
+  ctx.stroke();
+  y += canvasW * 0.045;
+
+  // Footer: logo + company + captador contact
+  drawLopesHeart(ctx, pad, y, canvasW * 0.06, '#FFFFFF');
+  ctx.font = `900 ${canvasW * 0.032}px sans-serif`;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(companySettings.company_name || 'Lopes', pad + canvasW * 0.08, y + canvasW * 0.02);
+  ctx.font = `600 ${canvasW * 0.026}px sans-serif`;
+  ctx.fillStyle = '#CBD5E1';
+  ctx.fillText(`${captador.name} • ${prop.code}`, pad + canvasW * 0.08, y + canvasW * 0.048);
+}
+
+async function renderSocialCanvas(
+  prop: Property,
+  captador: User,
+  companySettings: CompanySettings,
+  width: number,
+  height: number,
+  panelHRatio: number
+): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas');
-  const width = 1080;
-  const height = 1350;
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    throw new Error('Não foi possível inicializar o canvas 2D.');
-  }
+  const ctx = canvas.getContext('2d')!;
 
-  // Background
-  ctx.fillStyle = '#0f172a';
-  ctx.fillRect(0, 0, width, height);
+  const images = extractPropertyImages(prop);
+  const mainImg = await loadImageElement(images[0] || '');
+  drawRoundedImage(ctx, mainImg, 0, 0, width, height, 0, prop.title);
 
-  // Load Main Property Image
-  const mainImageUrl = getPropertyMainImage(property);
-  try {
-    const propImg = await loadImage(mainImageUrl);
-    // Draw Property Image in top/mid section (0 to 800)
-    const imgHeight = 820;
-    // Cover fit
-    const imgAspect = propImg.width / propImg.height;
-    const targetAspect = width / imgHeight;
-    let renderW = width;
-    let renderH = imgHeight;
-    let offsetX = 0;
-    let offsetY = 0;
+  const panelH = height * panelHRatio;
+  drawInfoPanel(ctx, prop, captador, companySettings, width, height - panelH, panelH);
 
-    if (imgAspect > targetAspect) {
-      renderW = imgHeight * imgAspect;
-      offsetX = (width - renderW) / 2;
-    } else {
-      renderH = width / imgAspect;
-      offsetY = (imgHeight - renderH) / 2;
-    }
+  return canvas;
+}
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, width, imgHeight);
-    ctx.clip();
-    ctx.drawImage(propImg, offsetX, offsetY, renderW, renderH);
+function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
+  const url = canvas.toDataURL('image/png', 0.95);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+}
 
-    // Gradient overlay at bottom of photo
-    const grad = ctx.createLinearGradient(0, imgHeight - 200, 0, imgHeight);
-    grad.addColorStop(0, 'rgba(15, 23, 42, 0)');
-    grad.addColorStop(1, '#0f172a');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, imgHeight - 200, width, 200);
-    ctx.restore();
-  } catch (e) {
-    console.warn('Could not load property image on canvas:', e);
-  }
+/** Feed post — 1080x1350 (4:5), the safest aspect ratio for Instagram feed. */
+export async function generateFeedPost(prop: Property, captador: User, companySettings: CompanySettings): Promise<HTMLCanvasElement> {
+  return renderSocialCanvas(prop, captador, companySettings, 1080, 1350, 0.5);
+}
 
-  // Top header bar / Status Badge
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-  ctx.fillRect(40, 40, 360, 60);
-  ctx.fillStyle = '#f43f5e';
-  ctx.fillRect(40, 40, 8, 60);
+/** Story — 1080x1920 (9:16). */
+export async function generateStoryPost(prop: Property, captador: User, companySettings: CompanySettings): Promise<HTMLCanvasElement> {
+  return renderSocialCanvas(prop, captador, companySettings, 1080, 1920, 0.4);
+}
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 24px sans-serif';
-  ctx.fillText(`${property.purpose.toUpperCase()} • ${property.code}`, 65, 78);
+/** Generates and downloads both the feed and the story image for a property. */
+export async function generateAndDownloadSocialMedia(
+  prop: Property,
+  captador: User,
+  companySettings: CompanySettings
+) {
+  const feed = await generateFeedPost(prop, captador, companySettings);
+  downloadCanvas(feed, `${prop.code}_feed_instagram.png`);
 
-  // Category Tag on right
-  ctx.fillStyle = '#f43f5e';
-  ctx.fillRect(width - 240, 40, 200, 60);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 22px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(property.category.substring(0, 16), width - 140, 78);
-  ctx.textAlign = 'left';
-
-  // Lower Content Area (y = 820 to 1350)
-  const contentY = 850;
-
-  // Title
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 44px sans-serif';
-  const title = property.title.length > 36 ? property.title.substring(0, 34) + '...' : property.title;
-  ctx.fillText(title, 50, contentY);
-
-  // Neighborhood & City
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '500 28px sans-serif';
-  ctx.fillText(`${property.neighborhood || 'Excelente Localização'} • ${property.city || 'Manaus'}, ${property.state || 'AM'}`, 50, contentY + 45);
-
-  // Price Card
-  ctx.fillStyle = '#1e293b';
-  ctx.beginPath();
-  ctx.roundRect(50, contentY + 75, 460, 95, 16);
-  ctx.fill();
-
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.fillText(property.purpose === 'Locação' ? 'VALOR DA LOCAÇÃO' : 'VALOR DE VENDA', 75, contentY + 110);
-
-  ctx.fillStyle = '#38bdf8';
-  ctx.font = 'bold 38px sans-serif';
-  const priceValue = property.purpose === 'Locação' && property.rent_price ? property.rent_price : property.price;
-  ctx.fillText(formatCurrencyBRL(priceValue) + (property.purpose === 'Locação' ? '/mês' : ''), 75, contentY + 152);
-
-  // Specs Badges (Bedrooms, Suites, Bathrooms, Parking, Area)
-  const specs = [
-    property.bedrooms ? `${property.bedrooms} Qts` : null,
-    property.suites ? `${property.suites} Suítes` : null,
-    property.parking_spaces ? `${property.parking_spaces} Vagas` : null,
-    property.total_area || property.built_area ? `${property.total_area || property.built_area} m²` : null
-  ].filter(Boolean) as string[];
-
-  let specX = 530;
-  specs.slice(0, 3).forEach((spec) => {
-    ctx.fillStyle = '#1e293b';
-    ctx.beginPath();
-    ctx.roundRect(specX, contentY + 75, 145, 95, 16);
-    ctx.fill();
-
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 22px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(spec, specX + 72, contentY + 130);
-    ctx.textAlign = 'left';
-    specX += 160;
-  });
-
-  // Divider line
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(50, 1080);
-  ctx.lineTo(width - 50, 1080);
-  ctx.stroke();
-
-  // Captador & Company Footer
-  // Load captador photo if exists
-  if (captador.photo_url) {
-    try {
-      const capImg = await loadImage(captador.photo_url);
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(110, 1190, 50, 0, Math.PI * 2, true);
-      ctx.closePath();
-      ctx.clip();
-      ctx.drawImage(capImg, 60, 1140, 100, 100);
-      ctx.restore();
-    } catch {}
-  }
-
-  // Captador Details
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 30px sans-serif';
-  ctx.fillText(captador.name, 180, 1175);
-
-  ctx.fillStyle = '#38bdf8';
-  ctx.font = 'bold 24px sans-serif';
-  ctx.fillText(captador.phone || captador.whatsapp || companySettings.phone || '', 180, 1215);
-
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '500 20px sans-serif';
-  ctx.fillText(captador.creci ? `CRECI: ${captador.creci}` : (companySettings.company_name || 'Lopes Manaus'), 180, 1250);
-
-  // Lopes Logo or Brand watermark on bottom right
-  ctx.fillStyle = '#f43f5e';
-  ctx.font = 'bold 36px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(companySettings.company_name || 'LOPES MANAUS', width - 50, 1185);
-
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '500 20px sans-serif';
-  ctx.fillText(companySettings.unit_name || 'Shopping Ponta Negra', width - 50, 1220);
-  ctx.fillText(companySettings.creci_j ? `CRECI PJ ${companySettings.creci_j}` : '', width - 50, 1250);
-  ctx.textAlign = 'left';
-
-  // Export to Blob and download
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `post-${property.code || 'imovel'}-${Date.now()}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
-      resolve();
-    }, 'image/png');
-  });
+  const story = await generateStoryPost(prop, captador, companySettings);
+  // Slight delay so the browser doesn't drop the second automatic download.
+  await new Promise(resolve => setTimeout(resolve, 400));
+  downloadCanvas(story, `${prop.code}_story_instagram.png`);
 }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Property, User } from '../types';
-import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2 } from 'lucide-react';
+import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2, Smartphone } from 'lucide-react';
 import { getPropertyMainImage, handleImageError } from '../lib/imageUtils';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
 
@@ -11,6 +11,7 @@ interface PropertyCardProps {
   onEdit?: (property: Property) => void;
   onDelete?: (property: Property) => void;
   onShareWhatsApp?: (property: Property) => void;
+  onGenerateSocialMedia?: (property: Property) => void;
   canEdit?: boolean;
 }
 
@@ -21,6 +22,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
   onEdit,
   onDelete,
   onShareWhatsApp,
+  onGenerateSocialMedia,
   canEdit = false
 }) => {
   const priceInfo = getPropertyPriceInfo(property);
@@ -171,6 +173,20 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
                 title="Enviar por WhatsApp"
               >
                 <Share2 className="w-4 h-4" />
+              </button>
+            )}
+
+            {onGenerateSocialMedia && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onGenerateSocialMedia(property);
+                }}
+                className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-[#F10F4D] transition cursor-pointer"
+                title="Gerar Post/Story para Instagram"
+              >
+                <Smartphone className="w-4 h-4" />
               </button>
             )}
 

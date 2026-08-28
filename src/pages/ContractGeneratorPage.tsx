@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Property, User, ContractType, ContractFormData, ContractParty, ContractClauseToggle } from '../types';
+import { Property, User, CompanySettings, ContractType, ContractFormData, ContractParty, ContractClauseToggle } from '../types';
 import { CLAUSE_DEFINITIONS, getApplicableClauses } from '../lib/contractTemplates';
 import { prefillFromProperty, generateContractPDF, generateContractDocx, assembleContractText } from '../lib/contractGenerator';
 import { FileText, FileDown, Search, AlertTriangle, Home } from 'lucide-react';
@@ -7,6 +7,7 @@ import { FileText, FileDown, Search, AlertTriangle, Home } from 'lucide-react';
 interface ContractGeneratorPageProps {
   currentUser: User;
   properties: Property[];
+  companySettings?: CompanySettings;
 }
 
 const emptyParty: ContractParty = { name: '', cpf_cnpj: '', address: '', phone: '', email: '' };
