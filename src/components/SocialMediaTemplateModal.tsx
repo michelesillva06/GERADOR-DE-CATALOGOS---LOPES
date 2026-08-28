@@ -1,274 +1,301 @@
-import { Property, User, CompanySettings } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Property, CompanySettings } from '../types';
 import {
-  loadImageElement,
-  drawRoundedImage,
-  drawLopesHeart,
-  extractPropertyImages
-} from '../lib/pdfGenerator';
+  SocialMediaTemplate,
+  generateFeedPost,
+  generateStoryPost,
+  generateAndDownloadSocialMedia
+} from '../lib/socialMediaGenerator';
+import { X, Download, Smartphone, Sparkles, Layout, Layers, CheckCircle2, Loader2 } from 'lucide-react';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
 
-const LOPES_RED = '#F10F4D';
-const LOPES_DARK = '#1A1A2E';
+interface SocialMediaTemplateModalProps {
+  property: Property;
+  companySettings: CompanySettings;
+  onClose: () => void;
+}
 
-export type SocialMediaTemplate = 'gradient' | 'card';
+export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> = ({
+  property,
+  companySettings,
+  onClose
+}) => {
+  const [selectedTemplate, setSelectedTemplate] = useState<SocialMediaTemplate>('gradient');
+  const [previewFormat, setPreviewFormat] = useState<'feed' | 'story'>('feed');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(true);
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let current = '';
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
-    if (ctx.measureText(test).width > maxWidth && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = test;
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const priceInfo = getPropertyPriceInfo(property);
+
+  // Update canvas preview whenever template or format changes
+  useEffect(() => {
+    let isMounted = true;
+    setIsPreviewLoading(true);
+
+    const updatePreview = async () => {
+      try {
+        let canvas: HTMLCanvasElement;
+        if (previewFormat === 'feed') {
+          canvas = await generateFeedPost(property, companySettings, selectedTemplate);
+        } else {
+          canvas = await generateStoryPost(property, companySettings, selectedTemplate);
+        }
+
+        if (!isMounted || !previewCanvasRef.current) return;
+
+        const targetCanvas = previewCanvasRef.current;
+        targetCanvas.width = canvas.width;
+        targetCanvas.height = canvas.height;
+        const ctx = targetCanvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, targetCanvas.width, targetCanvas.height);
+          ctx.drawImage(canvas, 0, 0);
+        }
+      } catch (err) {
+        console.error('Erro ao gerar preview social media:', err);
+      } finally {
+        if (isMounted) setIsPreviewLoading(false);
+      }
+    };
+
+    updatePreview();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [property, companySettings, selectedTemplate, previewFormat]);
+
+  const handleDownloadAll = async () => {
+    setIsGenerating(true);
+    try {
+      await generateAndDownloadSocialMedia(property, companySettings, selectedTemplate);
+    } catch (err) {
+      console.error('Erro ao baixar mídias sociais:', err);
+      alert('Ocorreu um erro ao baixar as mídias. Tente novamente.');
+    } finally {
+      setIsGenerating(false);
     }
-  }
-  if (current) lines.push(current);
-  return lines;
-}
+  };
 
-/** Small emoji-style icons stand in for the spec icons — no icon library needed for canvas. */
-function buildSpecItems(prop: Property): { icon: string; label: string }[] {
-  return [
-    prop.bedrooms ? { icon: '🛏️', label: `${prop.bedrooms}` } : null,
-    prop.bathrooms ? { icon: '🚿', label: `${prop.bathrooms}` } : null,
-    prop.parking_spaces ? { icon: '🚗', label: `${prop.parking_spaces}` } : null,
-    prop.total_area ? { icon: '📐', label: `${prop.total_area}m²` } : null
-  ].filter((x): x is { icon: string; label: string } => x !== null);
-}
+  const handleDownloadSingle = async (format: 'feed' | 'story') => {
+    setIsGenerating(true);
+    try {
+      let canvas: HTMLCanvasElement;
+      let filename: string;
+      if (format === 'feed') {
+        canvas = await generateFeedPost(property, companySettings, selectedTemplate);
+        filename = `${property.code}_feed_instagram.png`;
+      } else {
+        canvas = await generateStoryPost(property, companySettings, selectedTemplate);
+        filename = `${property.code}_story_instagram.png`;
+      }
+      const url = canvas.toDataURL('image/png', 0.95);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+    } catch (err) {
+      console.error('Erro ao baixar formato único:', err);
+      alert('Ocorreu um erro ao baixar o arquivo.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
-function drawSpecsRow(ctx: CanvasRenderingContext2D, prop: Property, canvasW: number, x: number, y: number, color: string) {
-  const items = buildSpecItems(prop);
-  let cursorX = x;
-  const gap = canvasW * 0.055;
-  for (const item of items) {
-    ctx.font = `${canvasW * 0.034}px sans-serif`;
-    ctx.fillStyle = color;
-    ctx.fillText(item.icon, cursorX, y);
-    const iconW = ctx.measureText(item.icon).width;
-    ctx.font = `700 ${canvasW * 0.03}px sans-serif`;
-    ctx.fillText(item.label, cursorX + iconW + canvasW * 0.012, y);
-    const labelW = ctx.measureText(item.label).width;
-    cursorX += iconW + labelW + gap;
-  }
-}
+  return (
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full text-white shadow-2xl overflow-hidden my-8 flex flex-col md:flex-row">
+        
+        {/* Left Column: Preview Area */}
+        <div className="md:w-1/2 bg-slate-950/80 p-6 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800 relative">
+          
+          {/* Format Switcher Pills */}
+          <div className="flex items-center gap-2 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 mb-4 shadow-inner">
+            <button
+              type="button"
+              onClick={() => setPreviewFormat('feed')}
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                previewFormat === 'feed'
+                  ? 'bg-[#F10F4D] text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Layout className="w-3.5 h-3.5" />
+              Feed (4:5)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewFormat('story')}
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                previewFormat === 'story'
+                  ? 'bg-[#F10F4D] text-white shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5" />
+              Stories (9:16)
+            </button>
+          </div>
 
-/**
- * TEMPLATE A — "gradient": full-bleed photo with a dark gradient panel at the bottom, price and
- * tag over the photo itself. The original layout.
- */
-function drawGradientTemplate(
-  ctx: CanvasRenderingContext2D,
-  prop: Property,
-  companySettings: Partial<CompanySettings>,
-  canvasW: number,
-  panelY: number,
-  panelH: number
-) {
-  const priceInfo = getPropertyPriceInfo(prop);
-  const pad = canvasW * 0.06;
+          {/* Canvas Wrapper */}
+          <div className="relative w-full max-w-[280px] flex items-center justify-center rounded-2xl overflow-hidden shadow-2xl border border-slate-800/80 bg-slate-900 aspect-[4/5] max-h-[420px]">
+            {isPreviewLoading && (
+              <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center z-10 gap-2">
+                <Loader2 className="w-6 h-6 text-[#F10F4D] animate-spin" />
+                <span className="text-[11px] font-semibold text-slate-300">Renderizando prévia...</span>
+              </div>
+            )}
+            <canvas
+              ref={previewCanvasRef}
+              className="w-full h-full object-contain"
+            />
+          </div>
 
-  const grad = ctx.createLinearGradient(0, panelY - panelH * 0.6, 0, panelY + panelH);
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.88)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, panelY - panelH * 0.6, canvasW, panelH * 1.6);
+          <p className="text-[11px] text-slate-400 mt-3 text-center">
+            {previewFormat === 'feed' ? 'Proporção 1080 × 1350 px (Instagram Feed)' : 'Proporção 1080 × 1920 px (Instagram Stories)'}
+          </p>
+        </div>
 
-  let y = panelY + pad * 0.6;
+        {/* Right Column: Controls & Templates */}
+        <div className="md:w-1/2 p-6 sm:p-8 flex flex-col justify-between space-y-6">
+          <div>
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-[#F10F4D] flex items-center justify-center border border-rose-500/20">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-white">Criar Arte para Instagram</h3>
+                  <p className="text-xs text-slate-400">{property.code} • {property.neighborhood || property.city}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-  // Purpose tag (VENDA / LOCAÇÃO)
-  ctx.font = `900 ${canvasW * 0.032}px sans-serif`;
-  ctx.fillStyle = LOPES_RED;
-  const tag = (prop.purpose || 'Venda').toUpperCase();
-  const tagW = ctx.measureText(tag).width + canvasW * 0.05;
-  ctx.beginPath();
-  ctx.roundRect(pad, y, tagW, canvasW * 0.06, canvasW * 0.03);
-  ctx.fill();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(tag, pad + canvasW * 0.025, y + canvasW * 0.042);
-  y += canvasW * 0.095;
+            {/* Property Summary Pill */}
+            <div className="mt-4 bg-slate-800/60 p-3 rounded-2xl border border-slate-700/50">
+              <p className="text-xs font-bold text-white truncate">{property.title}</p>
+              <div className="flex items-center justify-between mt-1 text-[11px] text-slate-300">
+                <span className="font-semibold text-rose-400">{property.purpose || 'Venda'}</span>
+                <span className="font-extrabold text-white">{priceInfo.primaryFormatted}</span>
+              </div>
+            </div>
 
-  // Price
-  ctx.font = `900 ${canvasW * 0.075}px sans-serif`;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(priceInfo.primaryFormatted, pad, y + canvasW * 0.06);
-  y += canvasW * 0.09;
+            {/* Template Selector */}
+            <div className="mt-5 space-y-2.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5 uppercase tracking-wider">
+                <Layers className="w-3.5 h-3.5 text-[#F10F4D]" />
+                Escolha o Modelo de Design
+              </label>
 
-  // Title / neighborhood
-  ctx.font = `700 ${canvasW * 0.036}px sans-serif`;
-  ctx.fillStyle = '#F1F5F9';
-  const titleLines = wrapText(ctx, `${prop.title} — ${prop.neighborhood}, ${prop.city}`, canvasW - pad * 2);
-  titleLines.slice(0, 2).forEach(line => {
-    ctx.fillText(line, pad, y + canvasW * 0.03);
-    y += canvasW * 0.045;
-  });
-  y += canvasW * 0.025;
+              <div className="grid grid-cols-2 gap-3">
+                {/* Template Gradient */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplate('gradient')}
+                  className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 relative ${
+                    selectedTemplate === 'gradient'
+                      ? 'border-[#F10F4D] bg-[#F10F4D]/10 text-white'
+                      : 'border-slate-800 bg-slate-800/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  {selectedTemplate === 'gradient' && (
+                    <CheckCircle2 className="w-4 h-4 text-[#F10F4D] absolute top-2.5 right-2.5" />
+                  )}
+                  <div>
+                    <span className="text-xs font-extrabold block text-white">Gradiente</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 leading-tight">
+                      Foto em tela cheia com painel escuro translúcido.
+                    </span>
+                  </div>
+                  <div className="h-6 rounded-lg bg-gradient-to-t from-black to-transparent border border-white/10 flex items-end p-1">
+                    <div className="w-6 h-1.5 bg-[#F10F4D] rounded-xs" />
+                  </div>
+                </button>
 
-  // Specs row, with icons
-  drawSpecsRow(ctx, prop, canvasW, pad, y + canvasW * 0.03, '#F1F5F9');
-  y += canvasW * 0.075;
+                {/* Template Card */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplate('card')}
+                  className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 relative ${
+                    selectedTemplate === 'card'
+                      ? 'border-[#F10F4D] bg-[#F10F4D]/10 text-white'
+                      : 'border-slate-800 bg-slate-800/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  {selectedTemplate === 'card' && (
+                    <CheckCircle2 className="w-4 h-4 text-[#F10F4D] absolute top-2.5 right-2.5" />
+                  )}
+                  <div>
+                    <span className="text-xs font-extrabold block text-white">Card Catálogo</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5 leading-tight">
+                      Foto no topo e cartão informativo sólido na base.
+                    </span>
+                  </div>
+                  <div className="h-6 rounded-lg bg-slate-900 border border-slate-700 flex flex-col justify-between p-1">
+                    <div className="w-full h-2 bg-slate-700 rounded-xs" />
+                    <div className="w-8 h-1 bg-[#F10F4D] rounded-xs" />
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
 
-  // Divider
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(pad, y);
-  ctx.lineTo(canvasW - pad, y);
-  ctx.stroke();
-  y += canvasW * 0.045;
+          {/* Action Buttons */}
+          <div className="space-y-2 pt-4 border-t border-slate-800">
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={handleDownloadAll}
+              className="w-full py-3.5 px-4 bg-[#F10F4D] hover:bg-rose-600 active:scale-[0.99] text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-rose-950/40 flex items-center justify-center gap-2 transition disabled:opacity-50 cursor-pointer"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Gerando Imagens...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>Baixar Feed + Stories (2 PNGs)</span>
+                </>
+              )}
+            </button>
 
-  // Footer: logo + company name only
-  drawLopesHeart(ctx, pad, y, canvasW * 0.06, '#FFFFFF');
-  ctx.font = `900 ${canvasW * 0.034}px sans-serif`;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(companySettings.company_name || 'Lopes', pad + canvasW * 0.08, y + canvasW * 0.038);
-}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={isGenerating}
+                onClick={() => handleDownloadSingle('feed')}
+                className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <Layout className="w-3.5 h-3.5 text-slate-400" />
+                Baixar só Feed
+              </button>
 
-/**
- * TEMPLATE B — "card": photo framed with a white border and rounded corners, solid-color info
- * card below it (not overlapping the photo)
- */
-function drawCardTemplate(
-  ctx: CanvasRenderingContext2D,
-  prop: Property,
-  companySettings: Partial<CompanySettings>,
-  canvasW: number,
-  canvasH: number,
-  photoH: number
-) {
-  const priceInfo = getPropertyPriceInfo(prop);
-  const pad = canvasW * 0.065;
-  const cardY = photoH;
-  const cardH = canvasH - photoH;
+              <button
+                type="button"
+                disabled={isGenerating}
+                onClick={() => handleDownloadSingle('story')}
+                className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold rounded-xl transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-slate-400" />
+                Baixar só Story
+              </button>
+            </div>
+          </div>
 
-  // Solid dark card background below the photo
-  ctx.fillStyle = LOPES_DARK;
-  ctx.fillRect(0, cardY, canvasW, cardH);
+        </div>
 
-  let y = cardY + pad * 0.9;
-
-  // Purpose tag
-  ctx.font = `900 ${canvasW * 0.03}px sans-serif`;
-  const tag = (prop.purpose || 'Venda').toUpperCase();
-  const tagW = ctx.measureText(tag).width + canvasW * 0.045;
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.roundRect(pad, y, tagW, canvasW * 0.055, canvasW * 0.027);
-  ctx.fill();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(tag, pad + canvasW * 0.022, y + canvasW * 0.038);
-
-  // Price, right-aligned on the same row as the tag
-  ctx.font = `900 ${canvasW * 0.055}px sans-serif`;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.textAlign = 'right';
-  ctx.fillText(priceInfo.primaryFormatted, canvasW - pad, y + canvasW * 0.045);
-  ctx.textAlign = 'left';
-  y += canvasW * 0.09;
-
-  // Title / neighborhood
-  ctx.font = `700 ${canvasW * 0.034}px sans-serif`;
-  ctx.fillStyle = '#F1F5F9';
-  const titleLines = wrapText(ctx, `${prop.title} — ${prop.neighborhood}, ${prop.city}`, canvasW - pad * 2);
-  titleLines.slice(0, 2).forEach(line => {
-    ctx.fillText(line, pad, y + canvasW * 0.028);
-    y += canvasW * 0.042;
-  });
-  y += canvasW * 0.03;
-
-  // Specs row, with icons, inside a subtle rounded strip
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  ctx.beginPath();
-  ctx.roundRect(pad, y, canvasW - pad * 2, canvasW * 0.075, canvasW * 0.02);
-  ctx.fill();
-  drawSpecsRow(ctx, prop, canvasW, pad + canvasW * 0.025, y + canvasW * 0.05, '#F1F5F9');
-  y += canvasW * 0.11;
-
-  // Footer: logo + company name only
-  drawLopesHeart(ctx, pad, y, canvasW * 0.055, LOPES_RED);
-  ctx.font = `900 ${canvasW * 0.032}px sans-serif`;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(companySettings.company_name || 'Lopes', pad + canvasW * 0.075, y + canvasW * 0.036);
-}
-
-async function renderSocialCanvas(
-  prop: Property,
-  companySettings: Partial<CompanySettings>,
-  width: number,
-  height: number,
-  template: SocialMediaTemplate,
-  panelHRatio: number
-): Promise<HTMLCanvasElement> {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d')!;
-
-  const images = extractPropertyImages(prop);
-  const mainImg = await loadImageElement(images[0] || '');
-
-  if (template === 'card') {
-    const photoH = height * (1 - panelHRatio * 1.3);
-    drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
-    drawCardTemplate(ctx, prop, companySettings, width, height, photoH);
-  } else {
-    drawRoundedImage(ctx, mainImg, 0, 0, width, height, 0, prop.title);
-    const panelH = height * panelHRatio;
-    drawGradientTemplate(ctx, prop, companySettings, width, height - panelH, panelH);
-  }
-
-  return canvas;
-}
-
-function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
-  const url = canvas.toDataURL('image/png', 0.95);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-}
-
-/** Feed post — 1080x1350 (4:5), the safest aspect ratio for Instagram feed. */
-export async function generateFeedPost(
-  prop: Property,
-  companySettings: Partial<CompanySettings> = { company_name: 'Lopes' },
-  template: SocialMediaTemplate = 'gradient'
-): Promise<HTMLCanvasElement> {
-  return renderSocialCanvas(prop, companySettings, 1080, 1350, template, 0.5);
-}
-
-/** Story — 1080x1920 (9:16). */
-export async function generateStoryPost(
-  prop: Property,
-  companySettings: Partial<CompanySettings> = { company_name: 'Lopes' },
-  template: SocialMediaTemplate = 'gradient'
-): Promise<HTMLCanvasElement> {
-  return renderSocialCanvas(prop, companySettings, 1080, 1920, template, 0.4);
-}
-
-/** Generates and downloads both the feed and the story image for a property, in the chosen template. */
-export async function generateAndDownloadSocialMedia(
-  prop: Property,
-  companySettingsOrCaptador: Partial<CompanySettings> | User = { company_name: 'Lopes' },
-  templateOrSettings: SocialMediaTemplate | Partial<CompanySettings> = 'gradient',
-  maybeTemplate: SocialMediaTemplate = 'gradient'
-) {
-  const settings: Partial<CompanySettings> =
-    'company_name' in companySettingsOrCaptador
-      ? (companySettingsOrCaptador as Partial<CompanySettings>)
-      : (typeof templateOrSettings === 'object' ? templateOrSettings : { company_name: 'Lopes' });
-
-  const template: SocialMediaTemplate =
-    typeof templateOrSettings === 'string'
-      ? templateOrSettings
-      : maybeTemplate || 'gradient';
-
-  const feed = await generateFeedPost(prop, settings, template);
-  downloadCanvas(feed, `${prop.code}_feed_instagram.png`);
-
-  const story = await generateStoryPost(prop, settings, template);
-  await new Promise(resolve => setTimeout(resolve, 400));
-  downloadCanvas(story, `${prop.code}_story_instagram.png`);
-}
+      </div>
+    </div>
+  );
+};
