@@ -61,7 +61,7 @@ export const PropertyUpdateReminderModal: React.FC<PropertyUpdateReminderModalPr
             </div>
             <div>
               <h2 className="text-base font-black text-slate-800">
-                {overdue.length} imóvel{overdue.length > 1 ? 'is' : ''} precisa{overdue.length > 1 ? 'm' : ''} de atualização
+                {overdue.length} {overdue.length > 1 ? 'imóveis' : 'imóvel'} precisa{overdue.length > 1 ? 'm' : ''} de atualização
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 Confirme com o proprietário que o preço e a disponibilidade continuam corretos.
