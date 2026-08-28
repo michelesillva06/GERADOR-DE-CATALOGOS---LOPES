@@ -73,6 +73,32 @@ function MainApp() {
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [pdfModalScope, setPdfModalScope] = useState<'meus' | 'todos'>('meus');
   const [pdfPrefilteredProps, setPdfPrefilteredProps] = useState<Property[] | undefined>(undefined);
+  const [showUpdateReminder, setShowUpdateReminder] = useState(false);
+  const [socialMediaTarget, setSocialMediaTarget] = useState<Property | null>(null);
+
+  // Only the current user's own properties for a captador; every property for admin/gestor
+  const updateReminderProperties = useMemo(() => {
+    if (!user) return [];
+    const isAdminOrGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
+    return isAdminOrGestor ? properties : properties.filter(p => p.user_id === user.id);
+  }, [properties, user]);
+
+  const overdueCount = useMemo(
+    () => updateReminderProperties.filter(needsStatusCheck).length,
+    [updateReminderProperties]
+  );
+
+  // Auto-open once per calendar day, per user
+  useEffect(() => {
+    if (!user || overdueCount === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const storageKey = `lopes_update_reminder_shown_${user.id}`;
+    const lastShown = localStorage.getItem(storageKey);
+    if (lastShown !== today) {
+      setShowUpdateReminder(true);
+      localStorage.setItem(storageKey, today);
+    }
+  }, [user, overdueCount]);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -222,21 +248,6 @@ function MainApp() {
       };
     }
   }, [user]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
-        <div className="text-center space-y-3">
-          <div className="w-12 h-12 border-4 border-[#F10F4D] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Carregando Lopes Captação...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Login />;
-  }
 
   // Handlers
   const handleOpenNewProperty = () => {
@@ -424,42 +435,10 @@ function MainApp() {
     const owner = users.find(u => u.id === prop.user_id) || user;
     const phone = getEffectiveWhatsApp(owner, companySettings);
     const link = `${window.location.origin}/imovel/${encodeURIComponent(prop.code || prop.id)}`;
-    const text = `Olá ${owner.name}! Gostaria de informações e agendar visita para o imóvel "${prop.title}": ${link}`;
+    const text = `Olá ${owner?.name || ''}! Gostaria de informações e agendar visita para o imóvel "${prop.title}": ${link}`;
     const waUrl = buildWhatsAppUrl(phone, text);
     window.open(waUrl, '_blank');
   };
-
-  const [showUpdateReminder, setShowUpdateReminder] = useState(false);
-
-  // Only the current user's own properties for a captador; every property for admin/gestor —
-  // matches the same scoping the old inline banner used. (Computed locally here, since the
-  // shared isMasterOrGestor constant is declared further down in this component.)
-  const updateReminderProperties = useMemo(() => {
-    if (!user) return [];
-    const isAdminOrGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
-    return isAdminOrGestor ? properties : properties.filter(p => p.user_id === user.id);
-  }, [properties, user]);
-
-  const overdueCount = useMemo(
-    () => updateReminderProperties.filter(needsStatusCheck).length,
-    [updateReminderProperties]
-  );
-
-  // Auto-open once per calendar day, per user — closing the modal (or just navigating away)
-  // never blocks using the rest of the system; it simply comes back tomorrow if the properties
-  // are still unconfirmed.
-  useEffect(() => {
-    if (!user || overdueCount === 0) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const storageKey = `lopes_update_reminder_shown_${user.id}`;
-    const lastShown = localStorage.getItem(storageKey);
-    if (lastShown !== today) {
-      setShowUpdateReminder(true);
-      localStorage.setItem(storageKey, today);
-    }
-  }, [user, overdueCount]);
-
-  const [socialMediaTarget, setSocialMediaTarget] = useState<Property | null>(null);
 
   const handleGenerateSocialMedia = (prop: Property) => {
     setSocialMediaTarget(prop);
@@ -857,6 +836,21 @@ function MainApp() {
     }
     fetchData();
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        <div className="text-center space-y-3">
+          <div className="w-12 h-12 border-4 border-[#F10F4D] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Carregando Lopes Captação...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
 
   const isMaster = user.role === 'MASTER_ADMIN';
   const isGestor = user.role === 'GESTOR' || user.role === 'GESTORA';
