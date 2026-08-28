@@ -577,6 +577,17 @@ export const PublicPropertyDetail: React.FC<PublicPropertyDetailProps> = ({ code
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>Abrir no Google Maps</span>
                 </a>
+                {property.official_site_url && (
+                  <a
+                    href={property.official_site_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-2 px-4 py-2 bg-[#F10F4D] hover:bg-[#d40d43] text-white rounded-xl text-xs font-bold transition shadow ml-2"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Ver no site oficial da Lopes</span>
+                  </a>
+                )}
               </div>
             </div>
 
