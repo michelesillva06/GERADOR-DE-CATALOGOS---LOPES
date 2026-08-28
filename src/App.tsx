@@ -461,11 +461,10 @@ function MainApp() {
   };
 
   const handleGenerateSocialMedia = async (prop: Property) => {
-    const owner = users.find(u => u.id === prop.user_id) || user;
     setGeneratingSocialMediaFor(prop.id);
     try {
       const { generateAndDownloadSocialMedia } = await import('./lib/socialMediaGenerator');
-      await generateAndDownloadSocialMedia(prop, owner, companySettings);
+      await generateAndDownloadSocialMedia(prop, companySettings, 'gradient');
     } catch (err) {
       console.error('Erro ao gerar mídia social:', err);
       alert('Não foi possível gerar a mídia. Tente novamente.');

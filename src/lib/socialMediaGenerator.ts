@@ -7,10 +7,10 @@ import {
 } from './pdfGenerator';
 import { getPropertyPriceInfo } from './priceUtils';
 
-export type SocialMediaTemplate = 'gradient' | 'card';
-
 const LOPES_RED = '#F10F4D';
 const LOPES_DARK = '#1A1A2E';
+
+export type SocialMediaTemplate = 'gradient' | 'card';
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(' ');
@@ -62,7 +62,7 @@ function drawSpecsRow(ctx: CanvasRenderingContext2D, prop: Property, canvasW: nu
 function drawGradientTemplate(
   ctx: CanvasRenderingContext2D,
   prop: Property,
-  companySettings: Partial<CompanySettings>,
+  companySettings: CompanySettings,
   canvasW: number,
   panelY: number,
   panelH: number
@@ -119,7 +119,8 @@ function drawGradientTemplate(
   ctx.stroke();
   y += canvasW * 0.045;
 
-  // Footer: logo + company name only
+  // Footer: logo + company name only — no captador name, no internal property code, since this
+  // image is meant for public posting and neither belongs on a public-facing post.
   drawLopesHeart(ctx, pad, y, canvasW * 0.06, '#FFFFFF');
   ctx.font = `900 ${canvasW * 0.034}px sans-serif`;
   ctx.fillStyle = '#FFFFFF';
@@ -128,12 +129,13 @@ function drawGradientTemplate(
 
 /**
  * TEMPLATE B — "card": photo framed with a white border and rounded corners, solid-color info
- * card below it (not overlapping the photo)
+ * card below it (not overlapping the photo) — a cleaner, more "catalog" look as an alternative
+ * to the gradient-over-photo style.
  */
 function drawCardTemplate(
   ctx: CanvasRenderingContext2D,
   prop: Property,
-  companySettings: Partial<CompanySettings>,
+  companySettings: CompanySettings,
   canvasW: number,
   canvasH: number,
   photoH: number
@@ -195,7 +197,7 @@ function drawCardTemplate(
 
 async function renderSocialCanvas(
   prop: Property,
-  companySettings: Partial<CompanySettings>,
+  companySettings: CompanySettings,
   width: number,
   height: number,
   template: SocialMediaTemplate,
@@ -210,6 +212,8 @@ async function renderSocialCanvas(
   const mainImg = await loadImageElement(images[0] || '');
 
   if (template === 'card') {
+    // Photo only fills the top portion, leaving a solid card area below for the text — so the
+    // photo needs a smaller height than the gradient template, where text overlaps the photo.
     const photoH = height * (1 - panelHRatio * 1.3);
     drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
     drawCardTemplate(ctx, prop, companySettings, width, height, photoH);
@@ -233,56 +237,32 @@ function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
 /** Feed post — 1080x1350 (4:5), the safest aspect ratio for Instagram feed. */
 export async function generateFeedPost(
   prop: Property,
-  companySettingsOrCaptador: Partial<CompanySettings> | User = { company_name: 'Lopes' },
-  templateOrSettings: SocialMediaTemplate | Partial<CompanySettings> = 'gradient'
+  companySettings: CompanySettings,
+  template: SocialMediaTemplate = 'gradient'
 ): Promise<HTMLCanvasElement> {
-  const settings: Partial<CompanySettings> =
-    'company_name' in companySettingsOrCaptador
-      ? (companySettingsOrCaptador as Partial<CompanySettings>)
-      : (typeof templateOrSettings === 'object' ? templateOrSettings : { company_name: 'Lopes' });
-  const template: SocialMediaTemplate =
-    typeof templateOrSettings === 'string' ? templateOrSettings : 'gradient';
-
-  return renderSocialCanvas(prop, settings, 1080, 1350, template, 0.5);
+  return renderSocialCanvas(prop, companySettings, 1080, 1350, template, 0.5);
 }
 
 /** Story — 1080x1920 (9:16). */
 export async function generateStoryPost(
   prop: Property,
-  companySettingsOrCaptador: Partial<CompanySettings> | User = { company_name: 'Lopes' },
-  templateOrSettings: SocialMediaTemplate | Partial<CompanySettings> = 'gradient'
+  companySettings: CompanySettings,
+  template: SocialMediaTemplate = 'gradient'
 ): Promise<HTMLCanvasElement> {
-  const settings: Partial<CompanySettings> =
-    'company_name' in companySettingsOrCaptador
-      ? (companySettingsOrCaptador as Partial<CompanySettings>)
-      : (typeof templateOrSettings === 'object' ? templateOrSettings : { company_name: 'Lopes' });
-  const template: SocialMediaTemplate =
-    typeof templateOrSettings === 'string' ? templateOrSettings : 'gradient';
-
-  return renderSocialCanvas(prop, settings, 1080, 1920, template, 0.4);
+  return renderSocialCanvas(prop, companySettings, 1080, 1920, template, 0.4);
 }
 
 /** Generates and downloads both the feed and the story image for a property, in the chosen template. */
 export async function generateAndDownloadSocialMedia(
   prop: Property,
-  companySettingsOrCaptador: Partial<CompanySettings> | User = { company_name: 'Lopes' },
-  templateOrSettings: SocialMediaTemplate | Partial<CompanySettings> = 'gradient',
-  maybeTemplate: SocialMediaTemplate = 'gradient'
+  companySettings: CompanySettings,
+  template: SocialMediaTemplate = 'gradient'
 ) {
-  const settings: Partial<CompanySettings> =
-    'company_name' in companySettingsOrCaptador
-      ? (companySettingsOrCaptador as Partial<CompanySettings>)
-      : (typeof templateOrSettings === 'object' ? templateOrSettings : { company_name: 'Lopes' });
-
-  const template: SocialMediaTemplate =
-    typeof templateOrSettings === 'string'
-      ? templateOrSettings
-      : maybeTemplate || 'gradient';
-
-  const feed = await generateFeedPost(prop, settings, template);
+  const feed = await generateFeedPost(prop, companySettings, template);
   downloadCanvas(feed, `${prop.code}_feed_instagram.png`);
 
-  const story = await generateStoryPost(prop, settings, template);
+  const story = await generateStoryPost(prop, companySettings, template);
+  // Slight delay so the browser doesn't drop the second automatic download.
   await new Promise(resolve => setTimeout(resolve, 400));
   downloadCanvas(story, `${prop.code}_story_instagram.png`);
 }
