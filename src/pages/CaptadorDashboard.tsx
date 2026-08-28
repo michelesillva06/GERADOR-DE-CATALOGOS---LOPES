@@ -205,7 +205,6 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
                 onView={onViewProperty}
                 onEdit={onEditProperty}
                 onDelete={onDeleteProperty}
-                onShareWhatsApp={onShareWhatsApp}
                 onGenerateSocialMedia={onGenerateSocialMedia}
                 canEdit={true}
               />
