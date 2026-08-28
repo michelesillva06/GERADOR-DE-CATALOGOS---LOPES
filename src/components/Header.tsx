@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Building2, User as UserIcon, LogOut, ExternalLink, ShieldAlert, Sparkles, ChevronDown } from 'lucide-react';
+import { Building2, User as UserIcon, LogOut, ExternalLink, ShieldAlert, Sparkles, ChevronDown, Bell } from 'lucide-react';
 import { LopesLogo } from './LopesLogo';
 import { getStoredUsers } from '../lib/storage';
 import { User } from '../types';
@@ -10,9 +10,12 @@ interface HeaderProps {
   activeView: string;
   setActiveView: (view: string) => void;
   users?: User[];
+  /** Number of properties needing owner status confirmation — shown as a badge on the bell icon. */
+  updateReminderCount?: number;
+  onOpenUpdateReminder?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView, users = [] }) => {
+export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView, users = [], updateReminderCount = 0, onOpenUpdateReminder }) => {
   const { user, logout, switchUserSimulated } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
@@ -31,6 +34,20 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView, users
 
         {/* Header Right Actions */}
         <div className="flex items-center space-x-3">
+
+          {/* Update Reminder Bell — reopens the daily "confirmar com o proprietário" reminder anytime */}
+          {onOpenUpdateReminder && updateReminderCount > 0 && (
+            <button
+              onClick={onOpenUpdateReminder}
+              className="relative p-2 rounded-xl hover:bg-slate-100 transition"
+              title={`${updateReminderCount} imóvel(is) precisam de confirmação de status`}
+            >
+              <Bell className="w-5 h-5 text-slate-500" />
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">
+                {updateReminderCount}
+              </span>
+            </button>
+          )}
           
           {/* Public Catalog Link Button */}
           {user && (
