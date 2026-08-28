@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import { Property, User, CompanySettings } from '../types';
+import { generateQRCodeDataUrl } from './qrCode';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from './whatsapp';
 import { getPropertyPriceInfo } from './priceUtils';
 
@@ -26,7 +27,7 @@ async function urlToBase64(url: string): Promise<string> {
   return url;
 }
 
-function formatCurrency(val: number): string {
+export function formatCurrency(val: number): string {
   if (!val || val === 0) return 'Sob Consulta';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 }
@@ -34,7 +35,7 @@ function formatCurrency(val: number): string {
 /**
  * Draws the official pixel-perfect Lopes heart emblem on any HTML5 Canvas context.
  */
-function drawLopesHeart(
+export function drawLopesHeart(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
@@ -173,7 +174,7 @@ export async function renderHorizontalCoverCanvas(
   return renderAdminCoverImage(type, companySettings);
 }
 
-function extractPropertyImages(prop: Property): string[] {
+export function extractPropertyImages(prop: Property): string[] {
   const result: string[] = [];
 
   // 1. Check main_image
@@ -213,7 +214,7 @@ function extractPropertyImages(prop: Property): string[] {
   return result;
 }
 
-async function loadImageElement(url: string): Promise<HTMLImageElement | null> {
+export async function loadImageElement(url: string): Promise<HTMLImageElement | null> {
   if (!url) return Promise.resolve(null);
 
   const loadImgFromSrc = (src: string, useCrossOrigin = true): Promise<HTMLImageElement | null> => {
@@ -256,7 +257,7 @@ async function loadImageElement(url: string): Promise<HTMLImageElement | null> {
   return await loadImgFromSrc(url, false);
 }
 
-function drawRoundedImage(
+export function drawRoundedImage(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement | null,
   x: number,
@@ -476,9 +477,9 @@ export async function renderHorizontalPropertyCanvas(
   // 6 Feature Cards Grid (2 rows x 3 columns)
   const gridY = titleY + 50;
   const cardW = 505;
-  const cardH = 260;
+  const cardH = 225;
   const gapX = 35;
-  const gapY = 32;
+  const gapY = 30;
 
   const cardsData = [
     {
@@ -602,85 +603,95 @@ export async function renderHorizontalPropertyCanvas(
     // Card Label
     ctx.fillStyle = '#64748B';
     ctx.font = '800 22px sans-serif';
-    ctx.fillText(card.label, cx + 90, cy + 55);
+    ctx.fillText(card.label, cx + 90, cy + 52);
 
     // Card Value
     if (card.isPrice) {
       ctx.fillStyle = LOPES_RED;
       const vLen = card.value.length;
-      ctx.font = vLen > 24 ? '900 26px sans-serif' : vLen > 16 ? '900 32px sans-serif' : '900 38px sans-serif';
-      ctx.fillText(card.value, cx + 90, cy + 130);
+      ctx.font = vLen > 24 ? '900 24px sans-serif' : vLen > 16 ? '900 30px sans-serif' : '900 38px sans-serif';
+      ctx.fillText(card.value, cx + 90, cy + 115);
     } else {
       ctx.fillStyle = TEXT_DARK;
       ctx.font = '800 30px sans-serif';
       const lines = card.value.split('\n');
       if (lines.length === 1) {
-        ctx.fillText(lines[0], cx + 90, cy + 125);
-      } else {
         ctx.fillText(lines[0], cx + 90, cy + 110);
+      } else {
+        ctx.fillText(lines[0], cx + 90, cy + 98);
         ctx.font = '600 26px sans-serif';
-        ctx.fillText(lines[1], cx + 90, cy + 148);
+        ctx.fillText(lines[1], cx + 90, cy + 132);
       }
     }
   });
 
-  // Top Right Info & Reference Strip under cards
-  const stripY = gridY + 2 * cardH + gapY + 15;
-  const stripH = 72;
-  ctx.fillStyle = '#F8FAFC';
-  ctx.strokeStyle = '#E2E8F0';
+  // =========================================================================
+  // DYNAMIC CTA BLOCK (VER DETALHES BUTTON & QR CODE)
+  // =========================================================================
+  const ctaY = gridY + 2 * cardH + gapY + 20;
+
+  // Draw background container
+  ctx.fillStyle = '#FFF1F2'; // Subtle light rose background
+  ctx.strokeStyle = '#FFE4E6'; // Subtle border
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(rightX, stripY, rightW, stripH, 12);
+  ctx.roundRect(rightX, ctaY, rightW, 150, 16);
   ctx.fill();
   ctx.stroke();
 
-  // Column 1: Código
-  const c1X = rightX + 40;
-  ctx.fillStyle = '#64748B';
-  ctx.font = '800 22px sans-serif';
-  const c1Label = 'CÓDIGO:';
-  ctx.fillText(c1Label, c1X, stripY + 45);
-  const c1LabelW = ctx.measureText(c1Label).width;
+  // Draw left texts
+  ctx.fillStyle = TEXT_DARK;
+  ctx.font = '900 28px sans-serif';
+  ctx.fillText('QUER SABER MAIS DETALHES E VER OUTRAS FOTOS?', rightX + 40, ctaY + 62);
+
+  ctx.fillStyle = TEXT_MUTED;
+  ctx.font = '600 22px sans-serif';
+  ctx.fillText('Acesse a página deste imóvel no site ou escaneie o QR Code ao lado.', rightX + 40, ctaY + 105);
+
+  // Draw "VER DETALHES" Button
+  const btnX = rightX + 1060;
+  const btnY = ctaY + 35;
+  const btnW = 320;
+  const btnH = 80;
 
   ctx.fillStyle = LOPES_RED;
-  ctx.font = '900 24px sans-serif';
-  ctx.fillText(prop.code, c1X + c1LabelW + 16, stripY + 45);
+  ctx.beginPath();
+  ctx.roundRect(btnX, btnY, btnW, btnH, 12);
+  ctx.fill();
 
-  // Column 2: Finalidade
-  const c2X = rightX + 460;
-  ctx.fillStyle = '#64748B';
-  ctx.font = '800 22px sans-serif';
-  const c2Label = 'FINALIDADE:';
-  ctx.fillText(c2Label, c2X, stripY + 45);
-  const c2LabelW = ctx.measureText(c2Label).width;
+  // Draw white text inside the button
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 26px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('VER DETALHES', btnX + (btnW / 2), btnY + 48);
+  ctx.textAlign = 'left';
 
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 24px sans-serif';
-  ctx.fillText(prop.purpose.toUpperCase(), c2X + c2LabelW + 16, stripY + 45);
-
-  // Column 3: Local
-  const c3X = rightX + 940;
-  ctx.fillStyle = '#64748B';
-  ctx.font = '800 22px sans-serif';
-  const c3Label = 'LOCAL:';
-  ctx.fillText(c3Label, c3X, stripY + 45);
-  const c3LabelW = ctx.measureText(c3Label).width;
-
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 24px sans-serif';
-  const localVal = `${(prop.neighborhood || 'MANAUS').toUpperCase()} - MANAUS/AM`;
-  ctx.fillText(localVal, c3X + c3LabelW + 16, stripY + 45);
+  // Draw dynamic QR Code
+  // Prefer the official Lopes site page when the captador has pasted one — the director wants
+  // "ver mais detalhes" pointing there when it's available, falling back to our own public
+  // catalog page only when a property hasn't gotten that link filled in yet.
+  const propertyPublicUrl = prop.official_site_url && prop.official_site_url.trim()
+    ? prop.official_site_url.trim()
+    : `${baseUrl}/imovel/${prop.code}`;
+  const qrCodeUrl = await generateQRCodeDataUrl(propertyPublicUrl, '#F10F4D');
+  const qrImg = await loadImageElement(qrCodeUrl);
+  if (qrImg) {
+    const qrX = rightX + 1430;
+    const qrY = ctaY + 15;
+    const qrW = 120;
+    const qrH = 120;
+    ctx.drawImage(qrImg, qrX, qrY, qrW, qrH);
+  }
 
   // =========================================================================
-  // LOWER GALLERY & VER MAIS DETALHES ROW
+  // LOWER GALLERY & DESCRIPTION ROW
   // =========================================================================
   const lowerY = 1240;
 
   // Gallery (4 photos on bottom left)
   const galX = 90;
   const photoW = 395;
-  const photoH = 430;
+  const photoH = 410;
   const photoGap = 30;
 
   const galleryThumbs = [
@@ -702,70 +713,74 @@ export async function renderHorizontalPropertyCanvas(
     ctx.textAlign = 'left';
   });
 
-  // "VER MAIS DETALHES" Box with CTA Button on bottom right
-  const descX = 1815;
-  const descW = 1065;
-  const descH = 430;
+  // Description Box ("SOBRE O IMÓVEL") on bottom right
+  const descX = 1835;
+  const descW = 1015;
+  const descH = 410;
 
-  // Box Background: Soft luxury light rose container with subtle border
-  ctx.fillStyle = '#FFF5F7';
-  ctx.strokeStyle = '#FECDD3';
-  ctx.lineWidth = 2;
+  // Box Background
+  ctx.fillStyle = BG_LIGHT;
+  ctx.strokeStyle = BORDER_COLOR;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(descX, lowerY, descW, descH, 20);
+  ctx.roundRect(descX, lowerY, descW, descH, 16);
   ctx.fill();
   ctx.stroke();
 
   // Red Left Border Accent
   ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.roundRect(descX, lowerY, 10, descH, [20, 0, 0, 20]);
+  ctx.roundRect(descX, lowerY, 8, descH, [16, 0, 0, 16]);
   ctx.fill();
 
-  // Header inside Box: Lopes Emblem Heart + "VER MAIS DETALHES"
-  drawLopesHeart(ctx, descX + 40, lowerY + 38, 48, LOPES_RED);
+  // Header inside Box: House icon + "SOBRE O IMÓVEL"
+  const descHeaderX = descX + 45;
+  const descHeaderY = lowerY + 60;
+
+  ctx.strokeStyle = LOPES_RED;
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(descHeaderX, descHeaderY - 5);
+  ctx.lineTo(descHeaderX + 16, descHeaderY - 22);
+  ctx.lineTo(descHeaderX + 32, descHeaderY - 5);
+  ctx.stroke();
+  ctx.strokeRect(descHeaderX + 5, descHeaderY - 5, 22, 18);
 
   ctx.fillStyle = TEXT_DARK;
   ctx.font = '900 36px sans-serif';
-  ctx.fillText('VER MAIS DETALHES', descX + 100, lowerY + 68);
+  ctx.fillText('SOBRE O IMÓVEL', descHeaderX + 48, descHeaderY + 8);
 
-  // Subtitle / Descriptive Copy
-  ctx.fillStyle = '#475569';
-  ctx.font = '600 26px sans-serif';
-  const ctaDescText1 = 'Acesse a ficha completa deste imóvel no portal Lopes Manaus com';
-  const ctaDescText2 = 'fotos em alta resolução, vídeo tour, comodidades e localização no mapa.';
-  ctx.fillText(ctaDescText1, descX + 45, lowerY + 125);
-  ctx.fillText(ctaDescText2, descX + 45, lowerY + 165);
+  // Description Paragraph Text
+  const defaultDesc = `Imóvel de alto padrão com excelente projeto arquitetônico e acabamento impecável. Projetado para oferecer conforto, segurança e funcionalidade para toda a família. Ambientes amplos e integrados, excelente iluminação natural e localização privilegiada no bairro ${prop.neighborhood || 'Parque 10'}, próximo a escolas, supermercados, serviços e vias principais de Manaus.`;
+  
+  const rawDesc = prop.description && prop.description.trim().length > 30 ? prop.description : defaultDesc;
+  
+  ctx.fillStyle = '#334155';
+  ctx.font = '600 30px sans-serif';
+  
+  const descWords = rawDesc.split(' ');
+  let line = '';
+  let lineY = descHeaderY + 68;
+  let lineCount = 0;
 
-  // Highlight points
-  ctx.fillStyle = LOPES_RED;
-  ctx.font = '800 22px sans-serif';
-  ctx.fillText('✦ Galeria Completa   •   ✦ Vídeo & Tour   •   ✦ Fale no WhatsApp', descX + 45, lowerY + 220);
-
-  // Prominent CTA Button: "CLIQUE AQUI E VEJA MAIS"
-  const btnX = descX + 45;
-  const btnY = lowerY + 258;
-  const btnW = descW - 90; // 975px
-  const btnH = 92;
-
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.roundRect(btnX, btnY, btnW, btnH, 16);
-  ctx.fill();
-
-  // Button text inside
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 32px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('👉 CLIQUE AQUI E VEJA MAIS', btnX + (btnW / 2), btnY + 56);
-  ctx.textAlign = 'left';
-
-  // Subtext under button
-  ctx.fillStyle = '#64748B';
-  ctx.font = '700 20px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(`lopesmanaus.com.br/imovel/${prop.code}  •  Cód: ${prop.code}`, btnX + (btnW / 2), btnY + 130);
-  ctx.textAlign = 'left';
+  for (let n = 0; n < descWords.length; n++) {
+    const testLine = line + descWords[n] + ' ';
+    if (ctx.measureText(testLine).width > (descW - 90) && n > 0) {
+      ctx.fillText(line.trim(), descHeaderX, lineY);
+      line = descWords[n] + ' ';
+      lineY += 46;
+      lineCount++;
+      if (lineCount >= 7) {
+        ctx.fillText(line.trim() + '...', descHeaderX, lineY);
+        break;
+      }
+    } else {
+      line = testLine;
+    }
+  }
+  if (lineCount < 7 && line.trim()) {
+    ctx.fillText(line.trim(), descHeaderX, lineY);
+  }
 
   // =========================================================================
   // FOOTER ZONE (Dark Navy Bar across bottom)
@@ -873,16 +888,69 @@ export async function generateCatalogPDF(options: {
     doc.addImage(horizontalCanvasDataUrl, 'JPEG', 0, 0, 297, 210);
 
     // Active interactive PDF link overlay for WhatsApp
-    const propertyPublicUrl = `${baseUrl}/imovel/${prop.code}`;
+    const propertyPublicUrl = prop.official_site_url && prop.official_site_url.trim()
+      ? prop.official_site_url.trim()
+      : `${baseUrl}/imovel/${prop.code}`;
     const waMsg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" (Cód: ${prop.code}) no seu catálogo Lopes e gostaria de mais informações.`;
     const whatsappDirectUrl = buildWhatsAppUrl(effectivePhone, waMsg);
 
     // Clickable link on the footer logo area for website/WhatsApp
     doc.link(10, 190, 80, 20, { url: whatsappDirectUrl });
 
-    // Register active link covering the "VER MAIS DETALHES" box and "CLIQUE AQUI E VEJA MAIS" CTA button
-    // Coordinates match descX = 1815, lowerY = 1240, descW = 1065, descH = 430 in mm
-    doc.link(181.5, 124, 106.5, 43, { url: propertyPublicUrl });
+    // Calculate exact gridY to match renderHorizontalPropertyCanvas for precise CTA box link placement
+    const rightW = 1590;
+    const canvasTemp = document.createElement('canvas');
+    const ctxTemp = canvasTemp.getContext('2d');
+    let titleY = 235;
+    if (ctxTemp) {
+      ctxTemp.font = '900 82px Georgia, "Times New Roman", serif';
+      const titleWords = prop.title.split(' ');
+      let titleLine1 = '';
+      let titleLine2 = '';
+      for (let w = 0; w < titleWords.length; w++) {
+        const testLine = titleLine1 + titleWords[w] + ' ';
+        if (ctxTemp.measureText(testLine).width > (rightW - 40) && w > 0) {
+          titleLine2 = titleWords.slice(w).join(' ');
+          break;
+        } else {
+          titleLine1 = testLine;
+        }
+      }
+      if (titleLine2) titleY += 90;
+    } else {
+      if (prop.title.length > 25) titleY += 90;
+    }
+
+    titleY += 55; // Subtitle start
+
+    if (ctxTemp) {
+      ctxTemp.font = '600 36px sans-serif';
+      const subtitle = `Conforto, localização e qualidade de vida no bairro ${prop.neighborhood || 'Parque 10'} em Manaus.`;
+      const subWords = subtitle.split(' ');
+      let subLine1 = '';
+      let subLine2 = '';
+      for (let w = 0; w < subWords.length; w++) {
+        const testLine = subLine1 + subWords[w] + ' ';
+        if (ctxTemp.measureText(testLine).width > (rightW - 40) && w > 0) {
+          subLine2 = subWords.slice(w).join(' ');
+          break;
+        } else {
+          subLine1 = testLine;
+        }
+      }
+      if (subLine2) titleY += 48;
+    } else {
+      titleY += 48;
+    }
+
+    titleY += 30; // Red bar accent
+    const gridY = titleY + 50;
+    const cardH = 225;
+    const gapY = 30;
+    const ctaY = gridY + 2 * cardH + gapY + 20;
+
+    // Register active link exactly covering the visual "VER DETALHES" banner (from X = 126mm to 285mm, Y = ctaY / 10 to (ctaY + 150) / 10)
+    doc.link(126, ctaY / 10, 159, 15, { url: propertyPublicUrl });
 
     // Keep footer slogan area link as fallback
     doc.link(120, 190, 160, 20, { url: propertyPublicUrl });
