@@ -1,6 +1,5 @@
 import jsPDF from 'jspdf';
 import { Property, User, CompanySettings } from '../types';
-import { generateQRCodeDataUrl } from './qrCode';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from './whatsapp';
 import { getPropertyPriceInfo } from './priceUtils';
 
@@ -646,12 +645,14 @@ export async function renderHorizontalPropertyCanvas(
 
   ctx.fillStyle = TEXT_MUTED;
   ctx.font = '600 22px sans-serif';
-  ctx.fillText('Acesse a página deste imóvel no site ou escaneie o QR Code ao lado.', rightX + 40, ctaY + 105);
+  ctx.fillText('Acesse a página deste imóvel no site clicando no botão ao lado.', rightX + 40, ctaY + 105);
 
-  // Draw "VER DETALHES" Button
+  // Draw "VER DETALHES" Button — widened to fill the space the QR Code used to occupy. The QR
+  // was too small to scan reliably from a printed/shared PDF and added no value once the button
+  // itself is already a working link, so it was removed rather than shrunk further.
   const btnX = rightX + 1060;
   const btnY = ctaY + 35;
-  const btnW = 320;
+  const btnW = 480;
   const btnH = 80;
 
   ctx.fillStyle = LOPES_RED;
@@ -666,22 +667,13 @@ export async function renderHorizontalPropertyCanvas(
   ctx.fillText('VER DETALHES', btnX + (btnW / 2), btnY + 48);
   ctx.textAlign = 'left';
 
-  // Draw dynamic QR Code
-  // Prefer the official Lopes site page when the captador has pasted one — the director wants
-  // "ver mais detalhes" pointing there when it's available, falling back to our own public
-  // catalog page only when a property hasn't gotten that link filled in yet.
+  // Prefer the official Lopes site page for this specific property when the captador has pasted
+  // one. When it's missing, point to the Lopes Manaus homepage instead of our own internal
+  // catalog page — a stranger clicking the button recognizes manaus.lopes.com.br, not an
+  // unfamiliar internal URL, even though it won't land on that exact property's page.
   const propertyPublicUrl = prop.official_site_url && prop.official_site_url.trim()
     ? prop.official_site_url.trim()
-    : `${baseUrl}/imovel/${prop.code}`;
-  const qrCodeUrl = await generateQRCodeDataUrl(propertyPublicUrl, '#F10F4D');
-  const qrImg = await loadImageElement(qrCodeUrl);
-  if (qrImg) {
-    const qrX = rightX + 1430;
-    const qrY = ctaY + 15;
-    const qrW = 120;
-    const qrH = 120;
-    ctx.drawImage(qrImg, qrX, qrY, qrW, qrH);
-  }
+    : 'https://manaus.lopes.com.br/';
 
   // =========================================================================
   // LOWER GALLERY & DESCRIPTION ROW
@@ -890,7 +882,7 @@ export async function generateCatalogPDF(options: {
     // Active interactive PDF link overlay for WhatsApp
     const propertyPublicUrl = prop.official_site_url && prop.official_site_url.trim()
       ? prop.official_site_url.trim()
-      : `${baseUrl}/imovel/${prop.code}`;
+      : 'https://manaus.lopes.com.br/';
     const waMsg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" (Cód: ${prop.code}) no seu catálogo Lopes e gostaria de mais informações.`;
     const whatsappDirectUrl = buildWhatsAppUrl(effectivePhone, waMsg);
 
