@@ -4,13 +4,13 @@ import {
   drawRoundedImage,
   drawLopesHeart,
   extractPropertyImages
-} from './pdfGenerator';
-import { getPropertyPriceInfo } from './priceUtils';
-
-export type SocialMediaTemplate = 'gradient' | 'card';
+} from '../lib/pdfGenerator';
+import { getPropertyPriceInfo } from '../lib/priceUtils';
 
 const LOPES_RED = '#F10F4D';
 const LOPES_DARK = '#1A1A2E';
+
+export type SocialMediaTemplate = 'gradient' | 'card';
 
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(' ');
@@ -233,33 +233,19 @@ function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
 /** Feed post — 1080x1350 (4:5), the safest aspect ratio for Instagram feed. */
 export async function generateFeedPost(
   prop: Property,
-  companySettingsOrCaptador: Partial<CompanySettings> | User = { company_name: 'Lopes' },
-  templateOrSettings: SocialMediaTemplate | Partial<CompanySettings> = 'gradient'
+  companySettings: Partial<CompanySettings> = { company_name: 'Lopes' },
+  template: SocialMediaTemplate = 'gradient'
 ): Promise<HTMLCanvasElement> {
-  const settings: Partial<CompanySettings> =
-    'company_name' in companySettingsOrCaptador
-      ? (companySettingsOrCaptador as Partial<CompanySettings>)
-      : (typeof templateOrSettings === 'object' ? templateOrSettings : { company_name: 'Lopes' });
-  const template: SocialMediaTemplate =
-    typeof templateOrSettings === 'string' ? templateOrSettings : 'gradient';
-
-  return renderSocialCanvas(prop, settings, 1080, 1350, template, 0.5);
+  return renderSocialCanvas(prop, companySettings, 1080, 1350, template, 0.5);
 }
 
 /** Story — 1080x1920 (9:16). */
 export async function generateStoryPost(
   prop: Property,
-  companySettingsOrCaptador: Partial<CompanySettings> | User = { company_name: 'Lopes' },
-  templateOrSettings: SocialMediaTemplate | Partial<CompanySettings> = 'gradient'
+  companySettings: Partial<CompanySettings> = { company_name: 'Lopes' },
+  template: SocialMediaTemplate = 'gradient'
 ): Promise<HTMLCanvasElement> {
-  const settings: Partial<CompanySettings> =
-    'company_name' in companySettingsOrCaptador
-      ? (companySettingsOrCaptador as Partial<CompanySettings>)
-      : (typeof templateOrSettings === 'object' ? templateOrSettings : { company_name: 'Lopes' });
-  const template: SocialMediaTemplate =
-    typeof templateOrSettings === 'string' ? templateOrSettings : 'gradient';
-
-  return renderSocialCanvas(prop, settings, 1080, 1920, template, 0.4);
+  return renderSocialCanvas(prop, companySettings, 1080, 1920, template, 0.4);
 }
 
 /** Generates and downloads both the feed and the story image for a property, in the chosen template. */
