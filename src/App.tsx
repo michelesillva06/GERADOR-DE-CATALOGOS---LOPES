@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
+import { PropertyUpdateReminderModal } from './components/PropertyUpdateReminderModal';
+import { needsStatusCheck } from './components/PropertyUpdateAlerts';
 import { Sidebar } from './components/Sidebar';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { Login } from './pages/Login';
@@ -70,7 +72,6 @@ function MainApp() {
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [pdfModalScope, setPdfModalScope] = useState<'meus' | 'todos'>('meus');
   const [pdfPrefilteredProps, setPdfPrefilteredProps] = useState<Property[] | undefined>(undefined);
-  const [generatingSocialMediaFor, setGeneratingSocialMediaFor] = useState<string | null>(null);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -220,6 +221,38 @@ function MainApp() {
       };
     }
   }, [user]);
+
+  const [generatingSocialMediaFor, setGeneratingSocialMediaFor] = useState<string | null>(null);
+
+  const [showUpdateReminder, setShowUpdateReminder] = useState(false);
+
+  // Only the current user's own properties for a captador; every property for admin/gestor —
+  // matches the same scoping the old inline banner used. (Computed locally here, since the
+  // shared isMasterOrGestor constant is declared further down in this component.)
+  const updateReminderProperties = useMemo(() => {
+    if (!user) return [];
+    const isAdminOrGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
+    return isAdminOrGestor ? properties : properties.filter(p => p.user_id === user.id);
+  }, [properties, user]);
+
+  const overdueCount = useMemo(
+    () => updateReminderProperties.filter(needsStatusCheck).length,
+    [updateReminderProperties]
+  );
+
+  // Auto-open once per calendar day, per user — closing the modal (or just navigating away)
+  // never blocks using the rest of the system; it simply comes back tomorrow if the properties
+  // are still unconfirmed.
+  useEffect(() => {
+    if (!user || overdueCount === 0) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const storageKey = `lopes_update_reminder_shown_${user.id}`;
+    const lastShown = localStorage.getItem(storageKey);
+    if (lastShown !== today) {
+      setShowUpdateReminder(true);
+      localStorage.setItem(storageKey, today);
+    }
+  }, [user, overdueCount]);
 
   if (loading) {
     return (
@@ -846,7 +879,18 @@ function MainApp() {
         activeView={activeView}
         setActiveView={setActiveView}
         users={users}
+        updateReminderCount={overdueCount}
+        onOpenUpdateReminder={() => setShowUpdateReminder(true)}
       />
+
+      {showUpdateReminder && (
+        <PropertyUpdateReminderModal
+          properties={updateReminderProperties}
+          onConfirmed={handlePropertyStatusConfirmed}
+          onClose={() => setShowUpdateReminder(false)}
+          showOwnerName={user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA'}
+        />
+      )}
 
       <div className="flex flex-1">
         <Sidebar
