@@ -70,6 +70,7 @@ function MainApp() {
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [pdfModalScope, setPdfModalScope] = useState<'meus' | 'todos'>('meus');
   const [pdfPrefilteredProps, setPdfPrefilteredProps] = useState<Property[] | undefined>(undefined);
+  const [generatingSocialMediaFor, setGeneratingSocialMediaFor] = useState<string | null>(null);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -246,6 +247,10 @@ function MainApp() {
     setIsFormModalOpen(true);
   };
 
+  const handlePropertyStatusConfirmed = (updatedProperty: Property) => {
+    setProperties(prev => prev.map(p => (p.id === updatedProperty.id ? updatedProperty : p)));
+  };
+
   const handleSaveProperty = async (propData: Partial<Property>) => {
     let savedPropFromBackend: Property | null = null;
     const targetUserId = propData.user_id || user.id;
@@ -420,6 +425,20 @@ function MainApp() {
     const text = `Olá ${owner.name}! Gostaria de informações e agendar visita para o imóvel "${prop.title}": ${link}`;
     const waUrl = buildWhatsAppUrl(phone, text);
     window.open(waUrl, '_blank');
+  };
+
+  const handleGenerateSocialMedia = async (prop: Property) => {
+    const owner = users.find(u => u.id === prop.user_id) || user;
+    setGeneratingSocialMediaFor(prop.id);
+    try {
+      const { generateAndDownloadSocialMedia } = await import('./lib/socialMediaGenerator');
+      await generateAndDownloadSocialMedia(prop, owner, companySettings);
+    } catch (err) {
+      console.error('Erro ao gerar mídia social:', err);
+      alert('Não foi possível gerar a mídia. Tente novamente.');
+    } finally {
+      setGeneratingSocialMediaFor(null);
+    }
   };
 
   const handleAddUser = async (userData: any) => {
@@ -848,6 +867,7 @@ function MainApp() {
                 onOpenNewPropertyModal={handleOpenNewProperty}
                 onOpenNewUserModal={() => setActiveView('users')}
                 setActiveView={setActiveView}
+                onPropertyConfirmed={handlePropertyStatusConfirmed}
               />
             ) : (
               <CaptadorDashboard
@@ -860,6 +880,8 @@ function MainApp() {
                 onEditProperty={handleEditProperty}
                 onDeleteProperty={handleDeleteProperty}
                 onShareWhatsApp={handleShareWhatsApp}
+                onGenerateSocialMedia={handleGenerateSocialMedia}
+                onPropertyConfirmed={handlePropertyStatusConfirmed}
               />
             )
           )}
@@ -879,6 +901,7 @@ function MainApp() {
             <ContractGeneratorPage
               currentUser={user}
               properties={properties}
+              companySettings={companySettings}
             />
           )}
 
@@ -906,6 +929,7 @@ function MainApp() {
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
               onShareWhatsApp={handleShareWhatsApp}
+              onGenerateSocialMedia={handleGenerateSocialMedia}
             />
           )}
 
