@@ -276,7 +276,6 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
                 onView={onViewProperty}
                 onEdit={onEditProperty}
                 onDelete={onDeleteProperty}
-                onShareWhatsApp={onShareWhatsApp}
                 onGenerateSocialMedia={onGenerateSocialMedia}
                 canEdit={canEdit}
               />

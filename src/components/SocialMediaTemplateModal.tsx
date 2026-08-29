@@ -20,7 +20,7 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
   companySettings,
   onClose
 }) => {
-  const [selectedTemplate, setSelectedTemplate] = useState<SocialMediaTemplate>('gradient');
+  const [selectedTemplate, setSelectedTemplate] = useState<SocialMediaTemplate>('capa');
   const [previewFormat, setPreviewFormat] = useState<'feed' | 'story'>('feed');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(true);
@@ -196,53 +196,77 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
                 Escolha o Modelo de Design
               </label>
 
-              <div className="grid grid-cols-2 gap-3">
-                {/* Template Gradient */}
+              <div className="grid grid-cols-3 gap-2">
+                {/* Template Capa */}
                 <button
                   type="button"
-                  onClick={() => setSelectedTemplate('gradient')}
-                  className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 relative ${
-                    selectedTemplate === 'gradient'
+                  onClick={() => setSelectedTemplate('capa')}
+                  className={`p-2.5 rounded-2xl border text-left transition flex flex-col justify-between gap-1.5 relative ${
+                    selectedTemplate === 'capa'
                       ? 'border-[#F10F4D] bg-[#F10F4D]/10 text-white'
                       : 'border-slate-800 bg-slate-800/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                   }`}
                 >
-                  {selectedTemplate === 'gradient' && (
-                    <CheckCircle2 className="w-4 h-4 text-[#F10F4D] absolute top-2.5 right-2.5" />
+                  {selectedTemplate === 'capa' && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#F10F4D] absolute top-2 right-2" />
                   )}
                   <div>
-                    <span className="text-xs font-extrabold block text-white">Gradiente</span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5 leading-tight">
-                      Foto em tela cheia com painel escuro translúcido.
+                    <span className="text-[11px] font-extrabold block text-white">Capa</span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5 leading-tight">
+                      Destaque fotográfico e especificações.
                     </span>
                   </div>
-                  <div className="h-6 rounded-lg bg-gradient-to-t from-black to-transparent border border-white/10 flex items-end p-1">
-                    <div className="w-6 h-1.5 bg-[#F10F4D] rounded-xs" />
+                  <div className="h-5 rounded bg-slate-800 border border-white/10 flex items-end p-0.5">
+                    <div className="w-4 h-1 bg-[#F10F4D] rounded-xs" />
                   </div>
                 </button>
 
-                {/* Template Card */}
+                {/* Template Ficha */}
                 <button
                   type="button"
-                  onClick={() => setSelectedTemplate('card')}
-                  className={`p-3 rounded-2xl border text-left transition flex flex-col justify-between gap-2 relative ${
-                    selectedTemplate === 'card'
+                  onClick={() => setSelectedTemplate('ficha')}
+                  className={`p-2.5 rounded-2xl border text-left transition flex flex-col justify-between gap-1.5 relative ${
+                    selectedTemplate === 'ficha'
                       ? 'border-[#F10F4D] bg-[#F10F4D]/10 text-white'
                       : 'border-slate-800 bg-slate-800/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
                   }`}
                 >
-                  {selectedTemplate === 'card' && (
-                    <CheckCircle2 className="w-4 h-4 text-[#F10F4D] absolute top-2.5 right-2.5" />
+                  {selectedTemplate === 'ficha' && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#F10F4D] absolute top-2 right-2" />
                   )}
                   <div>
-                    <span className="text-xs font-extrabold block text-white">Card Catálogo</span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5 leading-tight">
-                      Foto no topo e cartão informativo sólido na base.
+                    <span className="text-[11px] font-extrabold block text-white">Ficha Técnica</span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5 leading-tight">
+                      Detalhes e botão de agendamento.
                     </span>
                   </div>
-                  <div className="h-6 rounded-lg bg-slate-900 border border-slate-700 flex flex-col justify-between p-1">
-                    <div className="w-full h-2 bg-slate-700 rounded-xs" />
-                    <div className="w-8 h-1 bg-[#F10F4D] rounded-xs" />
+                  <div className="h-5 rounded bg-white border border-slate-700 flex flex-col justify-between p-0.5">
+                    <div className="w-full h-1.5 bg-slate-200 rounded-xs" />
+                    <div className="w-5 h-1 bg-[#F10F4D] rounded-xs" />
+                  </div>
+                </button>
+
+                {/* Template Premium */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedTemplate('premium')}
+                  className={`p-2.5 rounded-2xl border text-left transition flex flex-col justify-between gap-1.5 relative ${
+                    selectedTemplate === 'premium'
+                      ? 'border-[#F10F4D] bg-[#F10F4D]/10 text-white'
+                      : 'border-slate-800 bg-slate-800/40 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  }`}
+                >
+                  {selectedTemplate === 'premium' && (
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#F10F4D] absolute top-2 right-2" />
+                  )}
+                  <div>
+                    <span className="text-[11px] font-extrabold block text-white">Alto Padrão</span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5 leading-tight">
+                      Editorial minimalista sofisticado.
+                    </span>
+                  </div>
+                  <div className="h-5 rounded bg-[#111114] border border-slate-700 flex items-center justify-center p-0.5">
+                    <div className="w-3 h-1 bg-[#F10F4D] rounded-xs" />
                   </div>
                 </button>
               </div>
