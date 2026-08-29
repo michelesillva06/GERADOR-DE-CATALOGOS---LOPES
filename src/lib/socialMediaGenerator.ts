@@ -453,18 +453,38 @@ async function renderSocialCanvas(
   const images = extractPropertyImages(prop);
   const mainImg = await loadImageElement(images[0] || '');
 
+  // Real-estate photos captadores upload are usually plain phone snapshots (flat lighting,
+  // muted colors) rather than professionally shot/rendered images. A gentle brightness/
+  // contrast/saturation boost — the same kind of correction a phone camera app applies
+  // automatically — makes them read as noticeably more polished, without altering anything
+  // about the property itself (no AI-invented details, so nothing here can misrepresent what's
+  // actually being advertised). Reset the filter right after so it never leaks into the
+  // text/icon drawing that follows.
+  const applyPhotoEnhancement = () => {
+    ctx.filter = 'brightness(1.06) contrast(1.14) saturate(1.22)';
+  };
+  const resetFilter = () => {
+    ctx.filter = 'none';
+  };
+
   if (template === 'capa') {
     const photoH = height * 0.68;
+    applyPhotoEnhancement();
     drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
+    resetFilter();
     drawCapaTemplate(ctx, prop, companySettings, width, height, photoH);
   } else if (template === 'ficha') {
     const photoH = height * 0.32;
+    applyPhotoEnhancement();
     drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
+    resetFilter();
     drawFichaTemplate(ctx, prop, companySettings, width, height, photoH);
   } else {
     const photoY = 0;
     const photoH = height * 0.78;
+    applyPhotoEnhancement();
     drawRoundedImage(ctx, mainImg, 0, photoY, width, photoH, 0, prop.title);
+    resetFilter();
     drawPremiumTemplate(ctx, prop, companySettings, width, height, photoY, photoH);
   }
 
