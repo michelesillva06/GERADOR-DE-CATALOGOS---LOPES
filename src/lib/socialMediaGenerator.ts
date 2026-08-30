@@ -151,11 +151,15 @@ function drawPinIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: num
 interface SpecItem { icon: (ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) => void; label: string; }
 
 function buildSpecItems(prop: Property): SpecItem[] {
+  // Same fallback the PDF catalog already uses: some captadores only fill in built_area, others
+  // only total_area — checking a single field left the spec silently blank/missing for listings
+  // that had the data under the other one.
+  const areaValue = prop.built_area || prop.total_area;
   return [
     prop.bedrooms ? { icon: drawBedIcon, label: `${prop.bedrooms} Quartos` } : null,
     prop.bathrooms ? { icon: drawShowerIcon, label: `${prop.bathrooms} Banheiros` } : null,
     prop.parking_spaces ? { icon: drawCarIcon, label: `${prop.parking_spaces} Vagas` } : null,
-    prop.total_area ? { icon: drawAreaIcon, label: `${prop.total_area}m²` } : null
+    areaValue ? { icon: drawAreaIcon, label: `${areaValue}m²` } : null
   ].filter((x): x is SpecItem => x !== null);
 }
 
@@ -313,44 +317,65 @@ function drawFichaTemplate(
   ctx.moveTo(pad, y);
   ctx.lineTo(canvasW - pad, y);
   ctx.stroke();
-  y += canvasW * 0.05;
+  y += canvasW * 0.055;
 
-  // Detail list — label / value pairs, two columns
-  const details = [
-    ['Quartos', String(prop.bedrooms || '-')],
-    ['Suítes', String(prop.suites || '-')],
-    ['Banheiros', String(prop.bathrooms || '-')],
-    ['Vagas', String(prop.parking_spaces || '-')],
-    ['Área', prop.total_area ? `${prop.total_area}m²` : '-']
+  // Detail cards — icon + label + value, bordered, matching the same visual language already
+  // approved in the PDF catalog's property page (feature cards), instead of bare text.
+  // Area falls back to built_area when total_area isn't set — the PDF catalog does the same,
+  // since captadores sometimes only fill in one of the two fields.
+  const areaValue = prop.built_area || prop.total_area;
+  const detailCards: { icon: (ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) => void; label: string; value: string }[] = [
+    { icon: drawBedIcon, label: 'QUARTOS', value: String(prop.bedrooms || '-') },
+    { icon: drawShowerIcon, label: 'BANHOS', value: String(prop.bathrooms || '-') },
+    { icon: drawCarIcon, label: 'VAGAS', value: String(prop.parking_spaces || '-') },
+    { icon: drawAreaIcon, label: 'ÁREA', value: areaValue ? `${areaValue}m²` : '-' }
   ];
-  const colW = (canvasW - pad * 2) / 2;
-  details.forEach(([label, value], i) => {
-    const col = i % 2;
-    const row = Math.floor(i / 2);
-    const dx = pad + col * colW;
-    const dy = y + row * (canvasW * 0.075);
-    ctx.font = `600 ${canvasW * 0.025}px sans-serif`;
-    ctx.fillStyle = '#9CA3AF';
-    ctx.fillText(label, dx, dy);
-    ctx.font = `800 ${canvasW * 0.034}px sans-serif`;
-    ctx.fillStyle = NEAR_BLACK;
-    ctx.fillText(value, dx, dy + canvasW * 0.038);
-  });
-  y += Math.ceil(details.length / 2) * (canvasW * 0.075) + canvasW * 0.03;
+  // A single row of 4 compact cards — not a 2x2 grid — so the section stays short enough to
+  // always leave room for the description above the fixed price bar at the bottom, regardless
+  // of how many lines the title/description wrap to.
+  const cardGapX = canvasW * 0.02;
+  const cardW = (canvasW - pad * 2 - cardGapX * 3) / 4;
+  const cardH = canvasW * 0.16;
 
-  // Description
+  detailCards.forEach((card, i) => {
+    const cx = pad + i * (cardW + cardGapX);
+    const cy = y;
+
+    ctx.strokeStyle = '#E5E7EB';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(cx, cy, cardW, cardH, canvasW * 0.015);
+    ctx.stroke();
+
+    const iconSize = canvasW * 0.042;
+    const iconX = cx + cardW / 2 - iconSize / 2;
+    card.icon(ctx, iconX, cy + cardH * 0.18, iconSize, LOPES_RED);
+
+    ctx.textAlign = 'center';
+    ctx.font = `800 ${canvasW * 0.026}px sans-serif`;
+    ctx.fillStyle = NEAR_BLACK;
+    ctx.fillText(card.value, cx + cardW / 2, cy + cardH * 0.72);
+    ctx.font = `700 ${canvasW * 0.014}px sans-serif`;
+    ctx.fillStyle = '#9CA3AF';
+    ctx.fillText(card.label, cx + cardW / 2, cy + cardH * 0.9);
+    ctx.textAlign = 'left';
+  });
+  y += cardH + canvasW * 0.045;
+
+  // Description — capped to 2 lines so it reliably fits in the remaining space above the price
+  // bar, which stays anchored to a fixed position near the bottom of the canvas.
   if (prop.description) {
     ctx.font = `500 ${canvasW * 0.024}px sans-serif`;
     ctx.fillStyle = '#4B5563';
     const descLines = wrapText(ctx, prop.description, canvasW - pad * 2);
-    descLines.slice(0, 3).forEach(line => {
+    descLines.slice(0, 2).forEach(line => {
       ctx.fillText(line, pad, y);
       y += canvasW * 0.033;
     });
-    y += canvasW * 0.02;
   }
 
-  // Price + CTA bar
+  // Price + CTA bar — anchored to the bottom, so short descriptions never leave a dead gap
+  // above it the way a fixed "y +=" offset would.
   const ctaH = canvasW * 0.13;
   const ctaY = canvasH - ctaH - canvasW * 0.06;
   ctx.fillStyle = LOPES_RED;
@@ -474,7 +499,7 @@ async function renderSocialCanvas(
     resetFilter();
     drawCapaTemplate(ctx, prop, companySettings, width, height, photoH);
   } else if (template === 'ficha') {
-    const photoH = height * 0.32;
+    const photoH = height * 0.4;
     applyPhotoEnhancement();
     drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
     resetFilter();
