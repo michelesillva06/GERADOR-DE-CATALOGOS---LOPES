@@ -29,6 +29,17 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines;
 }
 
+/** Shortens text with an ellipsis if it would overflow maxWidth — used for single-line fields
+ * (like location) that must never wrap or run off the edge of the canvas. */
+function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let truncated = text;
+  while (truncated.length > 1 && ctx.measureText(truncated + '…').width > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated + '…';
+}
+
 // =============================================================================
 // VECTOR ICONS — simple line icons drawn with canvas paths. No emoji: the brand rules for this
 // generator explicitly call for a clean, editorial look, and emoji render inconsistently across
@@ -230,7 +241,7 @@ function drawCapaTemplate(
   py += canvasW * 0.055;
 
   ctx.font = `600 ${canvasW * 0.026}px sans-serif`;
-  const locationText = `${prop.neighborhood} | ${prop.city}`;
+  const locationText = truncateText(ctx, `${prop.neighborhood} | ${prop.city}`, canvasW - pad * 2 - canvasW * 0.06);
   const locW = ctx.measureText(locationText).width;
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
   ctx.beginPath();
@@ -286,7 +297,8 @@ function drawFichaTemplate(
   companySettings: CompanySettings,
   canvasW: number,
   canvasH: number,
-  photoH: number
+  photoH: number,
+  galleryImgs: (HTMLImageElement | null)[] = []
 ) {
   const pad = canvasW * 0.06;
   const priceInfo = getPropertyPriceInfo(prop);
@@ -309,7 +321,7 @@ function drawFichaTemplate(
   drawPinIcon(ctx, pad, y - canvasW * 0.03, canvasW * 0.032, LOPES_RED);
   ctx.font = `600 ${canvasW * 0.028}px sans-serif`;
   ctx.fillStyle = '#4B5563';
-  ctx.fillText(`${prop.neighborhood} · ${prop.city}  —  ${prop.category}`, pad + canvasW * 0.045, y);
+  ctx.fillText(truncateText(ctx, `${prop.neighborhood} · ${prop.city}  —  ${prop.category}`, canvasW - pad * 2 - canvasW * 0.045), pad + canvasW * 0.045, y);
   y += canvasW * 0.06;
 
   ctx.strokeStyle = '#E5E7EB';
@@ -330,9 +342,9 @@ function drawFichaTemplate(
     { icon: drawCarIcon, label: 'VAGAS', value: String(prop.parking_spaces || '-') },
     { icon: drawAreaIcon, label: 'ÁREA', value: areaValue ? `${areaValue}m²` : '-' }
   ];
-  // A single row of 4 compact cards — not a 2x2 grid — so the section stays short enough to
-  // always leave room for the description above the fixed price bar at the bottom, regardless
-  // of how many lines the title/description wrap to.
+  // A single row of 4 compact cards — not a 2x2 grid — keeps this section short and
+  // predictable, which matters now that the price bar below is positioned dynamically instead
+  // of at a fixed spot (see the end of this function).
   const cardGapX = canvasW * 0.02;
   const cardW = (canvasW - pad * 2 - cardGapX * 3) / 4;
   const cardH = canvasW * 0.16;
@@ -362,9 +374,25 @@ function drawFichaTemplate(
   });
   y += cardH + canvasW * 0.045;
 
-  // Description — capped to 2 lines so it reliably fits in the remaining space above the price
-  // bar, which stays anchored to a fixed position near the bottom of the canvas.
-  if (prop.description) {
+  // Photo gallery strip — the extra interior/exterior photos, matching the multi-photo layout
+  // already approved in the PDF catalog page — up to 3 more images beyond the main one. Shown
+  // instead of the description text when available: there usually isn't room for both in a
+  // portrait frame this size, and actual room photos sell the property harder than more text.
+  const validGalleryImgs = galleryImgs.filter((img): img is HTMLImageElement => img !== null);
+  if (validGalleryImgs.length > 0) {
+    const thumbGap = canvasW * 0.02;
+    const thumbCount = Math.min(validGalleryImgs.length, 3);
+    const thumbW = (canvasW - pad * 2 - thumbGap * (thumbCount - 1)) / thumbCount;
+    const thumbH = canvasW * 0.15;
+    ctx.filter = 'brightness(1.06) contrast(1.14) saturate(1.22)';
+    for (let i = 0; i < thumbCount; i++) {
+      const tx = pad + i * (thumbW + thumbGap);
+      drawRoundedImage(ctx, validGalleryImgs[i], tx, y, thumbW, thumbH, canvasW * 0.015);
+    }
+    ctx.filter = 'none';
+    y += thumbH + canvasW * 0.045;
+  } else if (prop.description) {
+    // Only one photo available — fall back to the description text instead of an empty gallery.
     ctx.font = `500 ${canvasW * 0.024}px sans-serif`;
     ctx.fillStyle = '#4B5563';
     const descLines = wrapText(ctx, prop.description, canvasW - pad * 2);
@@ -372,12 +400,18 @@ function drawFichaTemplate(
       ctx.fillText(line, pad, y);
       y += canvasW * 0.033;
     });
+    y += canvasW * 0.02;
   }
 
-  // Price + CTA bar — anchored to the bottom, so short descriptions never leave a dead gap
-  // above it the way a fixed "y +=" offset would.
+  // Price + CTA bar — positioned right after whatever content came before it (cards, then
+  // gallery or description), instead of a fixed spot near the bottom. A fixed position either
+  // overlapped taller content or left a dead gap under shorter content; anchoring it to the
+  // actual content height fixes both. The clamp is a safety net for extreme edge cases (very
+  // long title wrapping to 2 lines AND a gallery both present) so the bar never runs off the
+  // bottom edge of the canvas.
   const ctaH = canvasW * 0.13;
-  const ctaY = canvasH - ctaH - canvasW * 0.06;
+  const maxCtaY = canvasH - ctaH - canvasW * 0.04;
+  const ctaY = Math.min(y + canvasW * 0.03, maxCtaY);
   ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
   ctx.roundRect(pad, ctaY, canvasW - pad * 2, ctaH, canvasW * 0.02);
@@ -499,11 +533,16 @@ async function renderSocialCanvas(
     resetFilter();
     drawCapaTemplate(ctx, prop, companySettings, width, height, photoH);
   } else if (template === 'ficha') {
-    const photoH = height * 0.4;
+    const photoH = height * 0.32;
     applyPhotoEnhancement();
     drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
     resetFilter();
-    drawFichaTemplate(ctx, prop, companySettings, width, height, photoH);
+    // Small gallery strip of extra photos, matching the multi-photo layout already approved in
+    // the PDF catalog page — up to 3 more images beyond the main one.
+    const galleryImgs = await Promise.all(
+      images.slice(1, 4).map(url => loadImageElement(url))
+    );
+    drawFichaTemplate(ctx, prop, companySettings, width, height, photoH, galleryImgs);
   } else {
     const photoY = 0;
     const photoH = height * 0.78;
