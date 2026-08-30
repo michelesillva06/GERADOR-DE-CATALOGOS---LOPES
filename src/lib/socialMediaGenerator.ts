@@ -38,131 +38,74 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
 }
 
 // =============================================================================
-// VECTOR ICONS — simple line/fill icons drawn with canvas paths. No emoji, no external icon
-// library: this generator's brand rules call for a clean, editorial look, and emoji render
-// inconsistently across devices/browsers.
+// VECTOR ICONS — the actual Lucide icon paths (the same icon set used everywhere else in this
+// app's UI), rendered on canvas via Path2D. Hand-drawn placeholder icons read as noticeably
+// less polished than a real, professionally designed icon set, so this generator uses the real
+// thing instead of reinventing bed/car/shower shapes from scratch.
 // =============================================================================
 
-function drawHouseIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(x + s * 0.5, y);
-  ctx.lineTo(x + s * 0.95, y + s * 0.42);
-  ctx.lineTo(x + s * 0.8, y + s * 0.42);
-  ctx.lineTo(x + s * 0.8, y + s * 0.95);
-  ctx.lineTo(x + s * 0.2, y + s * 0.95);
-  ctx.lineTo(x + s * 0.2, y + s * 0.42);
-  ctx.lineTo(x + s * 0.05, y + s * 0.42);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+type LucideNode = { d: string } | { cx: number; cy: number; r: number };
+
+function isCircleNode(node: LucideNode): node is { cx: number; cy: number; r: number } {
+  return 'cx' in node;
 }
 
-function drawBedIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
+/** Draws a 24x24-viewBox Lucide icon at (x, y) scaled to `size`, stroked in `color`. */
+function drawLucideIcon(ctx: CanvasRenderingContext2D, nodes: LucideNode[], x: number, y: number, size: number, color: string) {
   ctx.save();
+  ctx.translate(x, y);
+  const scale = size / 24;
+  ctx.scale(scale, scale);
   ctx.strokeStyle = color;
-  ctx.lineWidth = s * 0.07;
+  ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.roundRect(x, y + s * 0.45, s, s * 0.35, s * 0.08);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.roundRect(x + s * 0.08, y + s * 0.15, s * 0.32, s * 0.32, s * 0.06);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x + s * 0.05, y + s * 0.8);
-  ctx.lineTo(x + s * 0.05, y + s * 0.95);
-  ctx.moveTo(x + s * 0.95, y + s * 0.8);
-  ctx.lineTo(x + s * 0.95, y + s * 0.95);
-  ctx.stroke();
+  for (const node of nodes) {
+    if (isCircleNode(node)) {
+      ctx.beginPath();
+      ctx.arc(node.cx, node.cy, node.r, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.stroke(new Path2D(node.d));
+    }
+  }
   ctx.restore();
 }
 
-function drawShowerIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = s * 0.08;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.roundRect(x + s * 0.15, y + s * 0.05, s * 0.7, s * 0.22, s * 0.1);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x + s * 0.28, y + s * 0.42);
-  ctx.lineTo(x + s * 0.24, y + s * 0.85);
-  ctx.moveTo(x + s * 0.5, y + s * 0.42);
-  ctx.lineTo(x + s * 0.5, y + s * 0.9);
-  ctx.moveTo(x + s * 0.72, y + s * 0.42);
-  ctx.lineTo(x + s * 0.76, y + s * 0.85);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawCarIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = s * 0.07;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(x, y + s * 0.65);
-  ctx.lineTo(x + s * 0.12, y + s * 0.35);
-  ctx.quadraticCurveTo(x + s * 0.2, y + s * 0.25, x + s * 0.32, y + s * 0.25);
-  ctx.lineTo(x + s * 0.68, y + s * 0.25);
-  ctx.quadraticCurveTo(x + s * 0.8, y + s * 0.25, x + s * 0.88, y + s * 0.35);
-  ctx.lineTo(x + s, y + s * 0.65);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.roundRect(x, y + s * 0.6, s, s * 0.15, s * 0.04);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(x + s * 0.24, y + s * 0.78, s * 0.11, 0, Math.PI * 2);
-  ctx.arc(x + s * 0.76, y + s * 0.78, s * 0.11, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawAreaIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = s * 0.08;
-  ctx.lineCap = 'round';
-  const armLen = s * 0.32;
-  const corners: [number, number, number, number][] = [
-    [x, y, 1, 1],
-    [x + s, y, -1, 1],
-    [x, y + s, 1, -1],
-    [x + s, y + s, -1, -1]
-  ];
-  corners.forEach(([cx, cy, dx, dy]) => {
-    ctx.beginPath();
-    ctx.moveTo(cx + dx * armLen, cy);
-    ctx.lineTo(cx, cy);
-    ctx.lineTo(cx, cy + dy * armLen);
-    ctx.stroke();
-  });
-  ctx.restore();
-}
-
-function drawPinIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x + s * 0.5, y + s * 0.38, s * 0.38, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(x + s * 0.5, y + s);
-  ctx.lineTo(x + s * 0.24, y + s * 0.55);
-  ctx.lineTo(x + s * 0.76, y + s * 0.55);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(x + s * 0.5, y + s * 0.38, s * 0.15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
+// Icon path data copied directly from lucide-react (same package this app's UI already uses).
+const ICON_HOUSE: LucideNode[] = [
+  { d: 'M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8' },
+  { d: 'M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' }
+];
+const ICON_BED: LucideNode[] = [
+  { d: 'M2 4v16' },
+  { d: 'M2 8h18a2 2 0 0 1 2 2v10' },
+  { d: 'M2 17h20' },
+  { d: 'M6 8v9' }
+];
+const ICON_BATH: LucideNode[] = [
+  { d: 'M10 4 8 6' },
+  { d: 'M17 19v2' },
+  { d: 'M2 12h20' },
+  { d: 'M7 19v2' },
+  { d: 'M9 5 7.621 3.621A2.121 2.121 0 0 0 4 5v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5' }
+];
+const ICON_CAR: LucideNode[] = [
+  { d: 'M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2' },
+  { cx: 7, cy: 17, r: 2 },
+  { d: 'M9 17h6' },
+  { cx: 17, cy: 17, r: 2 }
+];
+const ICON_MAXIMIZE: LucideNode[] = [
+  { d: 'M8 3H5a2 2 0 0 0-2 2v3' },
+  { d: 'M21 8V5a2 2 0 0 0-2-2h-3' },
+  { d: 'M3 16v3a2 2 0 0 0 2 2h3' },
+  { d: 'M16 21h3a2 2 0 0 0 2-2v-3' }
+];
+const ICON_MAP_PIN: LucideNode[] = [
+  { d: 'M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0' },
+  { cx: 12, cy: 10, r: 3 }
+];
 
 /**
  * THE template — a single standard layout modeled directly on the style Michele approved
@@ -207,7 +150,7 @@ function drawStandardTemplate(
   ctx.beginPath();
   ctx.roundRect(badgeX, canvasW * 0.025, badgeW, badgeH, [canvasW * 0.03, 0, 0, canvasW * 0.03]);
   ctx.fill();
-  drawHouseIcon(ctx, badgeX + canvasW * 0.025, canvasW * 0.025 + badgeH * 0.28, canvasW * 0.035, '#FFFFFF');
+  drawLucideIcon(ctx, ICON_HOUSE, badgeX + canvasW * 0.02, canvasW * 0.025 + badgeH * 0.22, canvasW * 0.04, '#FFFFFF');
   ctx.fillStyle = '#FFFFFF';
   ctx.fillText(purposeText, badgeX + canvasW * 0.075, canvasW * 0.025 + badgeH * 0.6);
 
@@ -223,7 +166,7 @@ function drawStandardTemplate(
   ctx.beginPath();
   ctx.arc(pad + circleR, y, circleR, 0, Math.PI * 2);
   ctx.fill();
-  drawHouseIcon(ctx, pad + circleR - circleR * 0.5, y - circleR * 0.5, circleR, '#FFFFFF');
+  drawLucideIcon(ctx, ICON_HOUSE, pad + circleR - circleR * 0.55, y - circleR * 0.55, circleR * 1.1, '#FFFFFF');
 
   const titleX = pad + circleR * 2 + canvasW * 0.03;
   ctx.font = `900 ${canvasW * 0.04}px sans-serif`;
@@ -235,12 +178,15 @@ function drawStandardTemplate(
 
   y += circleR + canvasW * 0.055;
 
-  // Location / Área / Preço info boxes, single row
+  // Location / Área / Preço info boxes, single row. Área only gets its own box when the
+  // property actually has that data — showing a bare "-" in a labeled box reads as broken to
+  // someone viewing the post, worse than just not mentioning it at all.
+  const areaValue = prop.built_area || prop.total_area;
   const boxGap = canvasW * 0.025;
   const boxH = canvasW * 0.175;
-  const locW = canvasW * 0.31;
-  const areaW = canvasW * 0.21;
-  const priceW = canvasW - pad * 2 - locW - areaW - boxGap * 2;
+  const locW = areaValue ? canvasW * 0.31 : canvasW * 0.42;
+  const areaW = areaValue ? canvasW * 0.21 : 0;
+  const priceW = canvasW - pad * 2 - locW - areaW - boxGap * (areaValue ? 2 : 1);
 
   const drawInfoBox = (bx: number, bw: number, filled: boolean) => {
     ctx.fillStyle = filled ? LOPES_RED : '#F8FAFC';
@@ -255,7 +201,7 @@ function drawStandardTemplate(
   // Localização box
   let bx = pad;
   drawInfoBox(bx, locW, false);
-  drawPinIcon(ctx, bx + canvasW * 0.02, y + canvasW * 0.02, canvasW * 0.032, LOPES_RED);
+  drawLucideIcon(ctx, ICON_MAP_PIN, bx + canvasW * 0.02, y + canvasW * 0.018, canvasW * 0.036, LOPES_RED);
   ctx.font = `700 ${canvasW * 0.016}px sans-serif`;
   ctx.fillStyle = '#9CA3AF';
   ctx.fillText('LOCALIZAÇÃO', bx + canvasW * 0.02, y + canvasW * 0.09);
@@ -266,20 +212,21 @@ function drawStandardTemplate(
     ctx.fillText(line, bx + canvasW * 0.02, y + canvasW * 0.12 + i * canvasW * 0.025);
   });
 
-  // Área box
-  bx = pad + locW + boxGap;
-  drawInfoBox(bx, areaW, false);
-  const areaValue = prop.built_area || prop.total_area;
-  drawAreaIcon(ctx, bx + canvasW * 0.02, y + canvasW * 0.02, canvasW * 0.032, LOPES_RED);
-  ctx.font = `700 ${canvasW * 0.016}px sans-serif`;
-  ctx.fillStyle = '#9CA3AF';
-  ctx.fillText('ÁREA', bx + canvasW * 0.02, y + canvasW * 0.09);
-  ctx.font = `800 ${canvasW * 0.024}px sans-serif`;
-  ctx.fillStyle = NEAR_BLACK;
-  ctx.fillText(areaValue ? `${areaValue}m²` : '-', bx + canvasW * 0.02, y + canvasW * 0.13);
+  // Área box — only drawn when there's real data to show
+  if (areaValue) {
+    bx = pad + locW + boxGap;
+    drawInfoBox(bx, areaW, false);
+    drawLucideIcon(ctx, ICON_MAXIMIZE, bx + canvasW * 0.02, y + canvasW * 0.018, canvasW * 0.036, LOPES_RED);
+    ctx.font = `700 ${canvasW * 0.016}px sans-serif`;
+    ctx.fillStyle = '#9CA3AF';
+    ctx.fillText('ÁREA', bx + canvasW * 0.02, y + canvasW * 0.09);
+    ctx.font = `800 ${canvasW * 0.024}px sans-serif`;
+    ctx.fillStyle = NEAR_BLACK;
+    ctx.fillText(`${areaValue}m²`, bx + canvasW * 0.02, y + canvasW * 0.13);
+  }
 
   // Preço box (filled red)
-  bx = pad + locW + areaW + boxGap * 2;
+  bx = pad + locW + areaW + boxGap * (areaValue ? 2 : 1);
   drawInfoBox(bx, priceW, true);
   ctx.font = `900 ${canvasW * 0.03}px sans-serif`;
   ctx.fillStyle = '#FFFFFF';
@@ -302,19 +249,22 @@ function drawStandardTemplate(
   ctx.fill();
   ctx.fillStyle = '#FFFFFF';
   ctx.fillText(labelText, pad + canvasW * 0.025, y + canvasW * 0.031);
-  y += canvasW * 0.045 + canvasW * 0.05;
+  y += canvasW * 0.045 + canvasW * 0.06;
 
-  // Feature icons row: quartos, banheiros, vagas
-  const features: { icon: (ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) => void; value: string; label: string }[] = [
-    { icon: drawBedIcon, value: String(prop.bedrooms || '-'), label: 'QUARTOS' },
-    { icon: drawShowerIcon, value: String(prop.bathrooms || '-'), label: 'BANHEIROS' },
-    { icon: drawCarIcon, value: String(prop.parking_spaces || '-'), label: 'VAGAS' }
+  // Feature icons row: quartos, banheiros, vagas, área (área repeated here even when it also
+  // has its own info box above — grouping every spec together under "Características" reads
+  // more complete than splitting them, and matches the reference layout Michele approved).
+  const features: { icon: LucideNode[]; value: string; label: string }[] = [
+    { icon: ICON_BED, value: String(prop.bedrooms || '-'), label: 'QUARTOS' },
+    { icon: ICON_BATH, value: String(prop.bathrooms || '-'), label: 'BANHEIROS' },
+    { icon: ICON_CAR, value: String(prop.parking_spaces || '-'), label: 'VAGAS' },
+    { icon: ICON_MAXIMIZE, value: areaValue ? `${areaValue}m²` : '-', label: 'ÁREA' }
   ];
   const featColW = (canvasW - pad * 2) / features.length;
   features.forEach((f, i) => {
     const fx = pad + i * featColW + featColW / 2;
     const iconSize = canvasW * 0.05;
-    f.icon(ctx, fx - iconSize / 2, y, iconSize, LOPES_RED);
+    drawLucideIcon(ctx, f.icon, fx - iconSize / 2, y, iconSize, LOPES_RED);
     ctx.textAlign = 'center';
     ctx.font = `900 ${canvasW * 0.03}px sans-serif`;
     ctx.fillStyle = NEAR_BLACK;
@@ -324,16 +274,21 @@ function drawStandardTemplate(
     ctx.fillText(f.label, fx, y + iconSize + canvasW * 0.058);
     ctx.textAlign = 'left';
   });
-  y += canvasW * 0.05 + canvasW * 0.075;
+  y += canvasW * 0.05 + canvasW * 0.09;
 
-  // Footer logo — positioned dynamically right after the content above, clamped so it never
-  // runs past the bottom edge on the taller Story canvas.
-  const footerY = Math.min(y, canvasH - canvasW * 0.09);
-  drawLopesHeart(ctx, canvasW / 2 - canvasW * 0.022, footerY, canvasW * 0.044, LOPES_RED);
+  // Footer band — a full-width colored strip rather than a logo floating on bare white space.
+  // On the Story format especially, there's meaningfully more vertical room below the content
+  // than on Feed; a deliberate footer band fills that space as a designed element instead of
+  // reading as "ran out of content halfway down the image".
+  const footerBandH = canvasH - y;
+  ctx.fillStyle = '#FFF1F4';
+  ctx.fillRect(0, y, canvasW, footerBandH);
+  const footerCenterY = y + footerBandH / 2;
+  drawLopesHeart(ctx, canvasW / 2 - canvasW * 0.022, footerCenterY - canvasW * 0.06, canvasW * 0.044, LOPES_RED);
   ctx.font = `800 ${canvasW * 0.022}px sans-serif`;
   ctx.fillStyle = NEAR_BLACK;
   ctx.textAlign = 'center';
-  ctx.fillText(companySettings.company_name || 'Lopes Manaus', canvasW / 2, footerY + canvasW * 0.06);
+  ctx.fillText(companySettings.company_name || 'Lopes Manaus', canvasW / 2, footerCenterY + canvasW * 0.01);
   ctx.textAlign = 'left';
 }
 

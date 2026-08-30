@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
 import { PropertyUpdateReminderModal } from './components/PropertyUpdateReminderModal';
-import { SocialMediaTemplateModal } from './components/SocialMediaTemplateModal';
 import { needsStatusCheck } from './components/PropertyUpdateAlerts';
 import { Sidebar } from './components/Sidebar';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -74,7 +73,6 @@ function MainApp() {
   const [pdfModalScope, setPdfModalScope] = useState<'meus' | 'todos'>('meus');
   const [pdfPrefilteredProps, setPdfPrefilteredProps] = useState<Property[] | undefined>(undefined);
   const [showUpdateReminder, setShowUpdateReminder] = useState(false);
-  const [socialMediaTarget, setSocialMediaTarget] = useState<Property | null>(null);
 
   // Only the current user's own properties for a captador; every property for admin/gestor
   const updateReminderProperties = useMemo(() => {
@@ -440,8 +438,19 @@ function MainApp() {
     window.open(waUrl, '_blank');
   };
 
-  const handleGenerateSocialMedia = (prop: Property) => {
-    setSocialMediaTarget(prop);
+  const [generatingSocialMediaFor, setGeneratingSocialMediaFor] = useState<string | null>(null);
+
+  const handleGenerateSocialMedia = async (prop: Property) => {
+    setGeneratingSocialMediaFor(prop.id);
+    try {
+      const { generateAndDownloadSocialMedia } = await import('./lib/socialMediaGenerator');
+      await generateAndDownloadSocialMedia(prop, companySettings);
+    } catch (err) {
+      console.error('Erro ao gerar mídia social:', err);
+      alert('Não foi possível gerar a mídia. Tente novamente.');
+    } finally {
+      setGeneratingSocialMediaFor(null);
+    }
   };
 
   const handleAddUser = async (userData: any) => {
@@ -874,14 +883,6 @@ function MainApp() {
           onConfirmed={handlePropertyStatusConfirmed}
           onClose={() => setShowUpdateReminder(false)}
           showOwnerName={user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA'}
-        />
-      )}
-
-      {socialMediaTarget && (
-        <SocialMediaTemplateModal
-          property={socialMediaTarget}
-          companySettings={companySettings}
-          onClose={() => setSocialMediaTarget(null)}
         />
       )}
 
