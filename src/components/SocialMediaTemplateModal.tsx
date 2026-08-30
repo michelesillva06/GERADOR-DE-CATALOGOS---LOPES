@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { Property, CompanySettings } from '../types';
-import { generateAndDownloadSocialMedia, SocialMediaTemplate } from '../lib/socialMediaGenerator';
-import { X, Loader2, Instagram } from 'lucide-react';
+import {
+  generateAndDownloadSocialMedia,
+  generateFeedPost,
+  generateStoryPost
+} from '../lib/socialMediaGenerator';
+import { X, Loader2, Instagram, Image, Smartphone, Download } from 'lucide-react';
 
 interface SocialMediaTemplateModalProps {
   property: Property;
@@ -9,80 +13,153 @@ interface SocialMediaTemplateModalProps {
   onClose: () => void;
 }
 
-const TEMPLATES: { id: SocialMediaTemplate; name: string; description: string }[] = [
-  {
-    id: 'capa',
-    name: 'Capa Premium',
-    description: 'Foto grande com selo, preço e localização sobre a imagem; título e características na parte de baixo.'
-  },
-  {
-    id: 'ficha',
-    name: 'Ficha Técnica',
-    description: 'Estilo catálogo: foto no topo, lista de detalhes, descrição e um botão de "Agende sua visita".'
-  },
-  {
-    id: 'premium',
-    name: 'Alto Padrão',
-    description: 'Fundo escuro elegante, poucos textos, bastante espaço — estilo revista imobiliária.'
-  }
-];
-
 export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> = ({
   property,
   companySettings,
   onClose
 }) => {
-  const [generatingTemplate, setGeneratingTemplate] = useState<SocialMediaTemplate | null>(null);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
-  const handleGenerate = async (template: SocialMediaTemplate) => {
-    setGeneratingTemplate(template);
+  const handleDownloadCanvas = (canvas: HTMLCanvasElement, filename: string) => {
+    const url = canvas.toDataURL('image/png', 0.95);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+  };
+
+  const handleGenerateAll = async () => {
+    setLoadingAction('all');
     try {
-      await generateAndDownloadSocialMedia(property, companySettings, template);
-      onClose();
+      await generateAndDownloadSocialMedia(property, companySettings);
+      setTimeout(onClose, 600);
     } catch (err) {
-      console.error('Erro ao gerar mídia social:', err);
-      alert('Não foi possível gerar a mídia. Tente novamente.');
+      console.error('Erro ao gerar mídias sociais:', err);
+      alert('Não foi possível gerar as mídias. Verifique a imagem do imóvel e tente novamente.');
     } finally {
-      setGeneratingTemplate(null);
+      setLoadingAction(null);
+    }
+  };
+
+  const handleGenerateFeed = async () => {
+    setLoadingAction('feed');
+    try {
+      const canvas = await generateFeedPost(property, companySettings);
+      handleDownloadCanvas(canvas, `${property.code}_feed_instagram.png`);
+      setTimeout(onClose, 600);
+    } catch (err) {
+      console.error('Erro ao gerar Feed:', err);
+      alert('Não foi possível gerar a imagem para o Feed.');
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleGenerateStory = async () => {
+    setLoadingAction('story');
+    try {
+      const canvas = await generateStoryPost(property, companySettings);
+      handleDownloadCanvas(canvas, `${property.code}_story_instagram.png`);
+      setTimeout(onClose, 600);
+    } catch (err) {
+      console.error('Erro ao gerar Story:', err);
+      alert('Não foi possível gerar a imagem para o Story.');
+    } finally {
+      setLoadingAction(null);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 p-5 border-b border-slate-100">
+        <div className="flex items-center justify-between gap-3 p-5 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center shrink-0 shadow-sm">
               <Instagram className="text-[#F10F4D]" size={20} />
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-800">Escolha o modelo</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Gera o Feed e o Story juntos, no modelo escolhido.</p>
+              <h2 className="text-base font-black text-slate-900">Gerar Mídia Social</h2>
+              <p className="text-xs text-slate-500 font-medium">Layout editorial padrão Lopes Manaus</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 shrink-0" title="Fechar">
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition shrink-0"
+            title="Fechar"
+          >
             <X size={18} />
           </button>
         </div>
 
-        <div className="p-4 space-y-3">
-          {TEMPLATES.map(t => (
-            <button
-              key={t.id}
-              onClick={() => handleGenerate(t.id)}
-              disabled={generatingTemplate !== null}
-              className="w-full text-left p-4 rounded-xl border border-slate-200 hover:border-[#F10F4D] hover:bg-rose-50/40 transition disabled:opacity-50 flex items-center justify-between gap-3"
-            >
-              <div>
-                <p className="text-sm font-bold text-slate-800">{t.name}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{t.description}</p>
+        <div className="p-5 space-y-3">
+          {/* Main Action: Generate Both */}
+          <button
+            onClick={handleGenerateAll}
+            disabled={loadingAction !== null}
+            className="w-full text-left p-4 rounded-2xl bg-[#F10F4D] hover:bg-rose-600 text-white transition disabled:opacity-50 flex items-center justify-between gap-3 shadow-md group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+                <Download size={18} className="text-white" />
               </div>
-              {generatingTemplate === t.id && <Loader2 size={18} className="animate-spin text-[#F10F4D] shrink-0" />}
+              <div>
+                <p className="text-sm font-bold">Baixar Ambos (Feed + Story)</p>
+                <p className="text-xs text-rose-100 mt-0.5">Gera e baixa as 2 versões em alta resolução</p>
+              </div>
+            </div>
+            {loadingAction === 'all' ? (
+              <Loader2 size={20} className="animate-spin text-white shrink-0" />
+            ) : (
+              <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg shrink-0">1-clique</span>
+            )}
+          </button>
+
+          <div className="relative py-2 flex items-center justify-center">
+            <div className="border-t border-slate-200 w-full" />
+            <span className="bg-white px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider absolute">Ou escolha o formato</span>
+          </div>
+
+          {/* Individual Options */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={handleGenerateFeed}
+              disabled={loadingAction !== null}
+              className="p-3.5 rounded-2xl border border-slate-200 hover:border-[#F10F4D] hover:bg-rose-50/30 transition disabled:opacity-50 flex flex-col items-center text-center gap-2 group"
+            >
+              <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-rose-100 flex items-center justify-center text-slate-600 group-hover:text-[#F10F4D] transition">
+                <Image size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">Apenas Feed</p>
+                <p className="text-[10px] text-slate-400">1080 x 1350 (4:5)</p>
+              </div>
+              {loadingAction === 'feed' && <Loader2 size={16} className="animate-spin text-[#F10F4D] mt-1" />}
             </button>
-          ))}
+
+            <button
+              onClick={handleGenerateStory}
+              disabled={loadingAction !== null}
+              className="p-3.5 rounded-2xl border border-slate-200 hover:border-[#F10F4D] hover:bg-rose-50/30 transition disabled:opacity-50 flex flex-col items-center text-center gap-2 group"
+            >
+              <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-rose-100 flex items-center justify-center text-slate-600 group-hover:text-[#F10F4D] transition">
+                <Smartphone size={18} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-800">Apenas Story</p>
+                <p className="text-[10px] text-slate-400">1080 x 1920 (9:16)</p>
+              </div>
+              {loadingAction === 'story' && <Loader2 size={16} className="animate-spin text-[#F10F4D] mt-1" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+          <p className="text-[11px] text-slate-500 font-medium">
+            Imóvel: <span className="font-bold text-slate-700">{property.code}</span> — {property.neighborhood}
+          </p>
         </div>
       </div>
     </div>

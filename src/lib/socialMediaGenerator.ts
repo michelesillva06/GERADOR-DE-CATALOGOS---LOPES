@@ -10,8 +10,6 @@ import { getPropertyPriceInfo } from './priceUtils';
 const LOPES_RED = '#F10F4D';
 const NEAR_BLACK = '#111114';
 
-export type SocialMediaTemplate = 'capa' | 'ficha' | 'premium';
-
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(' ');
   const lines: string[] = [];
@@ -29,8 +27,7 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines;
 }
 
-/** Shortens text with an ellipsis if it would overflow maxWidth — used for single-line fields
- * (like location) that must never wrap or run off the edge of the canvas. */
+/** Shortens text with an ellipsis if it would overflow maxWidth. */
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
   let truncated = text;
@@ -41,10 +38,26 @@ function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: num
 }
 
 // =============================================================================
-// VECTOR ICONS — simple line icons drawn with canvas paths. No emoji: the brand rules for this
-// generator explicitly call for a clean, editorial look, and emoji render inconsistently across
-// devices/browsers and read as informal rather than "imobiliária premium".
+// VECTOR ICONS — simple line/fill icons drawn with canvas paths. No emoji, no external icon
+// library: this generator's brand rules call for a clean, editorial look, and emoji render
+// inconsistently across devices/browsers.
 // =============================================================================
+
+function drawHouseIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x + s * 0.5, y);
+  ctx.lineTo(x + s * 0.95, y + s * 0.42);
+  ctx.lineTo(x + s * 0.8, y + s * 0.42);
+  ctx.lineTo(x + s * 0.8, y + s * 0.95);
+  ctx.lineTo(x + s * 0.2, y + s * 0.95);
+  ctx.lineTo(x + s * 0.2, y + s * 0.42);
+  ctx.lineTo(x + s * 0.05, y + s * 0.42);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
 
 function drawBedIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) {
   ctx.save();
@@ -52,15 +65,12 @@ function drawBedIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: num
   ctx.lineWidth = s * 0.07;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  // Mattress base
   ctx.beginPath();
   ctx.roundRect(x, y + s * 0.45, s, s * 0.35, s * 0.08);
   ctx.stroke();
-  // Pillow
   ctx.beginPath();
   ctx.roundRect(x + s * 0.08, y + s * 0.15, s * 0.32, s * 0.32, s * 0.06);
   ctx.stroke();
-  // Legs
   ctx.beginPath();
   ctx.moveTo(x + s * 0.05, y + s * 0.8);
   ctx.lineTo(x + s * 0.05, y + s * 0.95);
@@ -75,11 +85,9 @@ function drawShowerIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: 
   ctx.strokeStyle = color;
   ctx.lineWidth = s * 0.08;
   ctx.lineCap = 'round';
-  // Showerhead: a small rounded rectangle
   ctx.beginPath();
   ctx.roundRect(x + s * 0.15, y + s * 0.05, s * 0.7, s * 0.22, s * 0.1);
   ctx.stroke();
-  // Water streams
   ctx.beginPath();
   ctx.moveTo(x + s * 0.28, y + s * 0.42);
   ctx.lineTo(x + s * 0.24, y + s * 0.85);
@@ -97,7 +105,6 @@ function drawCarIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: num
   ctx.lineWidth = s * 0.07;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  // Body
   ctx.beginPath();
   ctx.moveTo(x, y + s * 0.65);
   ctx.lineTo(x + s * 0.12, y + s * 0.35);
@@ -109,7 +116,6 @@ function drawCarIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: num
   ctx.beginPath();
   ctx.roundRect(x, y + s * 0.6, s, s * 0.15, s * 0.04);
   ctx.stroke();
-  // Wheels
   ctx.beginPath();
   ctx.arc(x + s * 0.24, y + s * 0.78, s * 0.11, 0, Math.PI * 2);
   ctx.arc(x + s * 0.76, y + s * 0.78, s * 0.11, 0, Math.PI * 2);
@@ -123,7 +129,6 @@ function drawAreaIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: nu
   ctx.lineWidth = s * 0.08;
   ctx.lineCap = 'round';
   const armLen = s * 0.32;
-  // Four corner "expand" brackets
   const corners: [number, number, number, number][] = [
     [x, y, 1, 1],
     [x + s, y, -1, 1],
@@ -159,52 +164,14 @@ function drawPinIcon(ctx: CanvasRenderingContext2D, x: number, y: number, s: num
   ctx.restore();
 }
 
-interface SpecItem { icon: (ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) => void; label: string; }
-
-function buildSpecItems(prop: Property): SpecItem[] {
-  // Same fallback the PDF catalog already uses: some captadores only fill in built_area, others
-  // only total_area — checking a single field left the spec silently blank/missing for listings
-  // that had the data under the other one.
-  const areaValue = prop.built_area || prop.total_area;
-  return [
-    prop.bedrooms ? { icon: drawBedIcon, label: `${prop.bedrooms} Quartos` } : null,
-    prop.bathrooms ? { icon: drawShowerIcon, label: `${prop.bathrooms} Banheiros` } : null,
-    prop.parking_spaces ? { icon: drawCarIcon, label: `${prop.parking_spaces} Vagas` } : null,
-    areaValue ? { icon: drawAreaIcon, label: `${areaValue}m²` } : null
-  ].filter((x): x is SpecItem => x !== null);
-}
-
-/** Draws an icon+label spec row. `compact` uses shorter numeric labels (for tight overlays). */
-function drawSpecsRow(
-  ctx: CanvasRenderingContext2D,
-  prop: Property,
-  canvasW: number,
-  x: number,
-  y: number,
-  color: string,
-  iconSize: number,
-  gap: number,
-  compact = false
-) {
-  const items = buildSpecItems(prop);
-  let cursorX = x;
-  ctx.font = `700 ${iconSize * 0.75}px sans-serif`;
-  for (const item of items) {
-    item.icon(ctx, cursorX, y - iconSize * 0.72, iconSize, color);
-    const labelText = compact ? item.label.replace(/[^\d,.m²]+/g, '').trim() || item.label : item.label;
-    ctx.fillStyle = color;
-    ctx.fillText(labelText, cursorX + iconSize * 1.2, y);
-    const labelW = ctx.measureText(labelText).width;
-    cursorX += iconSize * 1.2 + labelW + gap;
-  }
-}
-
 /**
- * TEMPLATE "capa" — Capa Premium: photo fills ~70% of the frame, purpose tag + price +
- * neighborhood overlaid on the photo (with a gradient for legibility), then a clean white
- * section below with the property title, an icon spec row, and the logo footer.
+ * THE template — a single standard layout modeled directly on the style Michele approved
+ * (red rounded header/badge, circular category icon, location/area/price info boxes,
+ * "CARACTERÍSTICAS" icon row). Only public-facing fields are shown: no captação status, no
+ * caução/renda requirements or anything else from internal negotiation — those never belong on
+ * a public social post.
  */
-function drawCapaTemplate(
+function drawStandardTemplate(
   ctx: CanvasRenderingContext2D,
   prop: Property,
   companySettings: CompanySettings,
@@ -212,297 +179,169 @@ function drawCapaTemplate(
   canvasH: number,
   photoH: number
 ) {
-  const pad = canvasW * 0.06;
+  const pad = canvasW * 0.055;
   const priceInfo = getPropertyPriceInfo(prop);
 
-  // Legibility gradient over the lower part of the photo
-  const grad = ctx.createLinearGradient(0, photoH * 0.55, 0, photoH);
-  grad.addColorStop(0, 'rgba(0,0,0,0)');
-  grad.addColorStop(1, 'rgba(0,0,0,0.75)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, photoH * 0.55, canvasW, photoH * 0.45);
-
-  // Purpose tag — top-left over the photo
-  ctx.font = `900 ${canvasW * 0.03}px sans-serif`;
-  const tag = (prop.purpose || 'Venda').toUpperCase();
-  const tagW = ctx.measureText(tag).width + canvasW * 0.045;
+  // ---- Header banner (drawn over the photo, top-left) ----
+  const headerW = canvasW * 0.36;
+  const headerH = canvasW * 0.1;
   ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.roundRect(pad, pad, tagW, canvasW * 0.055, canvasW * 0.006);
+  ctx.roundRect(0, 0, headerW, headerH, [0, 0, canvasW * 0.03, 0]);
   ctx.fill();
+  drawLopesHeart(ctx, canvasW * 0.03, headerH * 0.16, canvasW * 0.045, '#FFFFFF');
+  ctx.font = `900 ${canvasW * 0.034}px sans-serif`;
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(tag, pad + canvasW * 0.022, pad + canvasW * 0.038);
+  ctx.fillText('Lopes', canvasW * 0.09, headerH * 0.5);
+  ctx.font = `700 ${canvasW * 0.017}px sans-serif`;
+  ctx.fillText('MANAUS', canvasW * 0.09, headerH * 0.82);
 
-  // Price + neighborhood pill, bottom of the photo
-  let py = photoH - canvasW * 0.15;
-  ctx.font = `900 ${canvasW * 0.062}px sans-serif`;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(priceInfo.primaryFormatted, pad, py);
-  py += canvasW * 0.055;
-
-  ctx.font = `600 ${canvasW * 0.026}px sans-serif`;
-  const locationText = truncateText(ctx, `${prop.neighborhood} | ${prop.city}`, canvasW - pad * 2 - canvasW * 0.06);
-  const locW = ctx.measureText(locationText).width;
-  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  // ---- Purpose badge (top-right, over the photo) ----
+  const purposeText = (prop.purpose || 'Venda').toUpperCase();
+  ctx.font = `900 ${canvasW * 0.024}px sans-serif`;
+  const badgeTextW = ctx.measureText(purposeText).width;
+  const badgeW = badgeTextW + canvasW * 0.13;
+  const badgeH = canvasW * 0.08;
+  const badgeX = canvasW - badgeW;
+  ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.roundRect(pad, py, locW + canvasW * 0.06, canvasW * 0.045, canvasW * 0.022);
+  ctx.roundRect(badgeX, canvasW * 0.025, badgeW, badgeH, [canvasW * 0.03, 0, 0, canvasW * 0.03]);
   ctx.fill();
+  drawHouseIcon(ctx, badgeX + canvasW * 0.025, canvasW * 0.025 + badgeH * 0.28, canvasW * 0.035, '#FFFFFF');
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(locationText, pad + canvasW * 0.03, py + canvasW * 0.032);
+  ctx.fillText(purposeText, badgeX + canvasW * 0.075, canvasW * 0.025 + badgeH * 0.6);
 
-  // Bottom white section
-  const bottomY = photoH;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, bottomY, canvasW, canvasH - bottomY);
-
-  let y = bottomY + canvasW * 0.075;
-  ctx.font = `800 ${canvasW * 0.038}px sans-serif`;
-  ctx.fillStyle = NEAR_BLACK;
-  const titleLines = wrapText(ctx, prop.title, canvasW - pad * 2);
-  titleLines.slice(0, 2).forEach(line => {
-    ctx.fillText(line, pad, y);
-    y += canvasW * 0.05;
-  });
-  y += canvasW * 0.02;
-
-  // Divider
-  ctx.strokeStyle = '#E5E7EB';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(pad, y);
-  ctx.lineTo(canvasW - pad, y);
-  ctx.stroke();
-  y += canvasW * 0.06;
-
-  drawSpecsRow(ctx, prop, canvasW, pad, y, NEAR_BLACK, canvasW * 0.045, canvasW * 0.04);
-  y += canvasW * 0.09;
-
-  // Footer logo
-  drawLopesHeart(ctx, canvasW / 2 - canvasW * 0.025, canvasH - canvasW * 0.11, canvasW * 0.05, LOPES_RED);
-  ctx.font = `900 ${canvasW * 0.03}px sans-serif`;
-  ctx.fillStyle = NEAR_BLACK;
-  ctx.textAlign = 'center';
-  ctx.fillText(companySettings.company_name || 'Lopes Manaus', canvasW / 2, canvasH - canvasW * 0.03);
-  ctx.textAlign = 'left';
-}
-
-/**
- * TEMPLATE "ficha" — Ficha Técnica: catalog-style layout. Photo on top, then title, a detail
- * list (Quartos/Suítes/Banheiros/Vagas/Área), the description, price, and a visual
- * "Agende sua visita" call-to-action bar at the bottom.
- */
-function drawFichaTemplate(
-  ctx: CanvasRenderingContext2D,
-  prop: Property,
-  companySettings: CompanySettings,
-  canvasW: number,
-  canvasH: number,
-  photoH: number,
-  galleryImgs: (HTMLImageElement | null)[] = []
-) {
-  const pad = canvasW * 0.06;
-  const priceInfo = getPropertyPriceInfo(prop);
-
+  // ---- White content area below the photo ----
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, photoH, canvasW, canvasH - photoH);
 
   let y = photoH + canvasW * 0.08;
-  ctx.font = `800 ${canvasW * 0.042}px sans-serif`;
-  ctx.fillStyle = NEAR_BLACK;
-  const heroTitle = `Seu novo lar em ${prop.neighborhood}`;
-  const titleLines = wrapText(ctx, heroTitle, canvasW - pad * 2);
-  titleLines.slice(0, 2).forEach(line => {
-    ctx.fillText(line, pad, y);
-    y += canvasW * 0.052;
-  });
-  y += canvasW * 0.015;
 
-  // Location + type row, with icon
-  drawPinIcon(ctx, pad, y - canvasW * 0.03, canvasW * 0.032, LOPES_RED);
-  ctx.font = `600 ${canvasW * 0.028}px sans-serif`;
-  ctx.fillStyle = '#4B5563';
-  ctx.fillText(truncateText(ctx, `${prop.neighborhood} · ${prop.city}  —  ${prop.category}`, canvasW - pad * 2 - canvasW * 0.045), pad + canvasW * 0.045, y);
-  y += canvasW * 0.06;
-
-  ctx.strokeStyle = '#E5E7EB';
-  ctx.beginPath();
-  ctx.moveTo(pad, y);
-  ctx.lineTo(canvasW - pad, y);
-  ctx.stroke();
-  y += canvasW * 0.055;
-
-  // Detail cards — icon + label + value, bordered, matching the same visual language already
-  // approved in the PDF catalog's property page (feature cards), instead of bare text.
-  // Area falls back to built_area when total_area isn't set — the PDF catalog does the same,
-  // since captadores sometimes only fill in one of the two fields.
-  const areaValue = prop.built_area || prop.total_area;
-  const detailCards: { icon: (ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) => void; label: string; value: string }[] = [
-    { icon: drawBedIcon, label: 'QUARTOS', value: String(prop.bedrooms || '-') },
-    { icon: drawShowerIcon, label: 'BANHOS', value: String(prop.bathrooms || '-') },
-    { icon: drawCarIcon, label: 'VAGAS', value: String(prop.parking_spaces || '-') },
-    { icon: drawAreaIcon, label: 'ÁREA', value: areaValue ? `${areaValue}m²` : '-' }
-  ];
-  // A single row of 4 compact cards — not a 2x2 grid — keeps this section short and
-  // predictable, which matters now that the price bar below is positioned dynamically instead
-  // of at a fixed spot (see the end of this function).
-  const cardGapX = canvasW * 0.02;
-  const cardW = (canvasW - pad * 2 - cardGapX * 3) / 4;
-  const cardH = canvasW * 0.16;
-
-  detailCards.forEach((card, i) => {
-    const cx = pad + i * (cardW + cardGapX);
-    const cy = y;
-
-    ctx.strokeStyle = '#E5E7EB';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(cx, cy, cardW, cardH, canvasW * 0.015);
-    ctx.stroke();
-
-    const iconSize = canvasW * 0.042;
-    const iconX = cx + cardW / 2 - iconSize / 2;
-    card.icon(ctx, iconX, cy + cardH * 0.18, iconSize, LOPES_RED);
-
-    ctx.textAlign = 'center';
-    ctx.font = `800 ${canvasW * 0.026}px sans-serif`;
-    ctx.fillStyle = NEAR_BLACK;
-    ctx.fillText(card.value, cx + cardW / 2, cy + cardH * 0.72);
-    ctx.font = `700 ${canvasW * 0.014}px sans-serif`;
-    ctx.fillStyle = '#9CA3AF';
-    ctx.fillText(card.label, cx + cardW / 2, cy + cardH * 0.9);
-    ctx.textAlign = 'left';
-  });
-  y += cardH + canvasW * 0.045;
-
-  // Photo gallery strip — the extra interior/exterior photos, matching the multi-photo layout
-  // already approved in the PDF catalog page — up to 3 more images beyond the main one. Shown
-  // instead of the description text when available: there usually isn't room for both in a
-  // portrait frame this size, and actual room photos sell the property harder than more text.
-  const validGalleryImgs = galleryImgs.filter((img): img is HTMLImageElement => img !== null);
-  if (validGalleryImgs.length > 0) {
-    const thumbGap = canvasW * 0.02;
-    const thumbCount = Math.min(validGalleryImgs.length, 3);
-    const thumbW = (canvasW - pad * 2 - thumbGap * (thumbCount - 1)) / thumbCount;
-    const thumbH = canvasW * 0.15;
-    ctx.filter = 'brightness(1.06) contrast(1.14) saturate(1.22)';
-    for (let i = 0; i < thumbCount; i++) {
-      const tx = pad + i * (thumbW + thumbGap);
-      drawRoundedImage(ctx, validGalleryImgs[i], tx, y, thumbW, thumbH, canvasW * 0.015);
-    }
-    ctx.filter = 'none';
-    y += thumbH + canvasW * 0.045;
-  } else if (prop.description) {
-    // Only one photo available — fall back to the description text instead of an empty gallery.
-    ctx.font = `500 ${canvasW * 0.024}px sans-serif`;
-    ctx.fillStyle = '#4B5563';
-    const descLines = wrapText(ctx, prop.description, canvasW - pad * 2);
-    descLines.slice(0, 2).forEach(line => {
-      ctx.fillText(line, pad, y);
-      y += canvasW * 0.033;
-    });
-    y += canvasW * 0.02;
-  }
-
-  // Price + CTA bar — positioned right after whatever content came before it (cards, then
-  // gallery or description), instead of a fixed spot near the bottom. A fixed position either
-  // overlapped taller content or left a dead gap under shorter content; anchoring it to the
-  // actual content height fixes both. The clamp is a safety net for extreme edge cases (very
-  // long title wrapping to 2 lines AND a gallery both present) so the bar never runs off the
-  // bottom edge of the canvas.
-  const ctaH = canvasW * 0.13;
-  const maxCtaY = canvasH - ctaH - canvasW * 0.04;
-  const ctaY = Math.min(y + canvasW * 0.03, maxCtaY);
+  // Category icon + title/subtitle
+  const circleR = canvasW * 0.052;
   ctx.fillStyle = LOPES_RED;
   ctx.beginPath();
-  ctx.roundRect(pad, ctaY, canvasW - pad * 2, ctaH, canvasW * 0.02);
+  ctx.arc(pad + circleR, y, circleR, 0, Math.PI * 2);
+  ctx.fill();
+  drawHouseIcon(ctx, pad + circleR - circleR * 0.5, y - circleR * 0.5, circleR, '#FFFFFF');
+
+  const titleX = pad + circleR * 2 + canvasW * 0.03;
+  ctx.font = `900 ${canvasW * 0.04}px sans-serif`;
+  ctx.fillStyle = NEAR_BLACK;
+  ctx.fillText(truncateText(ctx, (prop.category || 'Imóvel').toUpperCase(), canvasW - titleX - pad), titleX, y - canvasW * 0.008);
+  ctx.font = `600 ${canvasW * 0.024}px sans-serif`;
+  ctx.fillStyle = '#6B7280';
+  ctx.fillText(truncateText(ctx, `${prop.neighborhood} — ${prop.city}`, canvasW - titleX - pad), titleX, y + canvasW * 0.028);
+
+  y += circleR + canvasW * 0.055;
+
+  // Location / Área / Preço info boxes, single row
+  const boxGap = canvasW * 0.025;
+  const boxH = canvasW * 0.175;
+  const locW = canvasW * 0.31;
+  const areaW = canvasW * 0.21;
+  const priceW = canvasW - pad * 2 - locW - areaW - boxGap * 2;
+
+  const drawInfoBox = (bx: number, bw: number, filled: boolean) => {
+    ctx.fillStyle = filled ? LOPES_RED : '#F8FAFC';
+    ctx.strokeStyle = '#E5E7EB';
+    ctx.lineWidth = filled ? 0 : 1.5;
+    ctx.beginPath();
+    ctx.roundRect(bx, y, bw, boxH, canvasW * 0.02);
+    ctx.fill();
+    if (!filled) ctx.stroke();
+  };
+
+  // Localização box
+  let bx = pad;
+  drawInfoBox(bx, locW, false);
+  drawPinIcon(ctx, bx + canvasW * 0.02, y + canvasW * 0.02, canvasW * 0.032, LOPES_RED);
+  ctx.font = `700 ${canvasW * 0.016}px sans-serif`;
+  ctx.fillStyle = '#9CA3AF';
+  ctx.fillText('LOCALIZAÇÃO', bx + canvasW * 0.02, y + canvasW * 0.09);
+  ctx.font = `800 ${canvasW * 0.021}px sans-serif`;
+  ctx.fillStyle = NEAR_BLACK;
+  const locLines = wrapText(ctx, prop.neighborhood || '', locW - canvasW * 0.04);
+  locLines.slice(0, 2).forEach((line, i) => {
+    ctx.fillText(line, bx + canvasW * 0.02, y + canvasW * 0.12 + i * canvasW * 0.025);
+  });
+
+  // Área box
+  bx = pad + locW + boxGap;
+  drawInfoBox(bx, areaW, false);
+  const areaValue = prop.built_area || prop.total_area;
+  drawAreaIcon(ctx, bx + canvasW * 0.02, y + canvasW * 0.02, canvasW * 0.032, LOPES_RED);
+  ctx.font = `700 ${canvasW * 0.016}px sans-serif`;
+  ctx.fillStyle = '#9CA3AF';
+  ctx.fillText('ÁREA', bx + canvasW * 0.02, y + canvasW * 0.09);
+  ctx.font = `800 ${canvasW * 0.024}px sans-serif`;
+  ctx.fillStyle = NEAR_BLACK;
+  ctx.fillText(areaValue ? `${areaValue}m²` : '-', bx + canvasW * 0.02, y + canvasW * 0.13);
+
+  // Preço box (filled red)
+  bx = pad + locW + areaW + boxGap * 2;
+  drawInfoBox(bx, priceW, true);
+  ctx.font = `900 ${canvasW * 0.03}px sans-serif`;
+  ctx.fillStyle = '#FFFFFF';
+  const priceLines = wrapText(ctx, priceInfo.primaryFormatted, priceW - canvasW * 0.03);
+  priceLines.slice(0, 2).forEach((line, i) => {
+    ctx.fillText(line, bx + canvasW * 0.018, y + canvasW * 0.075 + i * canvasW * 0.032);
+  });
+  ctx.font = `700 ${canvasW * 0.015}px sans-serif`;
+  ctx.fillText(purposeText, bx + canvasW * 0.018, y + boxH - canvasW * 0.018);
+
+  y += boxH + canvasW * 0.06;
+
+  // "CARACTERÍSTICAS" label
+  ctx.font = `900 ${canvasW * 0.019}px sans-serif`;
+  const labelText = 'CARACTERÍSTICAS';
+  const labelW = ctx.measureText(labelText).width + canvasW * 0.05;
+  ctx.fillStyle = LOPES_RED;
+  ctx.beginPath();
+  ctx.roundRect(pad, y, labelW, canvasW * 0.045, canvasW * 0.008);
   ctx.fill();
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = `900 ${canvasW * 0.034}px sans-serif`;
-  ctx.fillText(priceInfo.primaryFormatted, pad + canvasW * 0.04, ctaY + ctaH * 0.42);
-  ctx.font = `700 ${canvasW * 0.024}px sans-serif`;
-  ctx.fillText('Agende sua visita', pad + canvasW * 0.04, ctaY + ctaH * 0.75);
+  ctx.fillText(labelText, pad + canvasW * 0.025, y + canvasW * 0.031);
+  y += canvasW * 0.045 + canvasW * 0.05;
 
-  drawLopesHeart(ctx, canvasW - pad - canvasW * 0.06, ctaY + ctaH / 2 - canvasW * 0.03, canvasW * 0.06, '#FFFFFF');
-}
-
-/**
- * TEMPLATE "premium" — Alto Padrão: elegant dark background, large photo, minimal text, heavy
- * negative space — a "real-estate magazine" look rather than a busy ad card.
- */
-function drawPremiumTemplate(
-  ctx: CanvasRenderingContext2D,
-  prop: Property,
-  companySettings: CompanySettings,
-  canvasW: number,
-  canvasH: number,
-  photoY: number,
-  photoH: number
-) {
-  const pad = canvasW * 0.08;
-
-  // Only the strip below the photo needs a solid dark fill — the photo itself must stay
-  // visible. Filling the whole canvas here was overwriting the photo entirely.
-  ctx.fillStyle = NEAR_BLACK;
-  ctx.fillRect(0, photoY + photoH, canvasW, canvasH - (photoY + photoH));
-
-  // Photo is drawn by the caller (renderSocialCanvas) before this function runs.
-
-  // Dark gradient at top and bottom of the photo for text legibility
-  const topGrad = ctx.createLinearGradient(0, photoY, 0, photoY + canvasH * 0.22);
-  topGrad.addColorStop(0, 'rgba(0,0,0,0.65)');
-  topGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = topGrad;
-  ctx.fillRect(0, photoY, canvasW, canvasH * 0.22);
-
-  const bottomGrad = ctx.createLinearGradient(0, photoY + photoH - canvasH * 0.3, 0, photoY + photoH);
-  bottomGrad.addColorStop(0, 'rgba(0,0,0,0)');
-  bottomGrad.addColorStop(1, 'rgba(0,0,0,0.85)');
-  ctx.fillStyle = bottomGrad;
-  ctx.fillRect(0, photoY + photoH - canvasH * 0.3, canvasW, canvasH * 0.3);
-
-  // Overline
-  ctx.font = `italic 400 ${canvasW * 0.028}px Georgia, serif`;
-  ctx.fillStyle = '#E5E7EB';
-  ctx.fillText('Exclusividade em cada detalhe', pad, photoY + canvasW * 0.06);
-
-  // Title
-  ctx.font = `400 ${canvasW * 0.065}px Georgia, serif`;
-  ctx.fillStyle = '#FFFFFF';
-  const titleLines = wrapText(ctx, prop.title, canvasW - pad * 2);
-  let ty = photoY + canvasW * 0.13;
-  titleLines.slice(0, 2).forEach(line => {
-    ctx.fillText(line, pad, ty);
-    ty += canvasW * 0.075;
+  // Feature icons row: quartos, banheiros, vagas
+  const features: { icon: (ctx: CanvasRenderingContext2D, x: number, y: number, s: number, color: string) => void; value: string; label: string }[] = [
+    { icon: drawBedIcon, value: String(prop.bedrooms || '-'), label: 'QUARTOS' },
+    { icon: drawShowerIcon, value: String(prop.bathrooms || '-'), label: 'BANHEIROS' },
+    { icon: drawCarIcon, value: String(prop.parking_spaces || '-'), label: 'VAGAS' }
+  ];
+  const featColW = (canvasW - pad * 2) / features.length;
+  features.forEach((f, i) => {
+    const fx = pad + i * featColW + featColW / 2;
+    const iconSize = canvasW * 0.05;
+    f.icon(ctx, fx - iconSize / 2, y, iconSize, LOPES_RED);
+    ctx.textAlign = 'center';
+    ctx.font = `900 ${canvasW * 0.03}px sans-serif`;
+    ctx.fillStyle = NEAR_BLACK;
+    ctx.fillText(f.value, fx, y + iconSize + canvasW * 0.036);
+    ctx.font = `700 ${canvasW * 0.015}px sans-serif`;
+    ctx.fillStyle = '#9CA3AF';
+    ctx.fillText(f.label, fx, y + iconSize + canvasW * 0.058);
+    ctx.textAlign = 'left';
   });
+  y += canvasW * 0.05 + canvasW * 0.075;
 
-  // Bottom block: location + price
-  const priceInfo = getPropertyPriceInfo(prop);
-  let by = photoY + photoH - canvasW * 0.075;
-  ctx.font = `400 ${canvasW * 0.03}px Georgia, serif`;
-  ctx.fillStyle = '#D1D5DB';
-  ctx.fillText(`${prop.neighborhood} — ${prop.city}`, pad, by);
-  by -= canvasW * 0.06;
-  ctx.font = `700 ${canvasW * 0.05}px Georgia, serif`;
-  ctx.fillStyle = LOPES_RED;
-  ctx.fillText(priceInfo.primaryFormatted, pad, by);
-
-  // Footer logo, below the photo on the dark background
-  const footerY = photoY + photoH + canvasW * 0.07;
-  drawLopesHeart(ctx, canvasW / 2 - canvasW * 0.03, footerY, canvasW * 0.06, LOPES_RED);
-  ctx.font = `400 ${canvasW * 0.028}px Georgia, serif`;
-  ctx.fillStyle = '#FFFFFF';
+  // Footer logo — positioned dynamically right after the content above, clamped so it never
+  // runs past the bottom edge on the taller Story canvas.
+  const footerY = Math.min(y, canvasH - canvasW * 0.09);
+  drawLopesHeart(ctx, canvasW / 2 - canvasW * 0.022, footerY, canvasW * 0.044, LOPES_RED);
+  ctx.font = `800 ${canvasW * 0.022}px sans-serif`;
+  ctx.fillStyle = NEAR_BLACK;
   ctx.textAlign = 'center';
   ctx.fillText(companySettings.company_name || 'Lopes Manaus', canvasW / 2, footerY + canvasW * 0.06);
   ctx.textAlign = 'left';
 }
 
-
 async function renderSocialCanvas(
   prop: Property,
   companySettings: CompanySettings,
   width: number,
-  height: number,
-  template: SocialMediaTemplate
+  height: number
 ): Promise<HTMLCanvasElement> {
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -513,44 +352,15 @@ async function renderSocialCanvas(
   const mainImg = await loadImageElement(images[0] || '');
 
   // Real-estate photos captadores upload are usually plain phone snapshots (flat lighting,
-  // muted colors) rather than professionally shot/rendered images. A gentle brightness/
-  // contrast/saturation boost — the same kind of correction a phone camera app applies
-  // automatically — makes them read as noticeably more polished, without altering anything
-  // about the property itself (no AI-invented details, so nothing here can misrepresent what's
-  // actually being advertised). Reset the filter right after so it never leaks into the
-  // text/icon drawing that follows.
-  const applyPhotoEnhancement = () => {
-    ctx.filter = 'brightness(1.06) contrast(1.14) saturate(1.22)';
-  };
-  const resetFilter = () => {
-    ctx.filter = 'none';
-  };
+  // muted colors). A gentle brightness/contrast/saturation boost — the same kind of correction
+  // a phone camera app applies automatically — makes them read as noticeably more polished,
+  // without altering anything about the property itself.
+  const photoH = height * 0.4;
+  ctx.filter = 'brightness(1.06) contrast(1.14) saturate(1.22)';
+  drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
+  ctx.filter = 'none';
 
-  if (template === 'capa') {
-    const photoH = height * 0.68;
-    applyPhotoEnhancement();
-    drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
-    resetFilter();
-    drawCapaTemplate(ctx, prop, companySettings, width, height, photoH);
-  } else if (template === 'ficha') {
-    const photoH = height * 0.32;
-    applyPhotoEnhancement();
-    drawRoundedImage(ctx, mainImg, 0, 0, width, photoH, 0, prop.title);
-    resetFilter();
-    // Small gallery strip of extra photos, matching the multi-photo layout already approved in
-    // the PDF catalog page — up to 3 more images beyond the main one.
-    const galleryImgs = await Promise.all(
-      images.slice(1, 4).map(url => loadImageElement(url))
-    );
-    drawFichaTemplate(ctx, prop, companySettings, width, height, photoH, galleryImgs);
-  } else {
-    const photoY = 0;
-    const photoH = height * 0.78;
-    applyPhotoEnhancement();
-    drawRoundedImage(ctx, mainImg, 0, photoY, width, photoH, 0, prop.title);
-    resetFilter();
-    drawPremiumTemplate(ctx, prop, companySettings, width, height, photoY, photoH);
-  }
+  drawStandardTemplate(ctx, prop, companySettings, width, height, photoH);
 
   return canvas;
 }
@@ -564,33 +374,21 @@ function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
 }
 
 /** Feed post — 1080x1350 (4:5), the safest aspect ratio for Instagram feed. */
-export async function generateFeedPost(
-  prop: Property,
-  companySettings: CompanySettings,
-  template: SocialMediaTemplate = 'capa'
-): Promise<HTMLCanvasElement> {
-  return renderSocialCanvas(prop, companySettings, 1080, 1350, template);
+export async function generateFeedPost(prop: Property, companySettings: CompanySettings): Promise<HTMLCanvasElement> {
+  return renderSocialCanvas(prop, companySettings, 1080, 1350);
 }
 
 /** Story — 1080x1920 (9:16). */
-export async function generateStoryPost(
-  prop: Property,
-  companySettings: CompanySettings,
-  template: SocialMediaTemplate = 'capa'
-): Promise<HTMLCanvasElement> {
-  return renderSocialCanvas(prop, companySettings, 1080, 1920, template);
+export async function generateStoryPost(prop: Property, companySettings: CompanySettings): Promise<HTMLCanvasElement> {
+  return renderSocialCanvas(prop, companySettings, 1080, 1920);
 }
 
-/** Generates and downloads both the feed and the story image for a property, in the chosen template. */
-export async function generateAndDownloadSocialMedia(
-  prop: Property,
-  companySettings: CompanySettings,
-  template: SocialMediaTemplate = 'capa'
-) {
-  const feed = await generateFeedPost(prop, companySettings, template);
+/** Generates and downloads both the feed and the story image for a property. */
+export async function generateAndDownloadSocialMedia(prop: Property, companySettings: CompanySettings) {
+  const feed = await generateFeedPost(prop, companySettings);
   downloadCanvas(feed, `${prop.code}_feed_instagram.png`);
 
-  const story = await generateStoryPost(prop, companySettings, template);
+  const story = await generateStoryPost(prop, companySettings);
   // Slight delay so the browser doesn't drop the second automatic download.
   await new Promise(resolve => setTimeout(resolve, 400));
   downloadCanvas(story, `${prop.code}_story_instagram.png`);
