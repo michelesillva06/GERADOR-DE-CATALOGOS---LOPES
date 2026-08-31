@@ -438,21 +438,6 @@ function MainApp() {
     window.open(waUrl, '_blank');
   };
 
-  const [generatingSocialMediaFor, setGeneratingSocialMediaFor] = useState<string | null>(null);
-
-  const handleGenerateSocialMedia = async (prop: Property) => {
-    setGeneratingSocialMediaFor(prop.id);
-    try {
-      const { generateAndDownloadSocialMedia } = await import('./lib/socialMediaGenerator');
-      await generateAndDownloadSocialMedia(prop, companySettings);
-    } catch (err) {
-      console.error('Erro ao gerar mídia social:', err);
-      alert('Não foi possível gerar a mídia. Tente novamente.');
-    } finally {
-      setGeneratingSocialMediaFor(null);
-    }
-  };
-
   const handleAddUser = async (userData: any) => {
     let createdFromBackend: User | null = null;
     if (isBackendHealthy) {
@@ -918,7 +903,6 @@ function MainApp() {
                 onEditProperty={handleEditProperty}
                 onDeleteProperty={handleDeleteProperty}
                 onShareWhatsApp={handleShareWhatsApp}
-                onGenerateSocialMedia={handleGenerateSocialMedia}
                 onPropertyConfirmed={handlePropertyStatusConfirmed}
               />
             )
@@ -967,7 +951,6 @@ function MainApp() {
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
               onShareWhatsApp={handleShareWhatsApp}
-              onGenerateSocialMedia={handleGenerateSocialMedia}
             />
           )}
 
