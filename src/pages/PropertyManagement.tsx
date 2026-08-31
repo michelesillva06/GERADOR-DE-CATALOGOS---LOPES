@@ -16,6 +16,7 @@ interface PropertyManagementProps {
   onDeleteProperty: (property: Property) => void;
   onShareWhatsApp: (property: Property) => void;
   onGenerateSocialMedia?: (property: Property) => void;
+  onGenerateAiPost?: (property: Property) => void;
 }
 
 export const PropertyManagement: React.FC<PropertyManagementProps> = ({
@@ -29,7 +30,8 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   onEditProperty,
   onDeleteProperty,
   onShareWhatsApp,
-  onGenerateSocialMedia
+  onGenerateSocialMedia,
+  onGenerateAiPost
 }) => {
   const [scopeTab, setScopeTab] = useState<'meus' | 'geral'>('meus');
   const [search, setSearch] = useState('');
@@ -277,6 +279,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
                 onEdit={onEditProperty}
                 onDelete={onDeleteProperty}
                 onGenerateSocialMedia={onGenerateSocialMedia}
+                onGenerateAiPost={onGenerateAiPost}
                 canEdit={canEdit}
               />
             );

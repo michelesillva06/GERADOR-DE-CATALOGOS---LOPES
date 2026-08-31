@@ -37,7 +37,28 @@ cloudinary.config({
 import { initialUsers, initialProperties, initialDemoProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData.js';
 import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types.js';
 
+import { GoogleGenAI } from '@google/genai';
+
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
+
+let geminiClient: GoogleGenAI | null = null;
+function getGenAI(): GoogleGenAI {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new Error('GEMINI_API_KEY_MISSING');
+  }
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({
+      apiKey: key,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build'
+        }
+      }
+    });
+  }
+  return geminiClient;
+}
 
 // Initialize Firebase Web SDK for reliable cloud connection.
 // experimentalAutoDetectLongPolling: Vercel's serverless network sometimes blocks Firestore's
@@ -1860,6 +1881,52 @@ app.delete('/api/schedule/:id', requireAuth, async (req, res) => {
   addAuditLog(reqUser.id, reqUser.name, 'Cancelamento de Agendamento', `Cancelou ${existing.type}: "${existing.title}"`, req);
 
   res.json({ success: true });
+});
+
+/**
+ * AI SOCIAL MEDIA CAPTION GENERATOR (GEMINI 2.5 FLASH)
+ */
+app.post('/api/social-media/generate-caption', async (req, res) => {
+  try {
+    const { property } = req.body || {};
+    if (!property) {
+      return res.status(400).json({ error: 'Dados do imóvel não informados.' });
+    }
+
+    let ai: GoogleGenAI;
+    try {
+      ai = getGenAI();
+    } catch {
+      return res.json({
+        caption: `✨ ${property.title || 'Oportunidade Exclusiva Lopes Manaus'}\n📍 ${property.neighborhood || 'Manaus'}, ${property.city || 'AM'}\n\nEntre em contato e agende sua visita!\n#LopesManaus #ImoveisManaus #ManausImoveis`
+      });
+    }
+
+    const prompt = `Crie uma legenda persuasiva e profissional para o Instagram da imobiliária Lopes Manaus promovendo este imóvel:
+Título: ${property.title}
+Finalidade: ${property.purpose || 'Venda'}
+Bairro/Cidade: ${property.neighborhood}, ${property.city} - ${property.state}
+Preço: R$ ${property.sale_price || property.rent_price || ''}
+Quartos: ${property.bedrooms || '-'} | Vagas: ${property.parking_spaces || '-'} | Área: ${property.total_area || property.built_area || '-'}m²
+
+Instruções:
+- Use emojis adequados para o mercado imobiliário de alto padrão.
+- Destaque os pontos fortes e localização.
+- Inclua chamada para ação clara direcionando para o WhatsApp do consultor.
+- Finalize com 5 a 8 hashtags relevantes (#LopesManaus, #ImoveisManaus, etc.).`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt
+    });
+
+    const caption = response.text || '';
+    return res.json({ success: true, caption });
+  } catch (err: any) {
+    return res.json({
+      caption: `✨ ${req.body?.property?.title || 'Oportunidade Exclusiva Lopes Manaus'}\n📍 ${req.body?.property?.neighborhood || 'Manaus'}\n\nEntre em contato para saber mais detalhes!\n#LopesManaus #ImoveisManaus`
+    });
+  }
 });
 
 export default app;

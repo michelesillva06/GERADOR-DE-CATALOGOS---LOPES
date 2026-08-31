@@ -23,6 +23,7 @@ import { XMLImportPage } from './pages/XMLImportPage';
 import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
+import { AIPostGeneratorModal } from './components/AIPostGeneratorModal';
 import { buildWhatsAppUrl, getEffectiveWhatsApp } from './lib/whatsapp';
 import { Property, User, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './types';
 import { initialCompanySettings } from './data/mockData';
@@ -68,6 +69,8 @@ function MainApp() {
   // Modals state
   const [viewingProperty, setViewingProperty] = useState<Property | null>(null);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [selectedAiPostProperty, setSelectedAiPostProperty] = useState<Property | null>(null);
+  const [isAiPostModalOpen, setIsAiPostModalOpen] = useState(false);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [pdfModalScope, setPdfModalScope] = useState<'meus' | 'todos'>('meus');
@@ -436,6 +439,26 @@ function MainApp() {
     const text = `Olá ${owner?.name || ''}! Gostaria de informações e agendar visita para o imóvel "${prop.title}": ${link}`;
     const waUrl = buildWhatsAppUrl(phone, text);
     window.open(waUrl, '_blank');
+  };
+
+  const handleGenerateSocialMedia = async (prop: Property) => {
+    try {
+      const { generateAndDownloadSocialMedia } = await import('./lib/socialMediaGenerator');
+      await generateAndDownloadSocialMedia(prop, companySettings);
+    } catch (err: any) {
+      console.error('Erro ao gerar mídia social:', err);
+      alert(err?.message || 'Não foi possível gerar as mídias para redes sociais.');
+    }
+  };
+
+  const handleOpenAiPost = (prop: Property) => {
+    setSelectedAiPostProperty(prop);
+    setIsAiPostModalOpen(true);
+  };
+
+  const handleCloseAiPost = () => {
+    setIsAiPostModalOpen(false);
+    setSelectedAiPostProperty(null);
   };
 
   const handleAddUser = async (userData: any) => {
@@ -903,6 +926,8 @@ function MainApp() {
                 onEditProperty={handleEditProperty}
                 onDeleteProperty={handleDeleteProperty}
                 onShareWhatsApp={handleShareWhatsApp}
+                onGenerateSocialMedia={handleGenerateSocialMedia}
+                onGenerateAiPost={handleOpenAiPost}
                 onPropertyConfirmed={handlePropertyStatusConfirmed}
               />
             )
@@ -951,6 +976,8 @@ function MainApp() {
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
               onShareWhatsApp={handleShareWhatsApp}
+              onGenerateSocialMedia={handleGenerateSocialMedia}
+              onGenerateAiPost={handleOpenAiPost}
             />
           )}
 
@@ -1055,9 +1082,19 @@ function MainApp() {
           onDelete={(prop) => {
             handleDeleteProperty(prop);
           }}
+          onGenerateSocialMedia={handleGenerateSocialMedia}
+          onGenerateAiPost={handleOpenAiPost}
           onClose={() => setViewingProperty(null)}
         />
       )}
+
+      {/* Global AI Post Generator Modal */}
+      <AIPostGeneratorModal
+        property={selectedAiPostProperty}
+        companySettings={companySettings}
+        isOpen={isAiPostModalOpen}
+        onClose={handleCloseAiPost}
+      />
 
       {isFormModalOpen && (
         <PropertyFormModal

@@ -15,6 +15,7 @@ interface CaptadorDashboardProps {
   onDeleteProperty: (property: Property) => void;
   onShareWhatsApp: (property: Property) => void;
   onGenerateSocialMedia?: (property: Property) => void;
+  onGenerateAiPost?: (property: Property) => void;
   onPropertyConfirmed: (property: Property) => void;
 }
 
@@ -29,6 +30,7 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
   onDeleteProperty,
   onShareWhatsApp,
   onGenerateSocialMedia,
+  onGenerateAiPost,
   onPropertyConfirmed
 }) => {
   const [copied, setCopied] = useState(false);
@@ -206,6 +208,7 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
                 onEdit={onEditProperty}
                 onDelete={onDeleteProperty}
                 onGenerateSocialMedia={onGenerateSocialMedia}
+                onGenerateAiPost={onGenerateAiPost}
                 canEdit={true}
               />
             ))}

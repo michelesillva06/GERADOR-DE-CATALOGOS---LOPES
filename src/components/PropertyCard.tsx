@@ -1,6 +1,6 @@
 import React from 'react';
 import { Property, User } from '../types';
-import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2, Instagram } from 'lucide-react';
+import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2, Sparkles } from 'lucide-react';
 import { getPropertyMainImage, handleImageError } from '../lib/imageUtils';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
 
@@ -12,6 +12,7 @@ interface PropertyCardProps {
   onDelete?: (property: Property) => void;
   onShareWhatsApp?: (property: Property) => void;
   onGenerateSocialMedia?: (property: Property) => void;
+  onGenerateAiPost?: (property: Property) => void;
   canEdit?: boolean;
 }
 
@@ -23,9 +24,17 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
   onDelete,
   onShareWhatsApp,
   onGenerateSocialMedia,
+  onGenerateAiPost,
   canEdit = false
 }) => {
   const priceInfo = getPropertyPriceInfo(property);
+
+  const handleOpenAiPostModal = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onGenerateAiPost) {
+      onGenerateAiPost(property);
+    }
+  };
 
   const statusColors: Record<string, string> = {
     'Disponível': 'bg-emerald-600 text-white font-black shadow-md border-emerald-700',
@@ -152,6 +161,17 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
           <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
             <button
               type="button"
+              id={`btn-gerar-post-ia-card-${property.id || property.code || 'item'}`}
+              onClick={handleOpenAiPostModal}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white text-xs font-bold shadow-sm hover:shadow transition transform active:scale-95 cursor-pointer"
+              title="Gerar Post com IA para Redes Sociais"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+              <span>Gerar Post IA</span>
+            </button>
+
+            <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onView(property);
@@ -173,21 +193,6 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
                 title="Enviar por WhatsApp"
               >
                 <Share2 className="w-4 h-4" />
-              </button>
-            )}
-
-            {onGenerateSocialMedia && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onGenerateSocialMedia(property);
-                }}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F10F4D] hover:bg-[#d40d43] text-white text-xs font-bold transition cursor-pointer"
-                title="Gerar mídia para postar (Feed + Story)"
-              >
-                <Instagram className="w-4 h-4" />
-                <span>Baixar Mídias</span>
               </button>
             )}
 
@@ -225,3 +230,4 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
     </div>
   );
 };
+

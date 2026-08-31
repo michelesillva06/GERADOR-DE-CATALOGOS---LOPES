@@ -255,3 +255,12 @@ export interface ContractFormData {
   generated_by_user_id?: string;
   generated_by_user_name?: string;
 }
+
+export interface GeneratedPostRecord {
+  id: string;
+  propertyId: string;
+  templateId: string;
+  caption: string;
+  createdAt: string;
+}
+

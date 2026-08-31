@@ -817,7 +817,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                       previewFilter === 'new' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-emerald-700 hover:bg-emerald-50'
                     }`}
                   >
-                    ✨ Novos ({comparison.newCount})
+                    Novos ({comparison.newCount})
                   </button>
                   <button
                     onClick={() => setPreviewFilter('existing')}
@@ -856,7 +856,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                           {isNew ? (
                             <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase">
                               <Sparkles className="w-3 h-3 text-emerald-600" />
-                              <span>✨ NOVO</span>
+                              <span>NOVO</span>
                             </span>
                           ) : (
                             <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] uppercase">

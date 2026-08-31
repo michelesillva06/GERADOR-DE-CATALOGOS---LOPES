@@ -19,13 +19,15 @@ import {
   DollarSign,
   User as UserIcon,
   Edit3,
-  Trash2
+  Trash2,
+  Sparkles
 } from 'lucide-react';
 import { generateQRCodeDataUrl } from '../lib/qrCode';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { getPropertyImages, handleImageError } from '../lib/imageUtils';
 import { getPropertyPriceInfo, formatCurrencyBRL } from '../lib/priceUtils';
+import { getStoredSettings } from '../lib/storage';
 
 interface PropertyModalProps {
   property: Property | null;
@@ -34,21 +36,26 @@ interface PropertyModalProps {
   canEdit?: boolean;
   onEdit?: (property: Property) => void;
   onDelete?: (property: Property) => void;
+  onGenerateSocialMedia?: (property: Property) => void;
+  onGenerateAiPost?: (property: Property) => void;
   onClose: () => void;
 }
 
 export const PropertyModal: React.FC<PropertyModalProps> = ({
   property,
   captador,
-  companySettings,
+  companySettings: initialSettings,
   canEdit = false,
   onEdit,
   onDelete,
+  onGenerateSocialMedia,
+  onGenerateAiPost,
   onClose
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const companySettings = initialSettings || getStoredSettings();
 
   useEffect(() => {
     if (property) {
@@ -437,6 +444,22 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                id={`btn-gerar-post-ia-modal-${property.id || property.code || 'item'}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onGenerateAiPost) {
+                    onGenerateAiPost(property);
+                  }
+                }}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-rose-900/20 transition transform active:scale-95 cursor-pointer"
+                title="Criar arte para Feed e gerar legenda profissional com IA"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
+                <span>Gerar Post IA</span>
+              </button>
+
               <a
                 href={`/imovel/${encodeURIComponent(property.code || property.id)}`}
                 target="_blank"
@@ -450,7 +473,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
               <button
                 onClick={handleDownloadPdf}
                 disabled={isGeneratingPdf}
-                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition border border-slate-700 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition border border-slate-700 cursor-pointer disabled:opacity-50"
               >
                 <FileSpreadsheet className="w-4 h-4 text-[#F10F4D]" />
                 <span>{isGeneratingPdf ? 'Gerando PDF...' : 'Baixar PDF'}</span>
