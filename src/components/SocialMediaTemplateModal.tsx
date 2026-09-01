@@ -40,29 +40,29 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
     }
   };
 
-  const handleGenerateFeed = async () => {
-    setLoadingAction('feed');
+  const handleGenerateFeedVertical = async () => {
+    setLoadingAction('feed_vertical');
     try {
       const canvas = await generatePostImage(property, companySettings, 'feed_vertical');
-      handleDownloadCanvas(canvas, `${property.code}_feed_instagram.png`);
+      handleDownloadCanvas(canvas, `${property.code}_feed_retrato_1080x1350.png`);
       setTimeout(onClose, 600);
     } catch (err) {
-      console.error('Erro ao gerar Feed:', err);
-      alert('Não foi possível gerar a imagem para o Feed.');
+      console.error('Erro ao gerar Feed Retrato:', err);
+      alert('Não foi possível gerar a imagem para o Feed Retrato.');
     } finally {
       setLoadingAction(null);
     }
   };
 
-  const handleGenerateStory = async () => {
-    setLoadingAction('story');
+  const handleGenerateFeedQuadrado = async () => {
+    setLoadingAction('feed_quadrado');
     try {
-      const canvas = await generatePostImage(property, companySettings, 'story');
-      handleDownloadCanvas(canvas, `${property.code}_story_instagram.png`);
+      const canvas = await generatePostImage(property, companySettings, 'feed_quadrado');
+      handleDownloadCanvas(canvas, `${property.code}_feed_quadrado_1080x1080.png`);
       setTimeout(onClose, 600);
     } catch (err) {
-      console.error('Erro ao gerar Story:', err);
-      alert('Não foi possível gerar a imagem para o Story.');
+      console.error('Erro ao gerar Feed Quadrado:', err);
+      alert('Não foi possível gerar a imagem para o Feed Quadrado.');
     } finally {
       setLoadingAction(null);
     }
@@ -80,7 +80,7 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
               <Instagram className="text-[#F10F4D]" size={20} />
             </div>
             <div>
-              <h2 className="text-base font-black text-slate-900">Gerar Mídia Social</h2>
+              <h2 className="text-base font-black text-slate-900">Gerar Post</h2>
               <p className="text-xs text-slate-500 font-medium">Layout editorial padrão Lopes Manaus</p>
             </div>
           </div>
@@ -105,7 +105,7 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
                 <Download size={18} className="text-white" />
               </div>
               <div>
-                <p className="text-sm font-bold">Baixar Ambos (Feed + Story)</p>
+                <p className="text-sm font-bold">Baixar Ambos (Retrato + Quadrado)</p>
                 <p className="text-xs text-rose-100 mt-0.5">Gera e baixa as 2 versões em alta resolução</p>
               </div>
             </div>
@@ -124,7 +124,7 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
           {/* Individual Options */}
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={handleGenerateFeed}
+              onClick={handleGenerateFeedVertical}
               disabled={loadingAction !== null}
               className="p-3.5 rounded-2xl border border-slate-200 hover:border-[#F10F4D] hover:bg-rose-50/30 transition disabled:opacity-50 flex flex-col items-center text-center gap-2 group"
             >
@@ -132,25 +132,25 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
                 <Image size={18} />
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-800">Apenas Feed</p>
+                <p className="text-xs font-bold text-slate-800">Feed Retrato</p>
                 <p className="text-[10px] text-slate-400">1080 x 1350 (4:5)</p>
               </div>
-              {loadingAction === 'feed' && <Loader2 size={16} className="animate-spin text-[#F10F4D] mt-1" />}
+              {loadingAction === 'feed_vertical' && <Loader2 size={16} className="animate-spin text-[#F10F4D] mt-1" />}
             </button>
 
             <button
-              onClick={handleGenerateStory}
+              onClick={handleGenerateFeedQuadrado}
               disabled={loadingAction !== null}
               className="p-3.5 rounded-2xl border border-slate-200 hover:border-[#F10F4D] hover:bg-rose-50/30 transition disabled:opacity-50 flex flex-col items-center text-center gap-2 group"
             >
               <div className="w-8 h-8 rounded-xl bg-slate-100 group-hover:bg-rose-100 flex items-center justify-center text-slate-600 group-hover:text-[#F10F4D] transition">
-                <Smartphone size={18} />
+                <Image size={18} />
               </div>
               <div>
-                <p className="text-xs font-bold text-slate-800">Apenas Story</p>
-                <p className="text-[10px] text-slate-400">1080 x 1920 (9:16)</p>
+                <p className="text-xs font-bold text-slate-800">Feed Quadrado</p>
+                <p className="text-[10px] text-slate-400">1080 x 1080 (1:1)</p>
               </div>
-              {loadingAction === 'story' && <Loader2 size={16} className="animate-spin text-[#F10F4D] mt-1" />}
+              {loadingAction === 'feed_quadrado' && <Loader2 size={16} className="animate-spin text-[#F10F4D] mt-1" />}
             </button>
           </div>
         </div>

@@ -328,24 +328,14 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="shrink-0 px-6 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/90">
+        <div className="shrink-0 px-4 sm:px-6 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/90">
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-[#F10F4D] flex items-center justify-center shadow-sm">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#F10F4D] flex items-center justify-center shadow-sm shrink-0">
+              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm sm:text-base font-bold text-slate-900">
-                  Gerador de Posts para Redes Sociais — Lopes Manaus
-                </h2>
-                <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-100 text-[#F10F4D] border border-rose-200">
-                  Ficha Oficial
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Gere artes nos formatos Feed (1080x1350 / 1080x1080) e Stories (1080x1920) com a mesma estrutura de ficha do catálogo
-              </p>
-            </div>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900">
+              Gerador de Post
+            </h2>
           </div>
 
           <button
@@ -463,7 +453,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
                   onClick={handleDownloadCompletePack}
                   disabled={isDownloadingPack}
                   className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center space-x-1.5 border border-slate-700 transition transform active:scale-98 disabled:opacity-50 cursor-pointer"
-                  title="Baixa Pacote Completo (Feed Retrato + Quadrado + Story)"
+                  title="Baixa Pacote Completo (Feed Retrato + Quadrado)"
                 >
                   {isDownloadingPack ? (
                     <>
@@ -473,7 +463,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
                   ) : (
                     <>
                       <Layers className="w-3.5 h-3.5 text-amber-400" />
-                      <span className="truncate">Baixar Pacote (3 Artes)</span>
+                      <span className="truncate">Baixar Pacote (2 Artes)</span>
                     </>
                   )}
                 </button>
@@ -503,7 +493,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
 
           {/* RIGHT COLUMN: Photo Picker, Formats & Text Editor */}
           <div
-            className={`lg:col-span-6 bg-white p-4 sm:p-5 flex-col justify-between min-h-0 overflow-y-auto space-y-4 ${
+            className={`lg:col-span-6 bg-white p-3.5 sm:p-5 flex flex-col min-h-0 overflow-y-auto space-y-4 ${
               mobileTab === 'edit' ? 'flex flex-1 h-full' : 'hidden lg:flex'
             }`}
           >
@@ -513,7 +503,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5">
                 Formato da Arte:
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {POST_TEMPLATES_CONFIG.map((config) => {
                   const isSelected = selectedTemplate === config.id;
                   return (
@@ -549,7 +539,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
                   {images.length > 1 ? `${images.length} fotos no imóvel` : '1 foto'}
                 </span>
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setPostData({ ...postData, layoutStyle: 'single' })}
@@ -775,7 +765,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
                     Selo Principal:
@@ -849,7 +839,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
                     Chamada de Ação (CTA):
@@ -877,7 +867,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
             </div>
 
             {/* 4. Instagram Caption Textarea */}
-            <div className="flex-1 min-h-0 flex flex-col space-y-2">
+            <div className="flex flex-col space-y-2 shrink-0">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
@@ -910,14 +900,15 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
               <textarea
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
-                className="w-full flex-1 min-h-[120px] bg-slate-50 rounded-xl border border-slate-200 p-3 font-sans text-xs text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#F10F4D] resize-none"
+                className="w-full h-32 sm:h-36 bg-slate-50 rounded-xl border border-slate-200 p-3 font-sans text-xs text-slate-800 leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#F10F4D] resize-none"
                 placeholder="Legenda gerada..."
               />
             </div>
 
-            {/* Mobile Quick Switch Button to Preview */}
+            {/* Mobile Quick Switch Button to Preview (Placed below the Caption textarea) */}
             <button
               type="button"
+              id="btn-mobile-ver-arte-gerada"
               onClick={() => setMobileTab('preview')}
               className="lg:hidden w-full py-3 px-4 rounded-xl bg-[#F10F4D] hover:bg-[#d40d43] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-rose-900/30 transition cursor-pointer shrink-0 mt-2"
             >

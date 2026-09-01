@@ -1126,6 +1126,406 @@ function drawCenteredWrappedHeadline(
 }
 
 /**
+ * Dedicated Instagram Story Renderer (9:16 - 1080x1920)
+ * Engineered with strict safe-zones for Instagram UI (top 200px header & bottom 150px input overlay)
+ * Features a portrait hero photo card, floating badges, balanced specs grid, CTA & Footer.
+ */
+async function drawInstagramStoryDedicatedLayout(
+  ctx: CanvasRenderingContext2D,
+  options: CanvasPostOptions
+): Promise<void> {
+  const { property, companySettings, photoUrl, width, height, aiData } = options;
+  const theme = aiData?.designTheme || 'ruby_premium';
+
+  // 1. Process variables
+  const purposeLower = (property.purpose || '').toLowerCase().trim();
+  const isRent = purposeLower.includes('loca') || purposeLower.includes('aluguel') || purposeLower.includes('rent');
+  const defaultStatus = isRent ? 'LOCAÇÃO' : 'VENDA';
+  const statusText = (aiData?.statusTag && aiData.statusTag.trim()) ? aiData.statusTag.trim().toUpperCase() : defaultStatus;
+  const subStatusText = aiData?.subStatus !== undefined ? aiData.subStatus : 'DISPONÍVEL';
+
+  const priceVal = isRent ? (property.rent_price || property.price || 0) : (property.price || 0);
+  const defaultPriceText = priceVal > 0 
+    ? `R$ ${priceVal.toLocaleString('pt-BR')}${isRent ? '/mês' : ''}` 
+    : 'Consulte-nos';
+  const priceFormatted = aiData?.priceFormatted || defaultPriceText;
+
+  const neighborhood = property.neighborhood || 'Manaus';
+  const city = property.city || 'Manaus';
+  const locationText = aiData?.locationTag || `${neighborhood} | ${city}`;
+
+  const category = (property.category || 'IMÓVEL').toUpperCase();
+  const rawTitle = property.title || `${category} em ${neighborhood}`;
+
+  let fullTitle = '';
+  if (aiData?.headlineLine1 || aiData?.headlineLine2) {
+    fullTitle = `${aiData.headlineLine1 || ''} ${aiData.headlineLine2 || ''}`.trim();
+  } else {
+    fullTitle = rawTitle;
+  }
+
+  const specs = aiData?.specs && aiData.specs.length > 0 ? aiData.specs : extractDefaultPropertySpecs(property);
+  const ctaText = aiData?.ctaText || 'AGENDE SUA VISITA';
+  const whatsappNum = (aiData?.whatsappNumber || companySettings.whatsapp || companySettings.phone || '').trim();
+
+  const isGallery = aiData?.layoutStyle === 'gallery';
+
+  // 2. Full Background Canvas Fill
+  ctx.save();
+  if (theme === 'gold_dark') {
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+    bgGrad.addColorStop(0, '#0B1120');
+    bgGrad.addColorStop(0.5, '#0F172A');
+    bgGrad.addColorStop(1, '#080D1A');
+    ctx.fillStyle = bgGrad;
+  } else {
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+    bgGrad.addColorStop(0, '#F8FAFC');
+    bgGrad.addColorStop(0.5, '#FFFFFF');
+    bgGrad.addColorStop(1, '#F1F5F9');
+    ctx.fillStyle = bgGrad;
+  }
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+
+  // 3. Header Top Safe Zone Badge (Y = 190px - Below top Instagram UI overlay)
+  const headerY = 190;
+  drawModernPropertyBadge(ctx, 40, headerY, statusText, subStatusText, theme);
+
+  // 4. Hero Photo Card (Y = 270px to Y = 1030px, Height = 760px)
+  const cardX = 32;
+  const cardY = 270;
+  const cardW = width - cardX * 2; // 1016px
+  const cardH = 760;
+  const cardRadius = 24;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 12;
+
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+  ctx.fillStyle = '#1E293B';
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  // Clip photo inside card
+  ctx.save();
+  ctx.beginPath();
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+  ctx.clip();
+
+  try {
+    const bgImg = await loadImageSafely(photoUrl);
+    drawImageCover(ctx, bgImg, cardX, cardY, cardW, cardH);
+  } catch (e) {
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(cardX, cardY, cardW, cardH);
+  }
+
+  // Soft bottom dark gradient inside photo card for legibility of floating banners
+  const photoGrad = ctx.createLinearGradient(0, cardY + cardH - 220, 0, cardY + cardH);
+  photoGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
+  photoGrad.addColorStop(1, 'rgba(15, 23, 42, 0.75)');
+  ctx.fillStyle = photoGrad;
+  ctx.fillRect(cardX, cardY + cardH - 220, cardW, 220);
+
+  ctx.restore(); // end clip
+
+  // Crisp border frame accent
+  ctx.strokeStyle = theme === 'gold_dark' ? 'rgba(212, 175, 55, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+  ctx.lineWidth = 3;
+  drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // 5. Floating Banners inside / on bottom edge of Photo Card
+  const secondaryList = aiData?.secondaryPhotos || [];
+  let thumbUrls: string[] = secondaryList.filter(img => img && img !== photoUrl);
+  if (isGallery && thumbUrls.length < 3) {
+    const propImgs = extractPropertyImages(property);
+    for (const img of propImgs) {
+      if (thumbUrls.length >= 3) break;
+      if (img !== photoUrl && !thumbUrls.includes(img)) {
+        thumbUrls.push(img);
+      }
+    }
+  }
+
+  const thumbCount = isGallery ? Math.min(3, thumbUrls.length) : 0;
+  const hasThumbnails = isGallery && thumbCount > 0;
+
+  if (hasThumbnails) {
+    // Gallery Thumbnails anchored at bottom edge of photo card (Y = 860px to Y = 1010px)
+    const thumbPadX = cardX + 20;
+    const gap = 14;
+    const availW = cardW - 40;
+    const thumbW = Math.floor((availW - gap * (thumbCount - 1)) / thumbCount);
+    const thumbH = 150;
+    const thumbY = cardY + cardH - 170;
+
+    // Draw Price & Location floating above thumbnails
+    drawPriceAndLocationBanners(ctx, cardX + 20, thumbY - 110, priceFormatted, locationText, theme);
+
+    const loadedThumbs = await Promise.all(
+      thumbUrls.slice(0, thumbCount).map(url => loadImageSafely(url).catch(() => null))
+    );
+
+    loadedThumbs.forEach((tImg, idx) => {
+      const tx = thumbPadX + idx * (thumbW + gap);
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.40)';
+      ctx.shadowBlur = 16;
+      ctx.shadowOffsetY = 6;
+
+      drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 14);
+      ctx.fillStyle = '#1E293B';
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      ctx.save();
+      ctx.beginPath();
+      drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 14);
+      ctx.clip();
+
+      if (tImg) {
+        drawImageCover(ctx, tImg, tx, thumbY, thumbW, thumbH);
+      } else {
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(tx, thumbY, thumbW, thumbH);
+      }
+      ctx.restore();
+
+      ctx.strokeStyle = theme === 'gold_dark' ? '#D4AF37' : '#FFFFFF';
+      ctx.lineWidth = 3;
+      drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 14);
+      ctx.stroke();
+
+      ctx.restore();
+    });
+  } else {
+    // Single photo mode: Price & Location floating near bottom of photo card
+    drawPriceAndLocationBanners(ctx, cardX + 24, cardY + cardH - 120, priceFormatted, locationText, theme);
+  }
+
+  // 6. Property Title (Y = 1070px)
+  const titleStartY = 1070;
+  const maxTitleWidth = width - 80;
+  const titleFontSizePx = 44;
+  const textColor = theme === 'gold_dark' ? '#FFFFFF' : '#0F172A';
+
+  const lastTitleY = drawCenteredWrappedHeadline(
+    ctx,
+    fullTitle,
+    width / 2,
+    titleStartY,
+    maxTitleWidth,
+    titleFontSizePx,
+    textColor
+  );
+
+  // 7. Specifications Cards Grid (Y = lastTitleY + 45)
+  const specsY = lastTitleY + 45;
+  const totalSpecsCount = specs.length;
+
+  let specRows: Array<Array<{ icon: string; label: string }>> = [];
+  if (totalSpecsCount <= 3) {
+    specRows = [specs];
+  } else if (totalSpecsCount <= 6) {
+    const half = Math.ceil(totalSpecsCount / 2);
+    specRows = [specs.slice(0, half), specs.slice(half)];
+  } else {
+    specRows = [specs.slice(0, 3), specs.slice(3, 6), specs.slice(6, 8)];
+  }
+
+  const badgeH = 74;
+  const rowGapY = 18;
+
+  ctx.save();
+  specRows.forEach((rowItems, rowIndex) => {
+    const rowItemCount = Math.max(1, rowItems.length);
+    const gapX = 14;
+    const maxRowWidth = width - 80;
+    const calculatedBadgeW = Math.floor((maxRowWidth - (rowItemCount - 1) * gapX) / rowItemCount);
+    const badgeW = Math.min(320, Math.max(180, calculatedBadgeW));
+
+    const totalRowW = rowItemCount * badgeW + (rowItemCount - 1) * gapX;
+    const rowStartX = (width - totalRowW) / 2;
+    const currentRowCenterY = specsY + rowIndex * (badgeH + rowGapY) + badgeH / 2;
+    const badgeY = currentRowCenterY - badgeH / 2;
+
+    rowItems.forEach((item, index) => {
+      const badgeX = rowStartX + index * (badgeW + gapX);
+
+      drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
+      ctx.fillStyle = theme === 'gold_dark' ? '#1E293B' : '#FFFFFF';
+      ctx.fill();
+
+      ctx.strokeStyle = theme === 'gold_dark' ? '#334155' : '#E2E8F0';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Icon circle
+      const iconCircleSize = 44;
+      const iconCircleX = badgeX + 10;
+      const iconCircleY = badgeY + (badgeH - iconCircleSize) / 2;
+      drawRoundRect(ctx, iconCircleX, iconCircleY, iconCircleSize, iconCircleSize, 12);
+      ctx.fillStyle = theme === 'gold_dark' ? '#334155' : '#FFF1F5';
+      ctx.fill();
+
+      const iconSize = 28;
+      const iconX = iconCircleX + (iconCircleSize - iconSize) / 2;
+      const iconY = iconCircleY + (iconCircleSize - iconSize) / 2;
+      const iconColor = theme === 'gold_dark' ? '#F3E5AB' : '#F10F4D';
+      drawSpecIcon(ctx, item.icon, iconX, iconY, iconSize, iconColor);
+
+      // Label text
+      const labelText = item.label.toUpperCase();
+      ctx.fillStyle = theme === 'gold_dark' ? '#FFFFFF' : '#0F172A';
+
+      let fontSize = 21;
+      ctx.font = `800 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+      let labelWidth = ctx.measureText(labelText).width;
+      const maxTextWidth = badgeW - iconCircleSize - 24;
+
+      while (labelWidth > maxTextWidth && fontSize > 12) {
+        fontSize -= 1;
+        ctx.font = `800 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+        labelWidth = ctx.measureText(labelText).width;
+      }
+
+      ctx.textAlign = 'left';
+      ctx.fillText(labelText, iconCircleX + iconCircleSize + 10, badgeY + badgeH / 2 + (fontSize / 3));
+    });
+  });
+  ctx.restore();
+
+  // 8. Call to Action & WhatsApp Area (Anchored safely at Y = 1520px)
+  const ctaCenterY = 1520;
+  drawCtaBannerCentered(ctx, width / 2, ctaCenterY, ctaText, theme, true);
+
+  if (whatsappNum) {
+    ctx.save();
+    const waY = 1620;
+    const waText = `WhatsApp: ${whatsappNum}`;
+    const waFontSize = 25;
+    const waIconSize = 32;
+
+    ctx.font = `800 ${waFontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+    const waTextMetrics = ctx.measureText(waText);
+    const waTotalW = waIconSize + 12 + waTextMetrics.width;
+    const waStartX = (width - waTotalW) / 2;
+
+    drawWhatsAppVectorIcon(ctx, waStartX, waY - Math.floor(waIconSize / 2 + 5), waIconSize);
+
+    ctx.fillStyle = theme === 'gold_dark' ? '#F3E5AB' : '#0F172A';
+    ctx.textAlign = 'left';
+    ctx.fillText(waText, waStartX + waIconSize + 12, waY);
+    ctx.restore();
+  }
+
+  // 9. Footer Bar (Anchored at Y = 1680px to Y = 1775px - ABOVE bottom Instagram safe zone!)
+  const storyFooterH = 95;
+  const storyFooterY = 1680;
+
+  ctx.save();
+  ctx.fillStyle = '#0F172A';
+  ctx.fillRect(0, storyFooterY, width, storyFooterH);
+
+  ctx.fillStyle = theme === 'gold_dark' ? '#D4AF37' : '#F10F4D';
+  ctx.fillRect(0, storyFooterY, width, 3);
+
+  const paddingX = 32;
+  const baselineY = storyFooterY + Math.floor(storyFooterH / 2) + 7;
+
+  ctx.textBaseline = 'alphabetic';
+
+  const textLopes = 'Lopes';
+  const textManaus = 'MANAUS';
+  const separatorText = '—';
+  const sloganText = 'Sua melhor decisão imobiliária';
+
+  const fontLopes = "900 28px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontManaus = "800 20px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontSep = "600 20px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontSlogan = "700 19px 'Plus Jakarta Sans', 'Inter', sans-serif";
+
+  ctx.font = fontLopes;
+  const lopesWidth = ctx.measureText(textLopes).width;
+
+  ctx.font = fontManaus;
+  const manausWidth = ctx.measureText(textManaus).width;
+
+  ctx.font = fontSep;
+  const sepWidth = ctx.measureText(separatorText).width;
+
+  const heartSize = 28;
+  const heartGap = 8;
+  const wordGap = 7;
+  const sepGap = 10;
+
+  let currentX = paddingX;
+
+  drawLopesHeartVector(ctx, currentX, baselineY - 21, heartSize, '#F10F4D');
+  currentX += heartSize + heartGap;
+
+  ctx.fillStyle = '#F10F4D';
+  ctx.font = fontLopes;
+  ctx.fillText(textLopes, currentX, baselineY);
+  currentX += lopesWidth + wordGap;
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = fontManaus;
+  ctx.fillText(textManaus, currentX, baselineY);
+  currentX += manausWidth + sepGap;
+
+  ctx.fillStyle = '#64748B';
+  ctx.font = fontSep;
+  ctx.fillText(separatorText, currentX, baselineY);
+  currentX += sepWidth + sepGap;
+
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = fontSlogan;
+  ctx.fillText(sloganText, currentX, baselineY);
+
+  const siteText = 'lopes.manaus.com.br';
+  const igText = '@lopesmanaus';
+
+  const fontRight = "800 19px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  ctx.font = fontRight;
+  const siteWidth = ctx.measureText(siteText).width;
+  const igWidth = ctx.measureText(igText).width;
+
+  const iconSize = 24;
+  const iconTextGap = 7;
+  const channelGap = 20;
+
+  let rightX = width - paddingX;
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = fontRight;
+  ctx.fillText(siteText, rightX, baselineY);
+
+  const siteIconX = rightX - siteWidth - iconTextGap - iconSize;
+  drawGlobeVectorIcon(ctx, siteIconX, baselineY - 18, iconSize, '#38BDF8');
+
+  rightX = siteIconX - channelGap;
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = fontRight;
+  ctx.fillText(igText, rightX, baselineY);
+
+  const igIconX = rightX - igWidth - iconTextGap - iconSize;
+  drawInstagramVectorIcon(ctx, igIconX, baselineY - 18, iconSize, '#F10F4D');
+
+  ctx.restore();
+}
+
+/**
  * Primary Native 2D Canvas Post Renderer (100% Deterministic & Ultra-Luxury)
  */
 export async function renderPostToCanvas(
@@ -1142,6 +1542,11 @@ export async function renderPostToCanvas(
   const theme = aiData?.designTheme || 'ruby_premium';
   const isSquare = height === 1080;
   const isStory = height >= 1800;
+
+  // Dedicated Instagram Stories Layout Engine (9:16 - 1080x1920)
+  if (isStory) {
+    return await drawInstagramStoryDedicatedLayout(ctx, options);
+  }
 
   const photoHeightRatio = 0.50; // Always half of post height (50%)
   const photoHeight = Math.round(height * photoHeightRatio);

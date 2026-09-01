@@ -53,7 +53,7 @@ export function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
 }
 
 /**
- * Generates and downloads the full pack (Feed Retrato + Feed Quadrado + Story)
+ * Generates and downloads the full pack (Feed Retrato + Feed Quadrado)
  */
 export async function generateAndDownloadSocialMedia(
   prop: Property,
@@ -72,11 +72,6 @@ export async function generateAndDownloadSocialMedia(
     await new Promise(resolve => setTimeout(resolve, 300));
     const feedQuad = await generatePostImage(prop, companySettings, 'feed_quadrado', photoUrl, aiData);
     downloadCanvas(feedQuad, `${code}_feed_quadrado_1080x1080.png`);
-
-    // 3. Story (1080x1920)
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const story = await generatePostImage(prop, companySettings, 'story', photoUrl, aiData);
-    downloadCanvas(story, `${code}_story_1080x1920.png`);
   } catch (err: any) {
     console.error('Erro na renderização do pacote de artes:', err);
     throw err;

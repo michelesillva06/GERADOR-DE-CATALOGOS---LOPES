@@ -21,12 +21,5 @@ export const POST_TEMPLATES_CONFIG: PostTemplateConfig[] = [
     description: 'Formato 1:1 quadrado tradicional para redes sociais',
     width: 1080,
     height: 1080
-  },
-  {
-    id: 'story',
-    name: 'Stories / Reels (1080x1920)',
-    description: 'Formato 9:16 vertical em tela cheia para Stories e Reels',
-    width: 1080,
-    height: 1920
   }
 ];

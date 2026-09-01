@@ -1,6 +1,6 @@
 import { Property, CompanySettings } from '../../types';
 
-export type PostTemplateId = 'feed_vertical' | 'feed_quadrado' | 'story';
+export type PostTemplateId = 'feed_vertical' | 'feed_quadrado';
 
 export interface PostTemplateConfig {
   id: PostTemplateId;
