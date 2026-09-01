@@ -444,21 +444,23 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              <button
-                type="button"
-                id={`btn-gerar-post-ia-modal-${property.id || property.code || 'item'}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (onGenerateAiPost) {
-                    onGenerateAiPost(property);
-                  }
-                }}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-rose-900/20 transition transform active:scale-95 cursor-pointer"
-                title="Criar arte para Feed e gerar legenda profissional com IA"
-              >
-                <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
-                <span>Gerar Post IA</span>
-              </button>
+              {onGenerateAiPost && (
+                <button
+                  type="button"
+                  id={`btn-gerar-post-ia-modal-${property.id || property.code || 'item'}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onGenerateAiPost) {
+                      onGenerateAiPost(property);
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-rose-900/20 transition transform active:scale-95 cursor-pointer"
+                  title="Criar arte para Feed e Stories"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span>Gerar Post</span>
+                </button>
+              )}
 
               <a
                 href={`/imovel/${encodeURIComponent(property.code || property.id)}`}

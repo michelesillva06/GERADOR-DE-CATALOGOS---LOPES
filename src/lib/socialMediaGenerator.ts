@@ -1,17 +1,17 @@
 import { Property, CompanySettings } from '../types';
 import { extractPropertyImages } from './pdfGenerator';
 import { PostTemplateId, POST_TEMPLATES_CONFIG } from '../components/postTemplates';
-import { renderPostToCanvas } from './canvasPostEngine';
+import { renderPostToCanvas, CanvasPostData } from './canvasPostEngine';
 
 /**
  * Renders a specific post template directly to a high-resolution 2D Canvas element.
- * 100% deterministic, zero HTML2Canvas distortions, instant execution.
  */
 export async function generatePostImage(
   property: Property,
   companySettings: CompanySettings,
   templateId: PostTemplateId,
-  photoUrl?: string
+  photoUrl?: string,
+  aiData?: CanvasPostData
 ): Promise<HTMLCanvasElement> {
   const images = extractPropertyImages(property);
   const selectedPhoto = photoUrl || images[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
@@ -31,7 +31,8 @@ export async function generatePostImage(
     templateId,
     photoUrl: selectedPhoto,
     width,
-    height
+    height,
+    aiData
   });
 
   return canvas;
@@ -51,33 +52,33 @@ export function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
   downloadDataUrl(url, filename);
 }
 
-/** Feed post — 1080x1350 (4:5), high-end portrait layout */
-export async function generateFeedPost(prop: Property, companySettings: CompanySettings): Promise<HTMLCanvasElement> {
-  const isRent = prop.purpose === 'Locação';
-  const templateId: PostTemplateId = isRent ? 'feed_aluguel' : 'feed_venda';
-  return generatePostImage(prop, companySettings, templateId);
-}
-
-/** Story post — 1080x1920 (9:16) */
-export async function generateStoryPost(prop: Property, companySettings: CompanySettings): Promise<HTMLCanvasElement> {
-  return generatePostImage(prop, companySettings, 'story');
-}
-
 /**
- * Generates and downloads both the feed and story images for a property.
+ * Generates and downloads the full pack (Feed Retrato + Feed Quadrado + Story)
  */
-export async function generateAndDownloadSocialMedia(prop: Property, companySettings: CompanySettings) {
+export async function generateAndDownloadSocialMedia(
+  prop: Property,
+  companySettings: CompanySettings,
+  photoUrl?: string,
+  aiData?: CanvasPostData
+) {
   const code = prop.code || prop.id || 'imovel';
 
   try {
-    const feed = await generateFeedPost(prop, companySettings);
-    downloadCanvas(feed, `${code}_feed_instagram.png`);
+    // 1. Feed Retrato (1080x1350)
+    const feedVert = await generatePostImage(prop, companySettings, 'feed_vertical', photoUrl, aiData);
+    downloadCanvas(feedVert, `${code}_feed_retrato_1080x1350.png`);
 
-    const story = await generateStoryPost(prop, companySettings);
+    // 2. Feed Quadrado (1080x1080)
     await new Promise(resolve => setTimeout(resolve, 300));
-    downloadCanvas(story, `${code}_story_instagram.png`);
+    const feedQuad = await generatePostImage(prop, companySettings, 'feed_quadrado', photoUrl, aiData);
+    downloadCanvas(feedQuad, `${code}_feed_quadrado_1080x1080.png`);
+
+    // 3. Story (1080x1920)
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const story = await generatePostImage(prop, companySettings, 'story', photoUrl, aiData);
+    downloadCanvas(story, `${code}_story_1080x1920.png`);
   } catch (err: any) {
-    console.error('Erro na renderização das mídias:', err);
+    console.error('Erro na renderização do pacote de artes:', err);
     throw err;
   }
 }

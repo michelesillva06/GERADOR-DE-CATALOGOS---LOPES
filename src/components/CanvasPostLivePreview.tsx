@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Property, CompanySettings } from '../types';
 import { PostTemplateId } from './postTemplates';
-import { renderPostToCanvas } from '../lib/canvasPostEngine';
+import { renderPostToCanvas, CanvasPostData } from '../lib/canvasPostEngine';
 import { Loader2 } from 'lucide-react';
 
 interface CanvasPostLivePreviewProps {
@@ -12,6 +12,7 @@ interface CanvasPostLivePreviewProps {
   width: number;
   height: number;
   scale?: number;
+  aiData?: CanvasPostData;
   className?: string;
   onCanvasReady?: (canvas: HTMLCanvasElement) => void;
 }
@@ -24,6 +25,7 @@ export const CanvasPostLivePreview: React.FC<CanvasPostLivePreviewProps> = ({
   width,
   height,
   scale = 1,
+  aiData,
   className = '',
   onCanvasReady
 }) => {
@@ -43,7 +45,8 @@ export const CanvasPostLivePreview: React.FC<CanvasPostLivePreviewProps> = ({
           templateId,
           photoUrl,
           width,
-          height
+          height,
+          aiData
         });
         if (!isCancelled && onCanvasReady && canvasRef.current) {
           onCanvasReady(canvasRef.current);
@@ -62,12 +65,12 @@ export const CanvasPostLivePreview: React.FC<CanvasPostLivePreviewProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [property, companySettings, templateId, photoUrl, width, height, onCanvasReady]);
+  }, [property, companySettings, templateId, photoUrl, width, height, aiData, onCanvasReady]);
 
   return (
     <div className={`relative flex items-center justify-center ${className}`}>
       {isRendering && (
-        <div className="absolute inset-0 z-20 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center">
+        <div className="absolute inset-0 z-20 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center pointer-events-none">
           <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/90 text-white text-xs font-bold shadow-lg">
             <Loader2 className="w-4 h-4 animate-spin text-[#F10F4D]" />
             <span>Processando arte em alta resolução...</span>
@@ -91,3 +94,4 @@ export const CanvasPostLivePreview: React.FC<CanvasPostLivePreviewProps> = ({
 };
 
 export default CanvasPostLivePreview;
+

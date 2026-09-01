@@ -1884,6 +1884,124 @@ app.delete('/api/schedule/:id', requireAuth, async (req, res) => {
 });
 
 /**
+ * AI SOCIAL MEDIA POST GENERATOR (GEMINI 2.5 FLASH)
+ * Generates headline line 1, line 2, highlight number, location tag, status, price, specs, and caption.
+ */
+app.post('/api/social-media/generate-ai-post', async (req, res) => {
+  try {
+    const { property, style = 'luxury', customInstructions = '' } = req.body || {};
+    if (!property) {
+      return res.status(400).json({ error: 'Dados do imóvel não informados.' });
+    }
+
+    const purpose = property.purpose || 'Venda';
+    const isRent = purpose === 'Locação' || purpose === 'Venda e Locação';
+    const priceVal = isRent ? (property.rent_price || property.price || 0) : (property.price || 0);
+    const priceStr = priceVal > 0 
+      ? `R$ ${priceVal.toLocaleString('pt-BR')}${isRent ? '/mês' : ''}` 
+      : 'Consulte-nos';
+    
+    const neighborhood = property.neighborhood || 'Manaus';
+    const city = property.city || 'Manaus';
+    const category = property.category || 'Imóvel';
+    const bedrooms = property.bedrooms || 0;
+    const suites = property.suites || 0;
+    const bathrooms = property.bathrooms || 0;
+    const parking = property.parking_spaces || 0;
+    const area = property.total_area || property.built_area || 0;
+
+    // Default structured response
+    const defaultData = {
+      headlineLine1: `${category} com`,
+      headlineLine2: bedrooms > 0 ? `${bedrooms} Quartos${suites > 0 ? ` (${suites} Suítes)` : ''}` : 'Alto Padrão em Manaus',
+      highlightNumber: bedrooms > 0 ? `${bedrooms}` : '',
+      statusTag: isRent ? 'LOCAÇÃO' : 'VENDA',
+      subStatus: 'EXCLUSIVO',
+      priceFormatted: priceStr,
+      locationTag: `${neighborhood} | ${city}`,
+      specs: [
+        bedrooms > 0 ? { icon: 'bed', label: `${bedrooms} QUARTOS` } : null,
+        bathrooms > 0 ? { icon: 'bath', label: `${bathrooms} BANHEIROS` } : null,
+        parking > 0 ? { icon: 'car', label: `${parking} VAGAS` } : null,
+        area > 0 ? { icon: 'area', label: `${area} m²` } : null,
+      ].filter(Boolean),
+      hook: `Oportunidade Exclusiva Lopes Manaus em ${neighborhood}`,
+      instagramCaption: `✨ ${property.title || `${category} Exclusivo em ${neighborhood}`}\n\n📍 Localização: ${neighborhood}, ${city}\n💰 Valor: ${priceStr}\n\n🏡 Destaques:\n• ${bedrooms > 0 ? `${bedrooms} Quartos (${suites} Suítes)` : 'Excelente distribuição interna'}\n• ${bathrooms} Banheiros\n• ${parking} Vagas\n• ${area > 0 ? `${area}m²` : 'Amplo espaço'}\n\n📲 Agende agora sua visita com a Lopes Manaus!\n\n#LopesManaus #ImoveisManaus #${neighborhood.replace(/\s+/g, '')} #ImovelDeLuxo`
+    };
+
+    let ai: GoogleGenAI;
+    try {
+      ai = getGenAI();
+    } catch {
+      return res.json({ success: true, aiGenerated: false, data: defaultData });
+    }
+
+    const prompt = `Você é o Diretor de Marketing Imobiliário da Lopes Manaus. Crie os dados textuais para a arte gráfica do Instagram (Feed 1080x1350) e a legenda perfeita para este imóvel:
+- Título original: ${property.title}
+- Categoria: ${category}
+- Finalidade: ${purpose}
+- Bairro: ${neighborhood} | Cidade: ${city}
+- Preço: ${priceStr}
+- Quartos: ${bedrooms} | Suítes: ${suites} | Banheiros: ${bathrooms} | Vagas: ${parking} | Área: ${area}m²
+- Características/Diferenciais: ${Array.isArray(property.features) ? property.features.join(', ') : 'Alto Padrão'}
+- Estilo desejado: ${style} (luxury = foco em sofisticação e exclusividade; opportunity = foco em oportunidade imperdível; family = foco em conforto familiar)
+${customInstructions ? `- Instruções adicionais do corretor: ${customInstructions}` : ''}
+
+Retorne ESTRITAMENTE um objeto JSON válido no formato:
+{
+  "headlineLine1": "Linha 1 do título elegante (ex: 'Casa Duplex com' ou 'Apartamento de Luxo com' ou 'Mansão Exclusiva com')",
+  "headlineLine2": "Linha 2 do título com o número/destaque (ex: '3 Quartos (2 Suítes)' ou 'Vista Panorâmica Rio Negro' ou '4 Suítes & Piscina')",
+  "highlightNumber": "O número principal a ser destacado em vermelho (ex: '3' ou '4' ou '')",
+  "statusTag": "${isRent ? 'LOCAÇÃO' : 'VENDA'}",
+  "subStatus": "EXCLUSIVO",
+  "priceFormatted": "${priceStr}",
+  "locationTag": "${neighborhood} | ${city}",
+  "specs": [
+    { "icon": "bed", "label": "${bedrooms > 0 ? `${bedrooms} QUARTOS` : 'QUARTOS'}" },
+    { "icon": "bath", "label": "${bathrooms > 0 ? `${bathrooms} BANHEIROS` : 'BANHEIROS'}" },
+    { "icon": "car", "label": "${parking > 0 ? `${parking} VAGAS` : 'VAGAS'}" }
+  ],
+  "hook": "Frase curta de impacto para a capa ou story",
+  "instagramCaption": "Legenda completa formatada para o Instagram com emojis, bullet points elegantes, CTA para o WhatsApp da Lopes Manaus e 5 a 8 hashtags (#LopesManaus, etc.)"
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const text = response.text || '';
+    let parsedData = defaultData;
+    try {
+      const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      parsedData = JSON.parse(cleanJson);
+    } catch (e) {
+      console.warn('[Gemini JSON parse failed, using fallback]:', e);
+    }
+
+    return res.json({
+      success: true,
+      aiGenerated: true,
+      data: {
+        ...defaultData,
+        ...parsedData,
+        // Guarantee safety on required fields
+        priceFormatted: parsedData.priceFormatted || priceStr,
+        locationTag: parsedData.locationTag || `${neighborhood} | ${city}`,
+        statusTag: parsedData.statusTag || (isRent ? 'LOCAÇÃO' : 'VENDA'),
+        subStatus: parsedData.subStatus || 'EXCLUSIVO'
+      }
+    });
+  } catch (err: any) {
+    console.error('Error generating AI post data:', err);
+    return res.status(500).json({ error: 'Erro ao gerar dados com IA: ' + err.message });
+  }
+});
+
+/**
  * AI SOCIAL MEDIA CAPTION GENERATOR (GEMINI 2.5 FLASH)
  */
 app.post('/api/social-media/generate-caption', async (req, res) => {
@@ -1906,7 +2024,7 @@ app.post('/api/social-media/generate-caption', async (req, res) => {
 Título: ${property.title}
 Finalidade: ${property.purpose || 'Venda'}
 Bairro/Cidade: ${property.neighborhood}, ${property.city} - ${property.state}
-Preço: R$ ${property.sale_price || property.rent_price || ''}
+Preço: R$ ${property.sale_price || property.rent_price || property.price || ''}
 Quartos: ${property.bedrooms || '-'} | Vagas: ${property.parking_spaces || '-'} | Área: ${property.total_area || property.built_area || '-'}m²
 
 Instruções:

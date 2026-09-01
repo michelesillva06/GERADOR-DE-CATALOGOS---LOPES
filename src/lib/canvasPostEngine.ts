@@ -1,6 +1,19 @@
 import { Property, CompanySettings } from '../types';
-import { formatCurrencyBRL } from './priceUtils';
 import { PostTemplateId } from '../components/postTemplates';
+
+export interface CanvasPostData {
+  headlineLine1?: string;
+  headlineLine2?: string;
+  highlightNumber?: string;
+  statusTag?: string;
+  subStatus?: string;
+  priceFormatted?: string;
+  locationTag?: string;
+  specs?: Array<{ icon: string; label: string }>;
+  ctaText?: string;
+  whatsappNumber?: string;
+  hook?: string;
+}
 
 export interface CanvasPostOptions {
   property: Property;
@@ -9,10 +22,11 @@ export interface CanvasPostOptions {
   photoUrl: string;
   width: number;
   height: number;
+  aiData?: CanvasPostData;
 }
 
 /**
- * Loads an image safely with cross-origin handling.
+ * Safe image loader with crossOrigin fallback handling
  */
 export async function loadImageSafely(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -20,7 +34,6 @@ export async function loadImageSafely(src: string): Promise<HTMLImageElement> {
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
     img.onerror = () => {
-      // If anonymous CORS failed, try fallback without crossOrigin
       const fallbackImg = new Image();
       fallbackImg.onload = () => resolve(fallbackImg);
       fallbackImg.onerror = (err) => reject(err);
@@ -61,132 +74,6 @@ export function drawRoundRect(
 }
 
 /**
- * Helper to wrap text cleanly and return lines.
- */
-export function getWrappedLines(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-  maxLines: number = 2
-): string[] {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let currentLine = '';
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const metrics = ctx.measureText(testLine);
-
-    if (metrics.width > maxWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-      if (lines.length === maxLines - 1) {
-        const remaining = words.slice(i).join(' ');
-        let lastLine = remaining;
-        while (ctx.measureText(`${lastLine}...`).width > maxWidth && lastLine.length > 0) {
-          lastLine = lastLine.slice(0, -1);
-        }
-        lines.push(`${lastLine.trim()}...`);
-        return lines;
-      }
-    } else {
-      currentLine = testLine;
-    }
-  }
-
-  if (currentLine && lines.length < maxLines) {
-    lines.push(currentLine);
-  }
-
-  return lines;
-}
-
-/**
- * Draws the vector Lopes Heart logo icon directly on the canvas.
- */
-export function drawLopesHeartVector(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  size: number = 44,
-  color: string = '#F10F4D'
-) {
-  ctx.save();
-  ctx.translate(x, y);
-  const scale = size / 100;
-  ctx.scale(scale, scale);
-
-  ctx.fillStyle = color;
-
-  // Head circle
-  ctx.beginPath();
-  ctx.arc(75, 28, 18, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Heart curve body
-  ctx.beginPath();
-  ctx.moveTo(46, 92);
-  ctx.bezierCurveTo(25, 74, 2, 52, 2, 30);
-  ctx.bezierCurveTo(2, 12, 16, 0, 34, 0);
-  ctx.bezierCurveTo(44, 0, 52, 5, 57, 14);
-  ctx.bezierCurveTo(52, 23, 50, 33, 53, 43);
-  ctx.bezierCurveTo(57, 55, 67, 62, 76, 62);
-  ctx.bezierCurveTo(68, 76, 57, 86, 46, 92);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
-}
-
-/**
- * Draws the complete Lopes brand lockup badge (Header Pill).
- */
-export function drawBrandHeaderBadge(
-  ctx: CanvasRenderingContext2D,
-  companySettings: CompanySettings,
-  x: number,
-  y: number
-) {
-  const companyName = (companySettings.company_name || 'LOPES').toUpperCase();
-  const unitName = (companySettings.unit_name || 'MANAUS').toUpperCase();
-
-  ctx.save();
-  // Outer Pill Container
-  const badgeWidth = 240;
-  const badgeHeight = 64;
-
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.22)';
-  ctx.shadowBlur = 16;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 6;
-
-  drawRoundRect(ctx, x, y, badgeWidth, badgeHeight, 18);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fill();
-
-  ctx.shadowColor = 'transparent';
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Lopes Heart Icon
-  drawLopesHeartVector(ctx, x + 16, y + 10, 42, '#F10F4D');
-
-  // Brand Name Typography
-  ctx.fillStyle = '#0F172A';
-  ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif";
-  ctx.fillText(companyName.includes('LOPES') ? 'LOPES' : companyName, x + 68, y + 36);
-
-  // Unit Name Typography
-  ctx.fillStyle = '#F10F4D';
-  ctx.font = "800 11px 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif";
-  ctx.fillText(unitName, x + 70, y + 52);
-
-  ctx.restore();
-}
-
-/**
  * Draws image with cover aspect ratio inside a bounding box.
  */
 export function drawImageCover(
@@ -220,377 +107,634 @@ export function drawImageCover(
 }
 
 /**
- * Primary Native 2D Canvas Post Renderer.
- * High-performance, pixel-perfect, zero html2canvas distortion.
+ * Draws the vector Lopes Heart logo icon directly on the canvas.
+ */
+export function drawLopesHeartVector(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number = 36,
+  color: string = '#E5094C'
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  const scale = size / 100;
+  ctx.scale(scale, scale);
+
+  ctx.fillStyle = color;
+
+  // Head circle
+  ctx.beginPath();
+  ctx.arc(75, 28, 18, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Heart curve body
+  ctx.beginPath();
+  ctx.moveTo(46, 92);
+  ctx.bezierCurveTo(25, 74, 2, 52, 2, 30);
+  ctx.bezierCurveTo(2, 12, 16, 0, 34, 0);
+  ctx.bezierCurveTo(44, 0, 52, 5, 57, 14);
+  ctx.bezierCurveTo(52, 23, 50, 33, 53, 43);
+  ctx.bezierCurveTo(57, 55, 67, 62, 76, 62);
+  ctx.bezierCurveTo(68, 76, 57, 86, 46, 92);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draws a modern property badge tag (Dual Capsule / Pill style).
+ * SubStatus (DISPONÍVEL) is now larger and proportional to top status text.
+ */
+export function drawModernPropertyBadge(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  status: string = 'VENDA',
+  subStatus: string = 'DISPONÍVEL'
+) {
+  ctx.save();
+
+  const mainStatusText = (status || 'VENDA').toUpperCase();
+  const subStatusText = (subStatus || 'DISPONÍVEL').toUpperCase();
+
+  ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const mainMetrics = ctx.measureText(mainStatusText);
+
+  ctx.font = "900 18px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const subMetrics = ctx.measureText(subStatusText);
+
+  const topH = 48;
+  const subH = 40;
+
+  // Calculate badge width so both main and sub text fit with generous padding
+  const minBadgeW = Math.max(mainMetrics.width + 68, subMetrics.width + 48);
+  const badgeW = Math.max(210, minBadgeW);
+
+  // Drop shadow
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 6;
+
+  // Top Main Capsule Pill (Lopes Ruby Red Gradient)
+  drawRoundRect(ctx, x, y, badgeW, topH, [16, 16, subStatusText ? 4 : 16, 4]);
+  const mainGrad = ctx.createLinearGradient(x, y, x + badgeW, y + topH);
+  mainGrad.addColorStop(0, '#E5094C');
+  mainGrad.addColorStop(1, '#B30030');
+  ctx.fillStyle = mainGrad;
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  // White inner border highlight
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // White Lopes Heart Icon inside main capsule
+  drawLopesHeartVector(ctx, x + 14, y + (topH - 26) / 2, 26, '#FFFFFF');
+
+  // Main Status Text ("LOCAÇÃO" / "VENDA")
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  ctx.textAlign = 'left';
+  ctx.fillText(mainStatusText, x + 50, y + topH / 2 + 8);
+
+  // Sub Status Pill attached underneath ("DISPONÍVEL") - Larger font & height
+  if (subStatusText) {
+    const subY = y + topH + 3;
+    const subW = badgeW;
+
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+
+    drawRoundRect(ctx, x, subY, subW, subH, [4, 4, 14, 14]);
+    ctx.fillStyle = '#0F172A';
+    ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = "900 18px 'Plus Jakarta Sans', 'Inter', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.fillText(subStatusText, x + subW / 2, subY + subH / 2 + 6);
+  }
+
+  ctx.restore();
+}
+
+export const drawHexagonalCrestBadge = drawModernPropertyBadge;
+
+/**
+ * Draws the high-impact Red Price Banner and Location Pill (Bottom Left of Photo)
+ * Location text (Neighborhood | City) is enlarged as requested.
+ */
+export function drawPriceAndLocationBanners(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  priceText: string,
+  locationText: string
+) {
+  ctx.save();
+
+  // 1. Red Price Rectangle
+  ctx.font = "900 42px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const priceMetrics = ctx.measureText(priceText);
+  const pricePadX = 26;
+  const priceW = Math.max(340, priceMetrics.width + pricePadX * 2);
+  const priceH = 70;
+
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 8;
+
+  ctx.fillStyle = '#E5094C';
+  ctx.fillRect(x, y, priceW, priceH);
+
+  // Price Text
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(priceText, x + pricePadX, y + 49);
+
+  // 2. Location Pill directly underneath (Larger font for Bairro | Cidade)
+  const locY = y + priceH + 4;
+  ctx.font = "800 22px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const locMetrics = ctx.measureText(locationText);
+  const locPadX = 24;
+  const locW = locMetrics.width + locPadX * 2;
+  const locH = 46;
+
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.30)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 6;
+
+  drawRoundRect(ctx, x, locY, locW, locH, [0, 16, 16, 0]);
+  ctx.fillStyle = '#E5094C';
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(locationText, x + locPadX, locY + 31);
+
+  ctx.restore();
+}
+
+/**
+ * Draws custom vector icons in Lopes Red for specifications.
+ */
+export function drawSpecIcon(
+  ctx: CanvasRenderingContext2D,
+  type: string,
+  x: number,
+  y: number,
+  size: number = 38,
+  color: string = '#E5094C'
+) {
+  ctx.save();
+  ctx.translate(x, y);
+  const scale = size / 32;
+  ctx.scale(scale, scale);
+
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const t = (type || '').toLowerCase();
+
+  if (t.includes('bed') || t.includes('quart') || t.includes('suit')) {
+    // Bed Vector Icon
+    ctx.beginPath();
+    ctx.moveTo(4, 24);
+    ctx.lineTo(4, 8);
+    ctx.moveTo(28, 24);
+    ctx.lineTo(28, 14);
+    ctx.moveTo(4, 16);
+    ctx.lineTo(28, 16);
+    ctx.moveTo(4, 22);
+    ctx.lineTo(28, 22);
+    ctx.stroke();
+
+    ctx.beginPath();
+    drawRoundRect(ctx, 7, 10, 8, 5, 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    drawRoundRect(ctx, 15, 14, 12, 7, 2);
+    ctx.stroke();
+  } else if (t.includes('bath') || t.includes('banh')) {
+    // Shower / Bath Icon
+    ctx.beginPath();
+    ctx.moveTo(6, 26);
+    ctx.lineTo(6, 8);
+    ctx.quadraticCurveTo(6, 4, 12, 4);
+    ctx.lineTo(16, 4);
+    ctx.quadraticCurveTo(22, 4, 22, 10);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(22, 10, 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(19, 17);
+    ctx.lineTo(19, 19);
+    ctx.moveTo(22, 18);
+    ctx.lineTo(22, 21);
+    ctx.moveTo(25, 17);
+    ctx.lineTo(25, 19);
+    ctx.stroke();
+  } else if (t.includes('car') || t.includes('vaga') || t.includes('garag')) {
+    // Car Icon
+    ctx.beginPath();
+    ctx.arc(8, 23, 3, 0, Math.PI * 2);
+    ctx.arc(24, 23, 3, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(3, 20);
+    ctx.lineTo(5, 20);
+    ctx.moveTo(11, 20);
+    ctx.lineTo(21, 20);
+    ctx.moveTo(27, 20);
+    ctx.lineTo(29, 20);
+    ctx.lineTo(28, 14);
+    ctx.lineTo(22, 14);
+    ctx.lineTo(19, 8);
+    ctx.lineTo(9, 8);
+    ctx.lineTo(6, 14);
+    ctx.lineTo(3, 15);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (t.includes('piscina') || t.includes('pool')) {
+    // Pool Waves
+    ctx.beginPath();
+    ctx.moveTo(4, 14);
+    ctx.quadraticCurveTo(8, 10, 12, 14);
+    ctx.quadraticCurveTo(16, 18, 20, 14);
+    ctx.quadraticCurveTo(24, 10, 28, 14);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(4, 22);
+    ctx.quadraticCurveTo(8, 18, 12, 22);
+    ctx.quadraticCurveTo(16, 26, 20, 22);
+    ctx.quadraticCurveTo(24, 18, 28, 22);
+    ctx.stroke();
+  } else if (t.includes('churras') || t.includes('bbq') || t.includes('gourmet')) {
+    // Grill / Flame
+    ctx.beginPath();
+    ctx.arc(16, 14, 10, 0, Math.PI);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(6, 14);
+    ctx.lineTo(26, 14);
+    ctx.moveTo(10, 24);
+    ctx.lineTo(6, 28);
+    ctx.moveTo(22, 24);
+    ctx.lineTo(26, 28);
+    ctx.stroke();
+  } else if (t.includes('area') || t.includes('m²')) {
+    // Area / Maximize Icon
+    ctx.beginPath();
+    ctx.moveTo(6, 12);
+    ctx.lineTo(6, 6);
+    ctx.lineTo(12, 6);
+
+    ctx.moveTo(20, 6);
+    ctx.lineTo(26, 6);
+    ctx.lineTo(26, 12);
+
+    ctx.moveTo(26, 20);
+    ctx.lineTo(26, 26);
+    ctx.lineTo(20, 26);
+
+    ctx.moveTo(12, 26);
+    ctx.lineTo(6, 26);
+    ctx.lineTo(6, 20);
+    ctx.stroke();
+  } else {
+    // Star / Feature Icon
+    ctx.beginPath();
+    ctx.moveTo(16, 4);
+    ctx.lineTo(20, 12);
+    ctx.lineTo(28, 13);
+    ctx.lineTo(22, 19);
+    ctx.lineTo(24, 28);
+    ctx.lineTo(16, 23);
+    ctx.lineTo(8, 28);
+    ctx.lineTo(10, 19);
+    ctx.lineTo(4, 13);
+    ctx.lineTo(12, 12);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws proportional, centered CTA Button ("AGENDE SUA VISITA")
+ */
+export function drawCtaBanner(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  y: number,
+  width: number,
+  ctaText: string = 'AGENDE SUA VISITA'
+) {
+  ctx.save();
+
+  let textToDraw = (ctaText || 'AGENDE SUA VISITA').trim();
+  if (textToDraw.includes('•')) {
+    textToDraw = textToDraw.split('•')[0].trim();
+  }
+  textToDraw = textToDraw.toUpperCase();
+
+  ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const textMetrics = ctx.measureText(textToDraw);
+
+  const padX = 46;
+  const ctaW = Math.max(340, Math.min(textMetrics.width + padX * 2, 540));
+  const ctaH = 62;
+  const ctaX = centerX - ctaW / 2;
+
+  // Drop shadow
+  ctx.shadowColor = 'rgba(5, 150, 105, 0.35)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 8;
+
+  // Emerald Green Capsule Pill
+  drawRoundRect(ctx, ctaX, y, ctaW, ctaH, 31);
+  const grad = ctx.createLinearGradient(ctaX, y, ctaX + ctaW, y + ctaH);
+  grad.addColorStop(0, '#059669');
+  grad.addColorStop(1, '#047857');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  // White inner subtle border
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // CTA Text centered
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  ctx.textAlign = 'center';
+  ctx.fillText(textToDraw, centerX, y + ctaH / 2 + 8);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the clean Lopes Manaus footer signature
+ */
+export function drawLopesManausFooter(
+  ctx: CanvasRenderingContext2D,
+  centerX: number,
+  bottomY: number
+) {
+  ctx.save();
+
+  const textLopes = 'Lopes';
+  const textManaus = 'MANAUS';
+
+  ctx.font = "900 26px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const lopesWidth = ctx.measureText(textLopes).width;
+
+  ctx.font = "800 18px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const manausWidth = ctx.measureText(textManaus).width;
+
+  const heartSize = 28;
+  const heartGap = 12;
+  const wordGap = 10;
+  const totalW = heartSize + heartGap + lopesWidth + wordGap + manausWidth;
+
+  const startX = centerX - totalW / 2;
+
+  // 1. Draw Lopes Heart Vector
+  drawLopesHeartVector(ctx, startX, bottomY - 26, heartSize, '#E5094C');
+
+  // 2. Draw "Lopes" in Red
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#E5094C';
+  ctx.font = "900 26px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  ctx.fillText(textLopes, startX + heartSize + heartGap, bottomY - 4);
+
+  // 3. Draw "MANAUS" in dark slate
+  ctx.fillStyle = '#0F172A';
+  ctx.font = "800 18px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  ctx.fillText(textManaus, startX + heartSize + heartGap + lopesWidth + wordGap, bottomY - 4);
+
+  ctx.restore();
+}
+
+/**
+ * Helper to wrap and draw centered bold headline text.
+ */
+function drawCenteredWrappedHeadline(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  centerX: number,
+  startY: number,
+  maxWidth: number,
+  fontSizePx: number
+): number {
+  ctx.font = `900 ${fontSizePx}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+  ctx.fillStyle = '#0F172A';
+  ctx.textAlign = 'center';
+
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = words[0] || '';
+
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i];
+    const testWidth = ctx.measureText(currentLine + ' ' + word).width;
+    if (testWidth <= maxWidth) {
+      currentLine += ' ' + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  lines.push(currentLine);
+
+  const linesToDraw = lines.slice(0, 2);
+  const lineHeight = fontSizePx * 1.25;
+
+  linesToDraw.forEach((line, idx) => {
+    ctx.fillText(line, centerX, startY + idx * lineHeight);
+  });
+
+  return startY + (linesToDraw.length - 1) * lineHeight;
+}
+
+/**
+ * Primary Native 2D Canvas Post Renderer (100% Deterministic)
  */
 export async function renderPostToCanvas(
   targetCanvas: HTMLCanvasElement,
   options: CanvasPostOptions
 ): Promise<void> {
-  const { property, companySettings, templateId, photoUrl, width, height } = options;
+  const { property, companySettings, templateId, photoUrl, width, height, aiData } = options;
   const ctx = targetCanvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context unavailable');
 
   targetCanvas.width = width;
   targetCanvas.height = height;
 
-  // 1. Draw Background Photo (Cover)
+  const isSquare = height === 1080;
+  const isStory = height >= 1800;
+  const photoHeightRatio = isSquare ? 0.62 : (isStory ? 0.70 : 0.67);
+  const photoHeight = Math.round(height * photoHeightRatio);
+
+  // 1. Draw Background Photo (Top section)
   try {
     const bgImg = await loadImageSafely(photoUrl);
-    drawImageCover(ctx, bgImg, 0, 0, width, height);
+    drawImageCover(ctx, bgImg, 0, 0, width, photoHeight);
   } catch (e) {
-    console.warn('Failed to load primary photo, drawing solid backdrop:', e);
+    console.warn('Failed to load photo, drawing placeholder:', e);
     ctx.fillStyle = '#1E293B';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, width, photoHeight);
   }
 
-  // 2. Soft photographic gradient overlays
-  // Top vignette for logo clarity
-  const topGrad = ctx.createLinearGradient(0, 0, 0, 320);
-  topGrad.addColorStop(0, 'rgba(15, 23, 42, 0.65)');
-  topGrad.addColorStop(0.5, 'rgba(15, 23, 42, 0.20)');
+  // 2. Photographic Vignette (Top shadow for badge readability)
+  const topGrad = ctx.createLinearGradient(0, 0, 0, 220);
+  topGrad.addColorStop(0, 'rgba(15, 23, 42, 0.45)');
   topGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
   ctx.fillStyle = topGrad;
-  ctx.fillRect(0, 0, width, 320);
+  ctx.fillRect(0, 0, width, 220);
 
-  // Bottom dark gradient to lift information card without muting the main photo
-  const bottomGrad = ctx.createLinearGradient(0, height * 0.45, 0, height);
-  bottomGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
-  bottomGrad.addColorStop(0.4, 'rgba(15, 23, 42, 0.25)');
-  bottomGrad.addColorStop(1, 'rgba(15, 23, 42, 0.90)');
-  ctx.fillStyle = bottomGrad;
-  ctx.fillRect(0, height * 0.45, width, height * 0.55);
+  // 3. Smooth Dark Transparent Gradient Transition Overlay between photo and lower white section
+  const transitionGrad = ctx.createLinearGradient(0, photoHeight - 160, 0, photoHeight);
+  transitionGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
+  transitionGrad.addColorStop(0.5, 'rgba(15, 23, 42, 0.50)');
+  transitionGrad.addColorStop(1, 'rgba(15, 23, 42, 0.88)');
+  ctx.fillStyle = transitionGrad;
+  ctx.fillRect(0, photoHeight - 160, width, 160);
 
-  // 3. Top Header Bar
-  drawBrandHeaderBadge(ctx, companySettings, 48, 48);
+  // 4. Process Variables
+  const isRent = property.purpose === 'Locação';
+  const defaultStatus = isRent ? 'LOCAÇÃO' : 'VENDA';
+  const statusText = aiData?.statusTag || defaultStatus;
+  const subStatusText = aiData?.subStatus || 'DISPONÍVEL';
 
-  // Status Badge on Top Right
-  const isRent =
-    templateId === 'feed_aluguel' ||
-    property.purpose === 'Locação' ||
-    property.purpose === 'Venda e Locação';
+  const priceVal = isRent ? (property.rent_price || property.price || 0) : (property.price || 0);
+  const defaultPriceText = priceVal > 0 
+    ? `R$ ${priceVal.toLocaleString('pt-BR')}${isRent ? '/mês' : ''}` 
+    : 'Consulte-nos';
+  const priceFormatted = aiData?.priceFormatted || defaultPriceText;
 
-  let statusText = 'VENDA EXCLUSIVA';
-  let statusColor = '#F10F4D';
-
-  if (templateId === 'feed_aluguel' || isRent) {
-    statusText = 'LOCAÇÃO DISPONÍVEL';
-    statusColor = '#059669';
-  } else if (templateId === 'carrossel_capa') {
-    statusText = 'TOUR COMPLETO';
-    statusColor = '#F10F4D';
-  } else if (templateId === 'story') {
-    statusText = isRent ? 'LOCAÇÃO EXCLUSIVA' : 'OPORTUNIDADE EXCLUSIVA';
-    statusColor = isRent ? '#059669' : '#F10F4D';
-  }
-
-  // Draw Status Badge Pill (Top Right)
-  ctx.save();
-  ctx.font = "800 13px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const statusWidth = ctx.measureText(statusText).width + 48;
-  const statusX = width - 48 - statusWidth;
-  const statusY = 56;
-
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
-  ctx.shadowBlur = 12;
-  ctx.shadowOffsetY = 4;
-
-  drawRoundRect(ctx, statusX, statusY, statusWidth, 48, 14);
-  ctx.fillStyle = statusColor;
-  ctx.fill();
-
-  ctx.shadowColor = 'transparent';
-  // Pulsing white dot
-  ctx.beginPath();
-  ctx.arc(statusX + 22, statusY + 24, 4.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fill();
-
-  // Status text
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(statusText, statusX + 36, statusY + 29);
-  ctx.restore();
-
-  // 4. Data Variables
-  const category = (property.category || 'Imóvel').toUpperCase();
-  const code = property.code || property.id?.slice(0, 6) || 'LOPES';
   const neighborhood = property.neighborhood || 'Manaus';
   const city = property.city || 'Manaus';
-  const bedrooms = property.bedrooms || 0;
-  const suites = property.suites || 0;
-  const bathrooms = property.bathrooms || 0;
-  const parkingSpaces = property.parking_spaces || 0;
-  const area = property.total_area || property.built_area || 0;
+  const locationText = aiData?.locationTag || `${neighborhood} | ${city}`;
 
-  const priceFormatted = isRent
-    ? formatCurrencyBRL(property.rent_price || property.price || 0)
-    : formatCurrencyBRL(property.price || 0);
+  const category = property.category || 'Imóvel';
+  const rawTitle = property.title || `${category} em ${neighborhood}`;
 
-  // 5. Render Main Floating Card Layout based on template dimensions
-  const isStory = templateId === 'story' || height >= 1800;
-  const cardMargin = 48;
-  const cardWidth = width - cardMargin * 2;
-  const cardHeight = isStory ? 760 : 640;
-  const footerHeight = 68;
-  const cardY = height - cardHeight - footerHeight - (isStory ? 48 : 36);
-
-  // Floating Location Pill (Above Main Card)
-  ctx.save();
-  const locationText = `📍  ${neighborhood.toUpperCase()}, ${city.toUpperCase()}`;
-  ctx.font = "800 13px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const locWidth = ctx.measureText(locationText).width + 36;
-  const locX = cardMargin;
-  const locY = cardY - 56;
-
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 14;
-  ctx.shadowOffsetY = 4;
-
-  drawRoundRect(ctx, locX, locY, locWidth, 42, 21);
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  ctx.shadowColor = 'transparent';
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(locationText, locX + 18, locY + 26);
-  ctx.restore();
-
-  // Floating Code Tag (Above Main Card, Right)
-  ctx.save();
-  const codeText = `CÓD: ${code}`;
-  ctx.font = "800 12px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const codeWidth = ctx.measureText(codeText).width + 28;
-  const codeX = width - cardMargin - codeWidth;
-  const codeY = cardY - 56;
-
-  drawRoundRect(ctx, codeX, codeY, codeWidth, 42, 21);
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  ctx.fillStyle = '#E2E8F0';
-  ctx.fillText(codeText, codeX + 14, codeY + 26);
-  ctx.restore();
-
-  // 6. Draw White Editorial Card Container
-  ctx.save();
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-  ctx.shadowBlur = 36;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 16;
-
-  drawRoundRect(ctx, cardMargin, cardY, cardWidth, cardHeight, 32);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fill();
-
-  ctx.shadowColor = 'transparent';
-  ctx.strokeStyle = 'rgba(226, 232, 240, 0.9)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  let innerY = cardY + 40;
-  const innerLeft = cardMargin + 36;
-  const innerRight = cardMargin + cardWidth - 36;
-  const innerContentWidth = innerRight - innerLeft;
-
-  // Category Tag inside card
-  ctx.font = "800 12px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const catTagText = `${category} • ${isRent ? 'LOCAÇÃO' : 'VENDA'}`;
-  const catTagWidth = ctx.measureText(catTagText).width + 24;
-
-  drawRoundRect(ctx, innerLeft, innerY, catTagWidth, 30, 8);
-  ctx.fillStyle = isRent ? '#ECFDF5' : '#FFF1F4';
-  ctx.fill();
-
-  ctx.fillStyle = isRent ? '#059669' : '#F10F4D';
-  ctx.fillText(catTagText, innerLeft + 12, innerY + 20);
-
-  // Agency branding right alignment
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = "800 12px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  ctx.textAlign = 'right';
-  ctx.fillText('LOPES MANAUS', innerRight, innerY + 20);
-  ctx.textAlign = 'left';
-
-  innerY += 56;
-
-  // Property Title (Wrapped cleanly)
-  ctx.fillStyle = '#0F172A';
-  ctx.font = isStory
-    ? "900 36px 'Plus Jakarta Sans', 'Inter', sans-serif"
-    : "900 30px 'Plus Jakarta Sans', 'Inter', sans-serif";
-
-  const rawTitle = property.title || `${category} de Alto Padrão em ${neighborhood}`;
-  const titleLines = getWrappedLines(ctx, rawTitle, innerContentWidth, 2);
-  const titleLineHeight = isStory ? 44 : 38;
-
-  titleLines.forEach((line) => {
-    ctx.fillText(line, innerLeft, innerY);
-    innerY += titleLineHeight;
-  });
-
-  innerY += 12;
-
-  // Price Banner Box
-  const priceBoxHeight = isStory ? 120 : 105;
-  drawRoundRect(ctx, innerLeft, innerY, innerContentWidth, priceBoxHeight, 20);
-  ctx.fillStyle = '#F8FAFC';
-  ctx.fill();
-  ctx.strokeStyle = '#E2E8F0';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Price Label
-  ctx.fillStyle = '#64748B';
-  ctx.font = "800 12px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  ctx.fillText(isRent ? 'VALOR DE LOCAÇÃO MENSAL' : 'VALOR DE VENDA', innerLeft + 24, innerY + 34);
-
-  // Price Value Big
-  ctx.fillStyle = isRent ? '#059669' : '#F10F4D';
-  ctx.font = isStory
-    ? "900 46px 'Plus Jakarta Sans', 'Inter', sans-serif"
-    : "900 40px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  ctx.fillText(priceFormatted, innerLeft + 24, innerY + 84);
-
-  if (isRent) {
-    ctx.font = "700 16px 'Plus Jakarta Sans', 'Inter', sans-serif";
-    ctx.fillStyle = '#64748B';
-    const pWidth = ctx.measureText(priceFormatted).width;
-    ctx.fillText('/mês', innerLeft + 24 + pWidth + 8, innerY + 84);
-  }
-
-  // Right side of Price Banner: Condo Fee or Ready badge
-  if (property.condo_fee && property.condo_fee > 0) {
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = "700 11px 'Plus Jakarta Sans', 'Inter', sans-serif";
-    ctx.fillText('CONDOMÍNIO', innerRight - 24, innerY + 44);
-
-    ctx.fillStyle = '#1E293B';
-    ctx.font = "800 15px 'Plus Jakarta Sans', 'Inter', sans-serif";
-    ctx.fillText(formatCurrencyBRL(property.condo_fee), innerRight - 24, innerY + 70);
-    ctx.textAlign = 'left';
+  // Unified Title handling: create a clean, bold, strong headline
+  let fullTitle = '';
+  if (aiData?.headlineLine1 || aiData?.headlineLine2) {
+    fullTitle = `${aiData.headlineLine1 || ''} ${aiData.headlineLine2 || ''}`.trim();
   } else {
-    ctx.textAlign = 'right';
-    const tag = isRent ? 'PRONTO PARA MORAR' : 'ALTO PADRÃO';
-    ctx.font = "800 11px 'Plus Jakarta Sans', 'Inter', sans-serif";
-    const tagW = ctx.measureText(tag).width + 20;
-
-    drawRoundRect(ctx, innerRight - 24 - tagW, innerY + 40, tagW, 28, 6);
-    ctx.fillStyle = '#F1F5F9';
-    ctx.fill();
-    ctx.fillStyle = '#475569';
-    ctx.fillText(tag, innerRight - 34, innerY + 58);
-    ctx.textAlign = 'left';
+    fullTitle = rawTitle;
   }
 
-  innerY += priceBoxHeight + 20;
+  // Specs array
+  const specs = aiData?.specs && aiData.specs.length > 0 ? aiData.specs : [];
 
-  // 4 Specification Metrics Boxes
-  const specGap = 12;
-  const specWidth = (innerContentWidth - specGap * 3) / 4;
-  const specHeight = isStory ? 92 : 82;
+  const ctaText = aiData?.ctaText || 'AGENDE SUA VISITA';
+  const whatsappNum = (aiData?.whatsappNumber || companySettings.whatsapp || companySettings.phone || '').trim();
 
-  const specs = [
-    { label: 'ÁREA', value: area > 0 ? `${area}m²` : '-' },
-    {
-      label: 'QUARTOS',
-      value: bedrooms > 0 ? (suites > 0 ? `${bedrooms} (${suites}s)` : `${bedrooms}`) : '-'
-    },
-    { label: 'BANHEIROS', value: bathrooms > 0 ? `${bathrooms}` : '-' },
-    { label: 'VAGAS', value: parkingSpaces > 0 ? `${parkingSpaces}` : '-' }
-  ];
+  // 5. Overlaid Elements on Photo (Modern Badge + Price / Location)
+  drawModernPropertyBadge(ctx, 45, 40, statusText, subStatusText);
+  drawPriceAndLocationBanners(ctx, 45, photoHeight - 130, priceFormatted, locationText);
 
-  specs.forEach((spec, idx) => {
-    const boxX = innerLeft + idx * (specWidth + specGap);
-    drawRoundRect(ctx, boxX, innerY, specWidth, specHeight, 16);
+  // 6. Bottom Information Card
+  const bottomCardY = photoHeight;
+  const bottomCardH = height - photoHeight;
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, bottomCardY, width, bottomCardH);
+
+  // 7. Property Headline Typography - LARGER, EXTRA BOLD, UNIFIED, CENTERED
+  // Pushed down slightly more from photo edge as requested (clears top gradient)
+  ctx.save();
+  const titleCenterX = width / 2;
+  const titleStartY = bottomCardY + (isSquare ? 64 : (isStory ? 84 : 70));
+  const maxTitleWidth = width - 100;
+  const titleFontSizePx = isSquare ? 38 : 42;
+
+  const lastTitleY = drawCenteredWrappedHeadline(
+    ctx,
+    fullTitle,
+    titleCenterX,
+    titleStartY,
+    maxTitleWidth,
+    titleFontSizePx
+  );
+  ctx.restore();
+
+  // 8. Specifications Row - FULLY CENTERED & EXPANDED TO FILL
+  const specsY = lastTitleY + (isSquare ? 52 : (isStory ? 74 : 62));
+  const specItemCount = Math.max(1, specs.length);
+  const gap = 16;
+  const maxRowWidth = width - 90;
+  const calculatedBadgeW = Math.floor((maxRowWidth - (specItemCount - 1) * gap) / specItemCount);
+  const badgeW = Math.min(280, Math.max(195, calculatedBadgeW));
+  const badgeH = isSquare ? 58 : 64;
+  const totalSpecsW = specItemCount * badgeW + (specItemCount - 1) * gap;
+  const specsStartX = (width - totalSpecsW) / 2;
+
+  ctx.save();
+  specs.forEach((item, index) => {
+    const badgeX = specsStartX + index * (badgeW + gap);
+    const badgeY = specsY - badgeH / 2;
+
+    drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 16);
     ctx.fillStyle = '#F8FAFC';
     ctx.fill();
-    ctx.strokeStyle = '#E2E8F0';
-    ctx.lineWidth = 1;
+
+    ctx.strokeStyle = '#CBD5E1';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    ctx.textAlign = 'center';
-    // Label
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = "800 11px 'Plus Jakarta Sans', 'Inter', sans-serif";
-    ctx.fillText(spec.label, boxX + specWidth / 2, innerY + 28);
+    // Icon + Label inside badge (Larger icon & text, centered/aligned)
+    const iconSize = isSquare ? 34 : 38;
+    const iconX = badgeX + 16;
+    const iconY = badgeY + (badgeH - iconSize) / 2;
+    drawSpecIcon(ctx, item.icon, iconX, iconY, iconSize, '#E5094C');
 
-    // Value
     ctx.fillStyle = '#0F172A';
-    ctx.font = "900 18px 'Plus Jakarta Sans', 'Inter', sans-serif";
-    ctx.fillText(spec.value, boxX + specWidth / 2, innerY + 58);
+    ctx.font = `${isSquare ? '800 19px' : '800 21px'} 'Plus Jakarta Sans', 'Inter', sans-serif`;
     ctx.textAlign = 'left';
+    ctx.fillText(item.label.toUpperCase(), iconX + iconSize + 10, badgeY + badgeH / 2 + 7);
   });
+  ctx.restore();
 
-  innerY += specHeight + 20;
+  // 9. Centered Proportional CTA Button ("AGENDE SUA VISITA")
+  const ctaY = specsY + (isSquare ? 54 : (isStory ? 82 : 62));
+  drawCtaBanner(ctx, width / 2, ctaY, width, ctaText);
 
-  // Story CTA or Carrossel CTA Banner
-  if (isStory) {
-    const ctaHeight = 52;
-    drawRoundRect(ctx, innerLeft, innerY, innerContentWidth, ctaHeight, 16);
-    ctx.fillStyle = '#F10F4D';
-    ctx.fill();
-
+  // 10. WhatsApp Text below CTA Button - Larger font & spaced slightly more below button
+  if (whatsappNum) {
+    ctx.save();
+    ctx.fillStyle = '#0F172A';
+    ctx.font = "800 23px 'Plus Jakarta Sans', 'Inter', sans-serif";
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = "800 14px 'Plus Jakarta Sans', 'Inter', sans-serif";
-    ctx.fillText('📲  RESPONDA ESTE STORY PARA AGENDAR UMA VISITA', innerLeft + innerContentWidth / 2, innerY + 32);
-    ctx.textAlign = 'left';
-  } else if (templateId === 'carrossel_capa') {
-    const ctaHeight = 48;
-    drawRoundRect(ctx, innerLeft, innerY, innerContentWidth, ctaHeight, 14);
-    ctx.fillStyle = '#F10F4D';
-    ctx.fill();
-
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = "800 13px 'Plus Jakarta Sans', 'Inter', sans-serif";
-    ctx.fillText('DESLIZE PARA VER TODAS AS FOTOS  ➡️', innerLeft + innerContentWidth / 2, innerY + 29);
-    ctx.textAlign = 'left';
+    ctx.fillText(`📲 WhatsApp: ${whatsappNum}`, width / 2, ctaY + 62 + 38);
+    ctx.restore();
   }
 
-  ctx.restore();
-
-  // 7. Footer Contact Bar
-  ctx.save();
-  const phone = companySettings.whatsapp || companySettings.phone || '(92) 98111-0000';
-  const instagram = companySettings.instagram || '@lopesmanaus';
-  const creci = companySettings.creci_j ? `CRECI ${companySettings.creci_j}` : 'CRECI PJ 432';
-
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.96)';
-  ctx.fillRect(0, height - footerHeight, width, footerHeight);
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = "700 14px 'Plus Jakarta Sans', 'Inter', sans-serif";
-
-  // Phone Left
-  ctx.fillStyle = '#F10F4D';
-  ctx.fillText('WhatsApp: ', cardMargin, height - 28);
-  const waPrefixW = ctx.measureText('WhatsApp: ').width;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(phone, cardMargin + waPrefixW, height - 28);
-
-  // Center CRECI
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = "600 12px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  ctx.fillText(creci, width / 2, height - 28);
-
-  // Instagram Right
-  ctx.textAlign = 'right';
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = "700 14px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  ctx.fillText('Instagram: ', width - cardMargin - ctx.measureText(instagram).width - 4, height - 28);
-  ctx.fillStyle = '#F10F4D';
-  ctx.fillText(instagram, width - cardMargin, height - 28);
-
-  ctx.restore();
+  // 11. Clean Centered Lopes Manaus Signature
+  const footerY = height - (isSquare ? 18 : (isStory ? 28 : 22));
+  drawLopesManausFooter(ctx, width / 2, footerY);
 }

@@ -159,16 +159,18 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
 
           {/* Quick Action Buttons */}
           <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              id={`btn-gerar-post-ia-card-${property.id || property.code || 'item'}`}
-              onClick={handleOpenAiPostModal}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white text-xs font-bold shadow-sm hover:shadow transition transform active:scale-95 cursor-pointer"
-              title="Gerar Post com IA para Redes Sociais"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-              <span>Gerar Post IA</span>
-            </button>
+            {(onGenerateAiPost || onGenerateSocialMedia) && (
+              <button
+                type="button"
+                id={`btn-gerar-post-ia-card-${property.id || property.code || 'item'}`}
+                onClick={handleOpenAiPostModal}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white text-xs font-bold shadow-sm hover:shadow transition transform active:scale-95 cursor-pointer"
+                title="Gerar Post para Redes Sociais"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                <span>Gerar Post</span>
+              </button>
+            )}
 
             <button
               type="button"
