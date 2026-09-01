@@ -15,22 +15,25 @@ import {
   Layers,
   FileCheck
 } from 'lucide-react';
-import { Property, CompanySettings } from '../types';
+import { Property, CompanySettings, User } from '../types';
 import { extractPropertyImages } from '../lib/pdfGenerator';
 import { formatCurrencyBRL } from '../lib/priceUtils';
+import { getEffectiveWhatsApp, formatPhoneDisplay } from '../lib/whatsapp';
 import {
   PostTemplateId,
   POST_TEMPLATES_CONFIG
 } from './postTemplates';
 import { CanvasPostLivePreview } from './CanvasPostLivePreview';
 import { generatePostImage, generateAndDownloadSocialMedia } from '../lib/socialMediaGenerator';
-import { CanvasPostData } from '../lib/canvasPostEngine';
+import { CanvasPostData, extractDefaultPropertySpecs } from '../lib/canvasPostEngine';
 
 interface AIPostGeneratorModalProps {
   property: Property | null;
   companySettings: CompanySettings;
   isOpen: boolean;
   onClose: () => void;
+  currentUser?: User | null;
+  users?: User[];
   allProperties?: Property[];
   onSelectProperty?: (property: Property) => void;
 }
@@ -38,6 +41,8 @@ interface AIPostGeneratorModalProps {
 export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
   property,
   companySettings,
+  currentUser,
+  users,
   isOpen,
   onClose
 }) => {
@@ -69,6 +74,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
   // Ref and state for proportional preview container scale
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [containerScale, setContainerScale] = useState<number>(0.3);
+  const initializedPropKeyRef = useRef<string | null>(null);
 
   // Sync currentProperty when prop changes
   useEffect(() => {
@@ -77,115 +83,77 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
     }
   }, [property]);
 
-  // Helper to extract real property specifications directly from property record
-  const buildPropertySpecsFromProperty = (p: Property): Array<{ icon: string; label: string }> => {
-    const specs: Array<{ icon: string; label: string }> = [];
-
-    const bedrooms = p.bedrooms || 0;
-    if (bedrooms > 0) {
-      specs.push({ icon: 'bed', label: `${bedrooms} ${bedrooms === 1 ? 'QUARTO' : 'QUARTOS'}` });
-    }
-
-    const bathrooms = p.bathrooms || 0;
-    if (bathrooms > 0) {
-      specs.push({ icon: 'bath', label: `${bathrooms} ${bathrooms === 1 ? 'BANHEIRO' : 'BANHEIROS'}` });
-    }
-
-    const parking = p.parking_spaces || 0;
-    if (parking > 0) {
-      specs.push({ icon: 'car', label: `${parking} ${parking === 1 ? 'VAGA' : 'VAGAS'}` });
-    }
-
-    const area = p.total_area || p.built_area || p.usable_area || 0;
-    if (area > 0) {
-      specs.push({ icon: 'area', label: `${area} m²` });
-    }
-
-    const suites = p.suites || 0;
-    if (suites > 0 && specs.length < 4) {
-      specs.push({ icon: 'bed', label: `${suites} ${suites === 1 ? 'SUÍTE' : 'SUÍTES'}` });
-    }
-
-    if (p.features && Array.isArray(p.features)) {
-      for (const feat of p.features) {
-        if (specs.length >= 4) break;
-        const f = feat.toLowerCase();
-        if (f.includes('piscina') && !specs.some(s => s.icon === 'piscina')) {
-          specs.push({ icon: 'piscina', label: 'PISCINA' });
-        } else if ((f.includes('churras') || f.includes('gourmet')) && !specs.some(s => s.icon === 'churrasqueira')) {
-          specs.push({ icon: 'churrasqueira', label: 'CHURRASQUEIRA' });
-        } else if (f.includes('quadra') && !specs.some(s => s.icon === 'quadra')) {
-          specs.push({ icon: 'quadra', label: 'QUADRA' });
-        } else if ((f.includes('festa') || f.includes('evento')) && !specs.some(s => s.icon === 'salao')) {
-          specs.push({ icon: 'salao', label: 'SALÃO FESTAS' });
-        } else if ((f.includes('academia') || f.includes('fitness')) && !specs.some(s => s.icon === 'academia')) {
-          specs.push({ icon: 'academia', label: 'ACADEMIA' });
-        } else if (f.includes('elevador') && !specs.some(s => s.icon === 'elevador')) {
-          specs.push({ icon: 'elevador', label: 'ELEVADOR' });
-        } else if ((f.includes('portaria') || f.includes('segurança')) && !specs.some(s => s.icon === 'portaria')) {
-          specs.push({ icon: 'portaria', label: 'PORTARIA 24H' });
-        } else if ((f.includes('varanda') || f.includes('sacada')) && !specs.some(s => s.icon === 'varanda')) {
-          specs.push({ icon: 'varanda', label: 'VARANDA' });
-        }
-      }
-    }
-
-    if (specs.length === 0) {
-      specs.push({ icon: 'star', label: (p.category || 'IMÓVEL').toUpperCase() });
-    }
-
-    return specs.slice(0, 4);
-  };
-
-  // Initialize data strictly from property fields when opened
+  // Initialize data strictly from property fields ONCE when opened
   useEffect(() => {
-    if (isOpen && currentProperty) {
-      const isRent = currentProperty.purpose === 'Locação' || currentProperty.purpose === 'Venda e Locação';
-      setSelectedTemplate('feed_vertical');
-      setSelectedPhotoIndex(0);
-      setMobileTab('preview');
-
-      const category = currentProperty.category || 'Imóvel';
-      const isRentProp = currentProperty.purpose === 'Locação';
-      const priceVal = isRentProp ? (currentProperty.rent_price || currentProperty.price || 0) : (currentProperty.price || 0);
-      const priceText = priceVal > 0 ? `R$ ${priceVal.toLocaleString('pt-BR')}${isRentProp ? '/mês' : ''}` : 'Consulte-nos';
-      const neighborhood = currentProperty.neighborhood || 'Manaus';
-      const city = currentProperty.city || 'Manaus';
-      const bedrooms = currentProperty.bedrooms || 0;
-      const suites = currentProperty.suites || 0;
-
-      const initialData: CanvasPostData = {
-        headlineLine1: '',
-        headlineLine2: currentProperty.title || `${category} em ${neighborhood}`,
-        highlightNumber: '',
-        statusTag: isRentProp ? 'LOCAÇÃO' : 'VENDA',
-        subStatus: 'DISPONÍVEL',
-        priceFormatted: priceText,
-        locationTag: `${neighborhood} | ${city}`,
-        ctaText: 'AGENDE SUA VISITA',
-        whatsappNumber: companySettings.whatsapp || companySettings.phone || '(92) 99999-9999',
-        specs: buildPropertySpecsFromProperty(currentProperty)
-      };
-
-      setPostData(initialData);
-
-      // Auto-generate clean Instagram Caption
-      const specsSummary = [
-        bedrooms > 0 ? `• ${bedrooms} Quartos${suites > 0 ? ` (${suites} Suítes)` : ''}` : null,
-        (currentProperty.bathrooms || 0) > 0 ? `• ${currentProperty.bathrooms} Banheiros` : null,
-        (currentProperty.parking_spaces || 0) > 0 ? `• ${currentProperty.parking_spaces} Vagas de Garagem` : null,
-        (currentProperty.total_area || currentProperty.built_area || 0) > 0 ? `• Área: ${currentProperty.total_area || currentProperty.built_area} m²` : null
-      ].filter(Boolean).join('\n');
-
-      const phone = companySettings.whatsapp || companySettings.phone || '(92) 99999-9999';
-
-      const autoCaption = `🏡 *${currentProperty.title || `${category} em ${neighborhood}`}*\n\n📍 *Localização:* ${neighborhood}, ${city}\n💰 *Valor:* ${priceText}\n\n✨ *Destaques do Imóvel:*\n${specsSummary}\n\n📲 Entre em contato com a Lopes Manaus e agende sua visita exclusiva!\n📞 ${phone}\n\n#LopesManaus #ImoveisManaus #${neighborhood.replace(/\s+/g, '')} #ImovelDeAltoPadrao #RedeLopes`;
-      setCaption(autoCaption);
-    } else {
+    if (!isOpen || !currentProperty) {
+      initializedPropKeyRef.current = null;
       setCaption('');
       setCopied(false);
+      return;
     }
-  }, [isOpen, currentProperty?.id]);
+
+    const propKey = `${currentProperty.id}`;
+    if (initializedPropKeyRef.current === propKey) {
+      return; // Already initialized for this open property session
+    }
+    initializedPropKeyRef.current = propKey;
+
+    const purposeLower = (currentProperty.purpose || '').toLowerCase().trim();
+    const isRentProp = purposeLower.includes('loca') || purposeLower.includes('aluguel') || purposeLower.includes('rent');
+
+    setSelectedTemplate('feed_vertical');
+    setSelectedPhotoIndex(0);
+    setMobileTab('preview');
+
+    const category = currentProperty.category || 'Imóvel';
+    const priceVal = isRentProp ? (currentProperty.rent_price || currentProperty.price || 0) : (currentProperty.price || 0);
+    const priceText = priceVal > 0 ? `R$ ${priceVal.toLocaleString('pt-BR')}${isRentProp ? '/mês' : ''}` : 'Consulte-nos';
+    const neighborhood = currentProperty.neighborhood || 'Manaus';
+    const city = currentProperty.city || 'Manaus';
+
+    const propImgs = extractPropertyImages(currentProperty);
+    const secondary = propImgs.slice(1, 4);
+
+    const extractedSpecs = extractDefaultPropertySpecs(currentProperty);
+
+    // Find property captador from users array or fallback to currentUser
+    const propertyCaptador = users?.find(
+      u => u.id === currentProperty.user_id ||
+           (u.id && currentProperty.user_id && u.id.toLowerCase() === currentProperty.user_id.toLowerCase()) ||
+           (u.email && currentProperty.user_id && u.email.toLowerCase() === currentProperty.user_id.toLowerCase()) ||
+           (u.username && currentProperty.user_id && u.username.toLowerCase() === currentProperty.user_id.toLowerCase())
+    );
+
+    const activeCaptador = propertyCaptador || currentUser;
+    const rawWa = getEffectiveWhatsApp(activeCaptador, companySettings);
+    const effectivePhoneDisplay = formatPhoneDisplay(rawWa);
+
+    const initialData: CanvasPostData = {
+      headlineLine1: '',
+      headlineLine2: currentProperty.title || `${category} em ${neighborhood}`,
+      highlightNumber: '',
+      statusTag: isRentProp ? 'LOCAÇÃO' : 'VENDA',
+      subStatus: 'DISPONÍVEL',
+      priceFormatted: priceText,
+      locationTag: `${neighborhood} | ${city}`,
+      ctaText: 'AGENDE SUA VISITA',
+      whatsappNumber: effectivePhoneDisplay,
+      specs: extractedSpecs,
+      designTheme: 'ruby_premium',
+      layoutStyle: 'gallery',
+      secondaryPhotos: secondary
+    };
+
+    setPostData(initialData);
+
+    // Auto-generate clean Instagram Caption with all extracted specs/features
+    const specsSummary = extractedSpecs
+      .map(s => `• ${s.label}`)
+      .join('\n');
+
+    const autoCaption = `🏡 *${currentProperty.title || `${category} em ${neighborhood}`}*\n\n📍 *Localização:* ${neighborhood}, ${city}\n💰 *Valor:* ${priceText}\n\n✨ *Destaques do Imóvel:*\n${specsSummary}\n\n📲 Entre em contato com a Lopes Manaus e agende sua visita exclusiva!\n📞 ${effectivePhoneDisplay}\n\n#LopesManaus #ImoveisManaus #${neighborhood.replace(/\s+/g, '')} #ImovelDeAltoPadrao #RedeLopes`;
+    setCaption(autoCaption);
+  }, [isOpen, currentProperty?.id, currentUser, users]);
 
   const images = currentProperty ? extractPropertyImages(currentProperty) : [];
   const defaultFallbackImage = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
@@ -294,14 +262,58 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
+  const selectPhotoByIndex = (newIdx: number) => {
+    setSelectedPhotoIndex(newIdx);
+    if (images.length > 0) {
+      const selectedMain = images[newIdx] || images[0];
+      const remaining = images.filter(img => img !== selectedMain);
+      setPostData(prev => {
+        const currentSec = (prev.secondaryPhotos || []).filter(img => img !== selectedMain);
+        return {
+          ...prev,
+          secondaryPhotos: currentSec.length > 0 ? currentSec.slice(0, 3) : remaining.slice(0, 3)
+        };
+      });
+    }
+  };
+
+  const toggleSecondaryPhoto = (imgUrl: string) => {
+    const currentMain = images[selectedPhotoIndex] || photoUrl;
+    if (imgUrl === currentMain) return;
+
+    setPostData(prev => {
+      const currentSec = prev.secondaryPhotos || [];
+      if (currentSec.includes(imgUrl)) {
+        return {
+          ...prev,
+          secondaryPhotos: currentSec.filter(u => u !== imgUrl)
+        };
+      } else {
+        if (currentSec.length >= 3) {
+          return {
+            ...prev,
+            secondaryPhotos: [...currentSec.slice(1), imgUrl]
+          };
+        } else {
+          return {
+            ...prev,
+            secondaryPhotos: [...currentSec, imgUrl]
+          };
+        }
+      }
+    });
+  };
+
   const handlePrevPhoto = () => {
     if (images.length <= 1) return;
-    setSelectedPhotoIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+    const nextIdx = selectedPhotoIndex > 0 ? selectedPhotoIndex - 1 : images.length - 1;
+    selectPhotoByIndex(nextIdx);
   };
 
   const handleNextPhoto = () => {
     if (images.length <= 1) return;
-    setSelectedPhotoIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));
+    const nextIdx = selectedPhotoIndex < images.length - 1 ? selectedPhotoIndex + 1 : 0;
+    selectPhotoByIndex(nextIdx);
   };
 
   return (
@@ -529,64 +541,217 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
               </div>
             </div>
 
+            {/* 1.2 Layout Style Selection (Single vs Gallery Catalog) */}
+            <div>
+              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+                <span>Modelo de Foto do Post:</span>
+                <span className="text-[10px] text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                  {images.length > 1 ? `${images.length} fotos no imóvel` : '1 foto'}
+                </span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPostData({ ...postData, layoutStyle: 'single' })}
+                  className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 cursor-pointer ${
+                    (postData.layoutStyle || 'gallery') === 'single'
+                      ? 'bg-slate-900 border-[#F10F4D] text-white shadow-md ring-2 ring-[#F10F4D]/30'
+                      : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <div className="p-1.5 rounded-lg bg-[#F10F4D]/10 text-[#F10F4D] shrink-0">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[11px] leading-tight">1 Foto Destaque</div>
+                    <div className="text-[9px] opacity-70">Imagem principal expandida</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPostData(prev => {
+                      const selectedMain = images[selectedPhotoIndex] || images[0];
+                      const remaining = images.filter(img => img !== selectedMain);
+                      const currentSec = (prev.secondaryPhotos && prev.secondaryPhotos.length > 0)
+                        ? prev.secondaryPhotos.filter(img => img !== selectedMain)
+                        : remaining.slice(0, 3);
+                      return {
+                        ...prev,
+                        layoutStyle: 'gallery',
+                        secondaryPhotos: currentSec.slice(0, 3)
+                      };
+                    });
+                  }}
+                  className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 cursor-pointer ${
+                    postData.layoutStyle === 'gallery'
+                      ? 'bg-slate-900 border-[#F10F4D] text-white shadow-md ring-2 ring-[#F10F4D]/30'
+                      : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                  }`}
+                >
+                  <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 shrink-0">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[11px] leading-tight">Catálogo (1 + 3 Fotos)</div>
+                    <div className="text-[9px] opacity-70">Principal + 3 miniaturas</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* 1.5. Design Theme Selection */}
+            <div>
+              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+                <span>Estilo Visual:</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'ruby_premium', name: 'Lopes Rubi', color: 'from-[#E5094C] to-[#99002B]' },
+                  { id: 'gold_dark', name: 'Dark Gold', color: 'from-[#0F172A] to-[#334155]' }
+                ].map((t) => {
+                  const isSelected = (postData.designTheme || 'ruby_premium') === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setPostData({ ...postData, designTheme: t.id as any })}
+                      className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? 'bg-slate-900 border-[#F10F4D] text-white shadow-md ring-2 ring-[#F10F4D]/30'
+                          : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <div className={`h-2.5 w-full rounded-full bg-gradient-to-r ${t.color}`} />
+                      <div className={`font-bold text-xs truncate ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                        {t.name}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* 2. Photo Selector */}
             {images.length > 0 && (
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-[#F10F4D]" />
-                    <span>Selecione a Foto Principal do Post:</span>
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold text-[#F10F4D] bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
-                      Foto {selectedPhotoIndex + 1} de {images.length}
-                    </span>
-                    {images.length > 1 && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={handlePrevPhoto}
-                          className="p-1 rounded bg-white hover:bg-slate-200 text-slate-700 transition cursor-pointer shadow-xs"
-                        >
-                          <ChevronLeft className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleNextPhoto}
-                          className="p-1 rounded bg-white hover:bg-slate-200 text-slate-700 transition cursor-pointer shadow-xs"
-                        >
-                          <ChevronRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-3">
+                {/* Main Photo Picker */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-[#F10F4D]" />
+                      <span>1. Foto Principal (Destaque Topo):</span>
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold text-[#F10F4D] bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
+                        Foto {selectedPhotoIndex + 1} de {images.length}
+                      </span>
+                      {images.length > 1 && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={handlePrevPhoto}
+                            className="p-1 rounded bg-white hover:bg-slate-200 text-slate-700 transition cursor-pointer shadow-xs"
+                          >
+                            <ChevronLeft className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleNextPhoto}
+                            className="p-1 rounded bg-white hover:bg-slate-200 text-slate-700 transition cursor-pointer shadow-xs"
+                          >
+                            <ChevronRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    {images.map((imgUrl, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => selectPhotoByIndex(idx)}
+                        className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition cursor-pointer ${
+                          selectedPhotoIndex === idx
+                            ? 'border-[#F10F4D] ring-2 ring-[#F10F4D]/30 scale-105 shadow-sm'
+                            : 'border-slate-200 hover:border-slate-300 opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <img
+                          src={imgUrl}
+                          alt={`Foto ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {selectedPhotoIndex === idx && (
+                          <div className="absolute inset-0 bg-[#F10F4D]/35 flex flex-col items-center justify-center">
+                            <Check className="w-4 h-4 text-white drop-shadow" />
+                            <span className="text-[7px] font-extrabold text-white uppercase tracking-tighter">Principal</span>
+                          </div>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                  {images.map((imgUrl, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setSelectedPhotoIndex(idx)}
-                      className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition cursor-pointer ${
-                        selectedPhotoIndex === idx
-                          ? 'border-[#F10F4D] ring-2 ring-[#F10F4D]/30 scale-105 shadow-sm'
-                          : 'border-slate-200 hover:border-slate-300 opacity-60 hover:opacity-100'
-                      }`}
-                    >
-                      <img
-                        src={imgUrl}
-                        alt={`Foto ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      {selectedPhotoIndex === idx && (
-                        <div className="absolute inset-0 bg-[#F10F4D]/25 flex items-center justify-center">
-                          <Check className="w-4 h-4 text-white drop-shadow" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                {/* Secondary Miniaturas Picker (Only when layoutStyle === 'gallery' and images > 1) */}
+                {postData.layoutStyle === 'gallery' && images.length > 1 && (
+                  <div className="pt-2 border-t border-slate-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-amber-500" />
+                        <span>2. Miniaturas do Catálogo (Selecione até 3):</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        {(postData.secondaryPhotos || []).length} de 3 selecionadas
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {images.map((imgUrl, idx) => {
+                        const isMain = selectedPhotoIndex === idx;
+                        const secPhotos = postData.secondaryPhotos || [];
+                        const secIndex = secPhotos.indexOf(imgUrl);
+                        const isSelectedSec = secIndex !== -1;
+
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            disabled={isMain}
+                            onClick={() => toggleSecondaryPhoto(imgUrl)}
+                            className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition ${
+                              isMain
+                                ? 'opacity-30 cursor-not-allowed border-slate-200'
+                                : isSelectedSec
+                                ? 'border-amber-500 ring-2 ring-amber-500/30 scale-105 shadow-sm cursor-pointer'
+                                : 'border-slate-200 hover:border-slate-300 opacity-60 hover:opacity-100 cursor-pointer'
+                            }`}
+                          >
+                            <img
+                              src={imgUrl}
+                              alt={`Miniatura ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {isSelectedSec && (
+                              <div className="absolute inset-0 bg-amber-500/40 flex flex-col items-center justify-center">
+                                <span className="text-[11px] font-black text-white drop-shadow">#{secIndex + 1}</span>
+                                <span className="text-[7px] font-extrabold text-white uppercase tracking-tighter">Miniatura</span>
+                              </div>
+                            )}
+                            {isMain && (
+                              <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
+                                <span className="text-[7px] font-bold text-slate-300 uppercase">Principal</span>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -658,6 +823,30 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
                   onChange={(e) => setPostData({ ...postData, locationTag: e.target.value })}
                   className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-bold focus:outline-none focus:ring-1 focus:ring-[#F10F4D]"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-600 mb-1 flex items-center justify-between">
+                  <span>Características na Arte (até 8):</span>
+                  <span className="text-[9px] text-[#F10F4D] font-bold">
+                    {(postData.specs || []).length} de 8 no destaque
+                  </span>
+                </label>
+                <div className="flex flex-wrap gap-1 bg-white p-2 rounded-lg border border-slate-200">
+                  {(postData.specs && postData.specs.length > 0) ? (
+                    postData.specs.map((s, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 bg-slate-100 text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#F10F4D]" />
+                        <span>{s.label}</span>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[10px] text-slate-400 italic">Sem características</span>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

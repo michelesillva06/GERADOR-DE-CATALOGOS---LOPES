@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { Property, CompanySettings } from '../types';
 import {
   generateAndDownloadSocialMedia,
-  generateFeedPost,
-  generateStoryPost
+  generatePostImage
 } from '../lib/socialMediaGenerator';
 import { X, Loader2, Instagram, Image, Smartphone, Download } from 'lucide-react';
 
@@ -44,7 +43,7 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
   const handleGenerateFeed = async () => {
     setLoadingAction('feed');
     try {
-      const canvas = await generateFeedPost(property, companySettings);
+      const canvas = await generatePostImage(property, companySettings, 'feed_vertical');
       handleDownloadCanvas(canvas, `${property.code}_feed_instagram.png`);
       setTimeout(onClose, 600);
     } catch (err) {
@@ -58,7 +57,7 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
   const handleGenerateStory = async () => {
     setLoadingAction('story');
     try {
-      const canvas = await generateStoryPost(property, companySettings);
+      const canvas = await generatePostImage(property, companySettings, 'story');
       handleDownloadCanvas(canvas, `${property.code}_story_instagram.png`);
       setTimeout(onClose, 600);
     } catch (err) {

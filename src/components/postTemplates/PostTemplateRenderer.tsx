@@ -26,14 +26,11 @@ export const PostTemplateRenderer: React.FC<PostTemplateRendererProps> = ({
   };
 
   switch (templateId) {
-    case 'feed_venda':
+    case 'feed_vertical':
+    case 'feed_quadrado':
       return <FeedVendaTemplate {...commonProps} />;
-    case 'feed_aluguel':
-      return <FeedAluguelTemplate {...commonProps} />;
     case 'story':
       return <StoryTemplate {...commonProps} />;
-    case 'carrossel_capa':
-      return <CarrosselCapaTemplate {...commonProps} />;
     default:
       return <FeedVendaTemplate {...commonProps} />;
   }

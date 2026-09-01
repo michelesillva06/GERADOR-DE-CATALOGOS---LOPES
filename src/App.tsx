@@ -1092,6 +1092,8 @@ function MainApp() {
       <AIPostGeneratorModal
         property={selectedAiPostProperty}
         companySettings={companySettings}
+        currentUser={user}
+        users={users}
         isOpen={isAiPostModalOpen}
         onClose={handleCloseAiPost}
       />

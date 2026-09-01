@@ -145,11 +145,8 @@ export const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
       setBathrooms(2);
       setParkingSpaces(2);
       setSelectedFeatures(['Portaria 24h', 'Piscina', 'Gerador 100%']);
-      setImages([
-        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'
-      ]);
-      setMainImage('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80');
+      setImages([]);
+      setMainImage('');
       
       setClientName('');
       setClientCpfCnpj('');
