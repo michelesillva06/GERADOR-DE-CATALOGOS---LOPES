@@ -2,7 +2,7 @@ import { Property, CompanySettings } from '../types';
 import { PostTemplateId } from '../components/postTemplates';
 import { extractPropertyImages } from './pdfGenerator';
 
-export type PostDesignTheme = 'ruby_premium' | 'gold_dark' | 'clean_editorial';
+export type PostDesignTheme = 'ruby_premium' | 'gold_dark';
 export type PostLayoutStyle = 'single' | 'gallery';
 
 export interface CanvasPostData {
@@ -297,11 +297,6 @@ export function drawModernPropertyBadge(
     goldGrad.addColorStop(0.5, '#F3E5AB');
     goldGrad.addColorStop(1, '#AA771C');
     ctx.fillStyle = goldGrad;
-  } else if (theme === 'clean_editorial') {
-    const cleanGrad = ctx.createLinearGradient(x, y, x + badgeW, y + topH);
-    cleanGrad.addColorStop(0, '#0F172A');
-    cleanGrad.addColorStop(1, '#1E293B');
-    ctx.fillStyle = cleanGrad;
   } else {
     const mainGrad = ctx.createLinearGradient(x, y, x + badgeW, y + topH);
     mainGrad.addColorStop(0, '#F10F4D');
@@ -333,11 +328,11 @@ export function drawModernPropertyBadge(
     ctx.shadowOffsetY = 6;
 
     drawRoundRect(ctx, x, subY, subW, subH, [4, 4, 16, 16]);
-    ctx.fillStyle = theme === 'gold_dark' ? '#1E293B' : (theme === 'clean_editorial' ? '#0F172A' : '#0F172A');
+    ctx.fillStyle = theme === 'gold_dark' ? '#1E293B' : '#0F172A';
     ctx.fill();
 
     ctx.shadowColor = 'transparent';
-    ctx.fillStyle = theme === 'gold_dark' ? '#F3E5AB' : (theme === 'clean_editorial' ? '#F10F4D' : '#FFFFFF');
+    ctx.fillStyle = theme === 'gold_dark' ? '#F3E5AB' : '#FFFFFF';
     ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', sans-serif"; // Same font size as principal!
     ctx.textAlign = 'center';
     ctx.fillText(subStatusText, x + subW / 2, subY + subH / 2 + 8);
@@ -464,11 +459,6 @@ export function drawPriceAndLocationBanners(
     darkGrad.addColorStop(0, '#0F172A');
     darkGrad.addColorStop(1, '#1E293B');
     ctx.fillStyle = darkGrad;
-  } else if (theme === 'clean_editorial') {
-    const cleanGrad = ctx.createLinearGradient(x, y, x + priceW, y + priceH);
-    cleanGrad.addColorStop(0, '#0F172A');
-    cleanGrad.addColorStop(1, '#1E293B');
-    ctx.fillStyle = cleanGrad;
   } else {
     const rubyGrad = ctx.createLinearGradient(x, y, x + priceW, y + priceH);
     rubyGrad.addColorStop(0, '#F10F4D');
@@ -902,7 +892,7 @@ export function drawLopesManausFooterBar(
 ) {
   ctx.save();
 
-  const footerH = isSquare ? 80 : (isStory ? 100 : 90);
+  const footerH = isSquare ? 88 : (isStory ? 110 : 96);
   const footerY = height - footerH;
 
   // 1. Solid Dark Background Bar
@@ -910,26 +900,22 @@ export function drawLopesManausFooterBar(
   ctx.fillStyle = barBg;
   ctx.fillRect(0, footerY, width, footerH);
 
-  // 2. Top Accent Line (3px thick)
+  // 2. Top Accent Line (4px thick in brand red or gold)
   ctx.fillStyle = theme === 'gold_dark' ? '#D4AF37' : '#F10F4D';
-  ctx.fillRect(0, footerY, width, 3);
+  ctx.fillRect(0, footerY, width, 4);
 
-  const paddingX = 32;
+  const paddingX = isSquare ? 40 : 45;
   // Precise alphabetic baseline for ALL text elements to guarantee 100% horizontal alignment
-  const baselineY = footerY + Math.floor(footerH / 2) + 7;
+  const baselineY = footerY + Math.floor(footerH / 2) + 9;
 
   ctx.textBaseline = 'alphabetic';
 
-  // 3. LEFT SIDE: Logo, MANAUS, Separator & Slogan on the EXACT SAME HORIZONTAL BASELINE
+  // 3. LEFT SIDE: Logo & MANAUS only (no slogan) with larger, highly visible font
   const textLopes = 'Lopes';
   const textManaus = 'MANAUS';
-  const separatorText = '—';
-  const sloganText = 'Sua melhor decisão imobiliária';
 
-  const fontLopes = "900 28px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const fontManaus = "800 20px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const fontSep = "600 20px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const fontSlogan = "700 19px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontLopes = isSquare ? "900 34px 'Plus Jakarta Sans', 'Inter', sans-serif" : "900 38px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontManaus = isSquare ? "800 24px 'Plus Jakarta Sans', 'Inter', sans-serif" : "800 26px 'Plus Jakarta Sans', 'Inter', sans-serif";
 
   ctx.font = fontLopes;
   const lopesWidth = ctx.measureText(textLopes).width;
@@ -937,18 +923,14 @@ export function drawLopesManausFooterBar(
   ctx.font = fontManaus;
   const manausWidth = ctx.measureText(textManaus).width;
 
-  ctx.font = fontSep;
-  const sepWidth = ctx.measureText(separatorText).width;
-
-  const heartSize = 28;
-  const heartGap = 8;
-  const wordGap = 7;
-  const sepGap = 10;
+  const heartSize = isSquare ? 32 : 36;
+  const heartGap = 10;
+  const wordGap = 10;
 
   let currentX = paddingX;
 
   // Heart Icon in brand red #F10F4D
-  drawLopesHeartVector(ctx, currentX, baselineY - 21, heartSize, '#F10F4D');
+  drawLopesHeartVector(ctx, currentX, baselineY - (isSquare ? 26 : 30), heartSize, '#F10F4D');
   currentX += heartSize + heartGap;
 
   // "Lopes" in brand red
@@ -962,31 +944,19 @@ export function drawLopesManausFooterBar(
   ctx.fillStyle = '#FFFFFF';
   ctx.font = fontManaus;
   ctx.fillText(textManaus, currentX, baselineY);
-  currentX += manausWidth + sepGap;
 
-  // Separator "—"
-  ctx.fillStyle = '#64748B';
-  ctx.font = fontSep;
-  ctx.fillText(separatorText, currentX, baselineY);
-  currentX += sepWidth + sepGap;
-
-  // Slogan in larger, highly visible text
-  ctx.fillStyle = '#F8FAFC';
-  ctx.font = fontSlogan;
-  ctx.fillText(sloganText, currentX, baselineY);
-
-  // 4. RIGHT SIDE: Instagram (@lopesmanaus) & Website (lopes.manaus.com.br)
+  // 4. RIGHT SIDE: Instagram (@lopesmanaus) & Website (lopes.manaus.com.br) - Large & legible
   const siteText = 'lopes.manaus.com.br';
   const igText = '@lopesmanaus';
 
-  const fontRight = "800 19px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontRight = isSquare ? "800 22px 'Plus Jakarta Sans', 'Inter', sans-serif" : "800 24px 'Plus Jakarta Sans', 'Inter', sans-serif";
   ctx.font = fontRight;
   const siteWidth = ctx.measureText(siteText).width;
   const igWidth = ctx.measureText(igText).width;
 
-  const iconSize = 24;
-  const iconTextGap = 7;
-  const channelGap = 20;
+  const iconSize = isSquare ? 26 : 28;
+  const iconTextGap = 8;
+  const channelGap = isSquare ? 24 : 32;
 
   let rightX = width - paddingX;
 
@@ -997,7 +967,7 @@ export function drawLopesManausFooterBar(
   ctx.fillText(siteText, rightX, baselineY);
 
   const siteIconX = rightX - siteWidth - iconTextGap - iconSize;
-  drawGlobeVectorIcon(ctx, siteIconX, baselineY - 18, iconSize, '#38BDF8');
+  drawGlobeVectorIcon(ctx, siteIconX, baselineY - (isSquare ? 20 : 22), iconSize, '#38BDF8');
 
   // Move left for Instagram
   rightX = siteIconX - channelGap;
@@ -1008,7 +978,7 @@ export function drawLopesManausFooterBar(
   ctx.fillText(igText, rightX, baselineY);
 
   const igIconX = rightX - igWidth - iconTextGap - iconSize;
-  drawInstagramVectorIcon(ctx, igIconX, baselineY - 18, iconSize, '#F10F4D');
+  drawInstagramVectorIcon(ctx, igIconX, baselineY - (isSquare ? 20 : 22), iconSize, '#F10F4D');
 
   ctx.restore();
 }
@@ -1359,40 +1329,67 @@ async function drawInstagramStoryDedicatedLayout(
     rowItems.forEach((item, index) => {
       const badgeX = rowStartX + index * (badgeW + gapX);
 
-      drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
-      ctx.fillStyle = theme === 'gold_dark' ? '#1E293B' : '#FFFFFF';
-      ctx.fill();
+      // Card drop shadow
+      ctx.save();
+      ctx.shadowColor = theme === 'gold_dark' ? 'rgba(0, 0, 0, 0.45)' : 'rgba(15, 23, 42, 0.08)';
+      ctx.shadowBlur = 14;
+      ctx.shadowOffsetY = 4;
 
+      drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
+      if (theme === 'gold_dark') {
+        const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
+        badgeGrad.addColorStop(0, '#1E293B');
+        badgeGrad.addColorStop(1, '#131D2E');
+        ctx.fillStyle = badgeGrad;
+      } else {
+        const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
+        badgeGrad.addColorStop(0, '#FFFFFF');
+        badgeGrad.addColorStop(1, '#F8FAFC');
+        ctx.fillStyle = badgeGrad;
+      }
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
       ctx.strokeStyle = theme === 'gold_dark' ? '#334155' : '#E2E8F0';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.4;
+      drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
       ctx.stroke();
+      ctx.restore();
 
       // Icon circle
-      const iconCircleSize = 44;
+      const iconCircleSize = 48;
       const iconCircleX = badgeX + 10;
       const iconCircleY = badgeY + (badgeH - iconCircleSize) / 2;
-      drawRoundRect(ctx, iconCircleX, iconCircleY, iconCircleSize, iconCircleSize, 12);
-      ctx.fillStyle = theme === 'gold_dark' ? '#334155' : '#FFF1F5';
+      drawRoundRect(ctx, iconCircleX, iconCircleY, iconCircleSize, iconCircleSize, 14);
+      if (theme === 'gold_dark') {
+        ctx.fillStyle = '#334155';
+      } else {
+        const iconBgGrad = ctx.createLinearGradient(iconCircleX, iconCircleY, iconCircleX, iconCircleY + iconCircleSize);
+        iconBgGrad.addColorStop(0, '#FFF1F5');
+        iconBgGrad.addColorStop(1, '#FFE4EC');
+        ctx.fillStyle = iconBgGrad;
+      }
       ctx.fill();
 
-      const iconSize = 28;
+      const iconSize = 30;
       const iconX = iconCircleX + (iconCircleSize - iconSize) / 2;
       const iconY = iconCircleY + (iconCircleSize - iconSize) / 2;
       const iconColor = theme === 'gold_dark' ? '#F3E5AB' : '#F10F4D';
       drawSpecIcon(ctx, item.icon, iconX, iconY, iconSize, iconColor);
 
-      // Label text
+      // Label text - large and prominent
       const labelText = item.label.toUpperCase();
       ctx.fillStyle = theme === 'gold_dark' ? '#FFFFFF' : '#0F172A';
 
-      let fontSize = 21;
-      ctx.font = `800 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+      let fontSize = totalSpecsCount <= 3 ? 26 : 24;
+      ctx.font = `900 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
       let labelWidth = ctx.measureText(labelText).width;
-      const maxTextWidth = badgeW - iconCircleSize - 24;
+      const maxTextWidth = badgeW - iconCircleSize - 22;
 
-      while (labelWidth > maxTextWidth && fontSize > 12) {
+      while (labelWidth > maxTextWidth && fontSize > 16) {
         fontSize -= 1;
-        ctx.font = `800 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+        ctx.font = `900 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
         labelWidth = ctx.measureText(labelText).width;
       }
 
@@ -1426,31 +1423,27 @@ async function drawInstagramStoryDedicatedLayout(
     ctx.restore();
   }
 
-  // 9. Footer Bar (Anchored at Y = 1680px to Y = 1775px - ABOVE bottom Instagram safe zone!)
-  const storyFooterH = 95;
+  // 9. Footer Bar (Anchored at Y = 1680px to Y = 1790px - ABOVE bottom Instagram safe zone!)
+  const storyFooterH = 110;
   const storyFooterY = 1680;
 
   ctx.save();
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = theme === 'gold_dark' ? '#090D16' : '#0F172A';
   ctx.fillRect(0, storyFooterY, width, storyFooterH);
 
   ctx.fillStyle = theme === 'gold_dark' ? '#D4AF37' : '#F10F4D';
-  ctx.fillRect(0, storyFooterY, width, 3);
+  ctx.fillRect(0, storyFooterY, width, 4);
 
-  const paddingX = 32;
-  const baselineY = storyFooterY + Math.floor(storyFooterH / 2) + 7;
+  const paddingX = 45;
+  const baselineY = storyFooterY + Math.floor(storyFooterH / 2) + 9;
 
   ctx.textBaseline = 'alphabetic';
 
   const textLopes = 'Lopes';
   const textManaus = 'MANAUS';
-  const separatorText = '—';
-  const sloganText = 'Sua melhor decisão imobiliária';
 
-  const fontLopes = "900 28px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const fontManaus = "800 20px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const fontSep = "600 20px 'Plus Jakarta Sans', 'Inter', sans-serif";
-  const fontSlogan = "700 19px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontLopes = "900 38px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontManaus = "800 26px 'Plus Jakarta Sans', 'Inter', sans-serif";
 
   ctx.font = fontLopes;
   const lopesWidth = ctx.measureText(textLopes).width;
@@ -1458,17 +1451,13 @@ async function drawInstagramStoryDedicatedLayout(
   ctx.font = fontManaus;
   const manausWidth = ctx.measureText(textManaus).width;
 
-  ctx.font = fontSep;
-  const sepWidth = ctx.measureText(separatorText).width;
-
-  const heartSize = 28;
-  const heartGap = 8;
-  const wordGap = 7;
-  const sepGap = 10;
+  const heartSize = 36;
+  const heartGap = 10;
+  const wordGap = 10;
 
   let currentX = paddingX;
 
-  drawLopesHeartVector(ctx, currentX, baselineY - 21, heartSize, '#F10F4D');
+  drawLopesHeartVector(ctx, currentX, baselineY - 30, heartSize, '#F10F4D');
   currentX += heartSize + heartGap;
 
   ctx.fillStyle = '#F10F4D';
@@ -1479,28 +1468,18 @@ async function drawInstagramStoryDedicatedLayout(
   ctx.fillStyle = '#FFFFFF';
   ctx.font = fontManaus;
   ctx.fillText(textManaus, currentX, baselineY);
-  currentX += manausWidth + sepGap;
-
-  ctx.fillStyle = '#64748B';
-  ctx.font = fontSep;
-  ctx.fillText(separatorText, currentX, baselineY);
-  currentX += sepWidth + sepGap;
-
-  ctx.fillStyle = '#F8FAFC';
-  ctx.font = fontSlogan;
-  ctx.fillText(sloganText, currentX, baselineY);
 
   const siteText = 'lopes.manaus.com.br';
   const igText = '@lopesmanaus';
 
-  const fontRight = "800 19px 'Plus Jakarta Sans', 'Inter', sans-serif";
+  const fontRight = "800 24px 'Plus Jakarta Sans', 'Inter', sans-serif";
   ctx.font = fontRight;
   const siteWidth = ctx.measureText(siteText).width;
   const igWidth = ctx.measureText(igText).width;
 
-  const iconSize = 24;
-  const iconTextGap = 7;
-  const channelGap = 20;
+  const iconSize = 28;
+  const iconTextGap = 8;
+  const channelGap = 32;
 
   let rightX = width - paddingX;
 
@@ -1510,7 +1489,7 @@ async function drawInstagramStoryDedicatedLayout(
   ctx.fillText(siteText, rightX, baselineY);
 
   const siteIconX = rightX - siteWidth - iconTextGap - iconSize;
-  drawGlobeVectorIcon(ctx, siteIconX, baselineY - 18, iconSize, '#38BDF8');
+  drawGlobeVectorIcon(ctx, siteIconX, baselineY - 22, iconSize, '#38BDF8');
 
   rightX = siteIconX - channelGap;
 
@@ -1520,7 +1499,7 @@ async function drawInstagramStoryDedicatedLayout(
   ctx.fillText(igText, rightX, baselineY);
 
   const igIconX = rightX - igWidth - iconTextGap - iconSize;
-  drawInstagramVectorIcon(ctx, igIconX, baselineY - 18, iconSize, '#F10F4D');
+  drawInstagramVectorIcon(ctx, igIconX, baselineY - 22, iconSize, '#F10F4D');
 
   ctx.restore();
 }
@@ -1612,17 +1591,60 @@ export async function renderPostToCanvas(
 
   const isGallery = aiData?.layoutStyle === 'gallery';
 
-  // 5. Bottom Information Card Background Container (Edge-to-edge full width background with 25px inner padding)
+  // 5. Bottom Information Card Background Container (Refined Luxury Multi-layer Background)
   const bottomCardY = photoHeight;
   const bottomCardH = height - photoHeight;
 
   ctx.save();
-  ctx.fillStyle = theme === 'gold_dark' ? '#0F172A' : '#FFFFFF';
+  if (theme === 'gold_dark') {
+    const cardBgGrad = ctx.createLinearGradient(0, bottomCardY, 0, height);
+    cardBgGrad.addColorStop(0, '#0B1120');
+    cardBgGrad.addColorStop(0.4, '#0F172A');
+    cardBgGrad.addColorStop(1, '#080D1A');
+    ctx.fillStyle = cardBgGrad;
+  } else {
+    // Default Ruby Premium: Elegant warm slate & soft champagne pearl gradient with micro-depth
+    const cardBgGrad = ctx.createLinearGradient(0, bottomCardY, 0, height);
+    cardBgGrad.addColorStop(0, '#FFFFFF');
+    cardBgGrad.addColorStop(0.35, '#FBFBFC');
+    cardBgGrad.addColorStop(0.75, '#F4F5F8');
+    cardBgGrad.addColorStop(1, '#E9ECF2');
+    ctx.fillStyle = cardBgGrad;
+  }
   ctx.fillRect(0, bottomCardY, width, bottomCardH);
 
-  // Subtle top accent line on card
-  ctx.fillStyle = theme === 'gold_dark' ? '#D4AF37' : '#F10F4D';
-  drawRoundRect(ctx, width / 2 - 40, bottomCardY + 12, 80, 4, 2);
+  // Soft atmospheric radial glow under headline
+  const radialGlow = ctx.createRadialGradient(width / 2, bottomCardY + 160, 20, width / 2, bottomCardY + 160, 480);
+  if (theme === 'gold_dark') {
+    radialGlow.addColorStop(0, 'rgba(212, 175, 55, 0.08)');
+    radialGlow.addColorStop(1, 'rgba(15, 23, 42, 0)');
+  } else {
+    radialGlow.addColorStop(0, 'rgba(241, 15, 77, 0.04)');
+    radialGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  }
+  ctx.fillStyle = radialGlow;
+  ctx.fillRect(0, bottomCardY, width, bottomCardH);
+
+  // Premium Top Accent Bar on Card (Dual-color metallic/ruby pill)
+  const topAccentW = 100;
+  const topAccentH = 5;
+  const topAccentX = (width - topAccentW) / 2;
+  const topAccentY = bottomCardY + 10;
+  drawRoundRect(ctx, topAccentX, topAccentY, topAccentW, topAccentH, 3);
+  
+  if (theme === 'gold_dark') {
+    const goldLine = ctx.createLinearGradient(topAccentX, topAccentY, topAccentX + topAccentW, topAccentY);
+    goldLine.addColorStop(0, '#AA771C');
+    goldLine.addColorStop(0.5, '#F3E5AB');
+    goldLine.addColorStop(1, '#D4AF37');
+    ctx.fillStyle = goldLine;
+  } else {
+    const rubyLine = ctx.createLinearGradient(topAccentX, topAccentY, topAccentX + topAccentW, topAccentY);
+    rubyLine.addColorStop(0, '#F10F4D');
+    rubyLine.addColorStop(0.5, '#FF4D7E');
+    rubyLine.addColorStop(1, '#B30030');
+    ctx.fillStyle = rubyLine;
+  }
   ctx.fill();
   ctx.restore();
 
@@ -1780,21 +1802,57 @@ export async function renderPostToCanvas(
 
     rowItems.forEach((item, index) => {
       const badgeX = rowStartX + index * (badgeW + gapX);
+      const badgeRadius = isStory ? 20 : 16;
 
-      drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, isStory ? 18 : 16);
-      ctx.fillStyle = theme === 'gold_dark' ? '#1E293B' : '#F8FAFC';
+      // Soft ambient drop shadow for card depth
+      ctx.save();
+      ctx.shadowColor = theme === 'gold_dark' ? 'rgba(0, 0, 0, 0.45)' : 'rgba(15, 23, 42, 0.08)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 4;
+
+      drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
+      if (theme === 'gold_dark') {
+        const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
+        badgeGrad.addColorStop(0, '#1E293B');
+        badgeGrad.addColorStop(1, '#131D2E');
+        ctx.fillStyle = badgeGrad;
+      } else {
+        // Pure White Pearl Card with subtle top gloss
+        const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
+        badgeGrad.addColorStop(0, '#FFFFFF');
+        badgeGrad.addColorStop(1, '#F8FAFC');
+        ctx.fillStyle = badgeGrad;
+      }
       ctx.fill();
+      ctx.restore();
 
-      ctx.strokeStyle = theme === 'gold_dark' ? '#334155' : '#E2E8F0';
-      ctx.lineWidth = 1.5;
+      // Border stroke (with top gloss highlight)
+      ctx.save();
+      if (theme === 'gold_dark') {
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.strokeStyle = '#E2E8F0';
+        ctx.lineWidth = 1.4;
+      }
+      drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
       ctx.stroke();
+      ctx.restore();
 
-      // Circle background for icon
-      const iconCircleSize = Math.max(isStory ? 42 : 32, badgeH - 16);
+      // Circle background for icon (Pill with brand color glow)
+      const iconCircleSize = Math.max(isStory ? 48 : 38, badgeH - 14);
       const iconCircleX = badgeX + 8;
       const iconCircleY = badgeY + (badgeH - iconCircleSize) / 2;
       drawRoundRect(ctx, iconCircleX, iconCircleY, iconCircleSize, iconCircleSize, isStory ? 14 : 12);
-      ctx.fillStyle = theme === 'gold_dark' ? '#334155' : '#FFF1F5';
+      
+      if (theme === 'gold_dark') {
+        ctx.fillStyle = '#334155';
+      } else {
+        const iconBgGrad = ctx.createLinearGradient(iconCircleX, iconCircleY, iconCircleX, iconCircleY + iconCircleSize);
+        iconBgGrad.addColorStop(0, '#FFF1F5');
+        iconBgGrad.addColorStop(1, '#FFE4EC');
+        ctx.fillStyle = iconBgGrad;
+      }
       ctx.fill();
 
       // Vector Icon
@@ -1808,17 +1866,17 @@ export async function renderPostToCanvas(
       const labelText = item.label.toUpperCase();
       ctx.fillStyle = theme === 'gold_dark' ? '#FFFFFF' : '#0F172A';
 
-      // Dynamic font sizing (larger for Stories)
+      // Dynamic font sizing (much larger and readable)
       let fontSize = isStory
-        ? (totalSpecsCount > 3 ? 21 : 24)
-        : (isSquare ? (totalSpecsCount > 4 ? 16 : 19) : (totalSpecsCount > 4 ? 18 : 21));
-      ctx.font = `800 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+        ? (totalSpecsCount <= 3 ? 26 : 23)
+        : (isSquare ? (totalSpecsCount <= 4 ? 22 : 19) : (totalSpecsCount <= 4 ? 24 : 21));
+      ctx.font = `900 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
       let labelWidth = ctx.measureText(labelText).width;
-      const maxTextWidth = badgeW - iconCircleSize - 20;
+      const maxTextWidth = badgeW - iconCircleSize - 18;
 
-      while (labelWidth > maxTextWidth && fontSize > 11) {
+      while (labelWidth > maxTextWidth && fontSize > 15) {
         fontSize -= 1;
-        ctx.font = `800 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+        ctx.font = `900 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
         labelWidth = ctx.measureText(labelText).width;
       }
 

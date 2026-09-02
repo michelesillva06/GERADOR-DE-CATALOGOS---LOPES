@@ -1944,7 +1944,8 @@ app.post('/api/social-media/generate-ai-post', async (req, res) => {
       return res.json({ success: true, aiGenerated: false, data: defaultData });
     }
 
-    const prompt = `Você é o Diretor de Marketing Imobiliário da Lopes Manaus. Crie os dados textuais para a arte gráfica do Instagram (Feed 1080x1350) e a legenda perfeita para este imóvel:
+    const prompt = `Você é o Diretor de Arte e Marketing Imobiliário de Alto Padrão da Lopes Manaus.
+Crie os dados textuais profissionais para a ficha e arte gráfica do Instagram (Feed 1080x1350 / Story 1080x1920) e a legenda de alta conversão para este imóvel:
 - Título original: ${property.title}
 - Categoria: ${category}
 - Finalidade: ${purpose}
@@ -1952,24 +1953,31 @@ app.post('/api/social-media/generate-ai-post', async (req, res) => {
 - Preço: ${priceStr}
 - Quartos: ${bedrooms} | Suítes: ${suites} | Banheiros: ${bathrooms} | Vagas: ${parking} | Área: ${area}m²
 - Características/Diferenciais: ${Array.isArray(property.features) ? property.features.join(', ') : 'Alto Padrão'}
-- Estilo desejado: ${style} (luxury = foco em sofisticação e exclusividade; opportunity = foco em oportunidade imperdível; family = foco em conforto familiar)
+- Estilo desejado: ${style} (luxury = luxo e sofisticação; opportunity = oportunidade imperdível; family = conforto familiar)
 ${customInstructions ? `- Instruções adicionais do corretor: ${customInstructions}` : ''}
+
+Diretrizes para a Ficha Visual:
+1. Extraia de 4 a 6 características chave e ícones representativos (ex: 'bed', 'bath', 'car', 'area', 'piscina', 'churrasqueira', 'academia', 'varanda', 'vista', 'mobiliado', 'solar', 'elevador', 'portaria', 'quadra', 'salao'). Use textos objetivos e legíveis (ex: '3 SUÍTES', '2 VAGAS', '180 M²').
+2. Crie uma linha de título com forte apelo visual respeitando a identidade da Lopes Manaus.
+3. Sugira o tema visual: 'ruby_premium' (padrão oficial Lopes Manaus em vermelho rubi) ou 'gold_dark' (exclusivo para imóveis de altíssimo padrão/luxo).
 
 Retorne ESTRITAMENTE um objeto JSON válido no formato:
 {
-  "headlineLine1": "Linha 1 do título elegante (ex: 'Casa Duplex com' ou 'Apartamento de Luxo com' ou 'Mansão Exclusiva com')",
-  "headlineLine2": "Linha 2 do título com o número/destaque (ex: '3 Quartos (2 Suítes)' ou 'Vista Panorâmica Rio Negro' ou '4 Suítes & Piscina')",
-  "highlightNumber": "O número principal a ser destacado em vermelho (ex: '3' ou '4' ou '')",
+  "headlineLine1": "Linha 1 do título elegante (ex: 'Casa em Condomínio Fechado com' ou 'Apartamento de Alto Padrão com' ou 'Cobertura Duplex com')",
+  "headlineLine2": "Linha 2 do título com o principal diferencial (ex: '3 Suítes & Vista Rio Negro' ou '4 Suítes & Espaço Gourmet')",
+  "highlightNumber": "O número principal a destacar (ex: '3' ou '4' ou '')",
   "statusTag": "${isRent ? 'LOCAÇÃO' : 'VENDA'}",
   "subStatus": "EXCLUSIVO",
   "priceFormatted": "${priceStr}",
   "locationTag": "${neighborhood} | ${city}",
+  "designTheme": "ruby_premium",
   "specs": [
     { "icon": "bed", "label": "${bedrooms > 0 ? `${bedrooms} QUARTOS` : 'QUARTOS'}" },
     { "icon": "bath", "label": "${bathrooms > 0 ? `${bathrooms} BANHEIROS` : 'BANHEIROS'}" },
-    { "icon": "car", "label": "${parking > 0 ? `${parking} VAGAS` : 'VAGAS'}" }
+    { "icon": "car", "label": "${parking > 0 ? `${parking} VAGAS` : 'VAGAS'}" },
+    { "icon": "area", "label": "${area > 0 ? `${area} M²` : 'AMPLO ESPAÇO'}" }
   ],
-  "hook": "Frase curta de impacto para a capa ou story",
+  "hook": "Frase de impacto para anúncio de alto padrão",
   "instagramCaption": "Legenda completa formatada para o Instagram com emojis, bullet points elegantes, CTA para o WhatsApp da Lopes Manaus e 5 a 8 hashtags (#LopesManaus, etc.)"
 }`;
 

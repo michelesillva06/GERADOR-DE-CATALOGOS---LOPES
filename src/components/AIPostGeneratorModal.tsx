@@ -101,7 +101,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
     const purposeLower = (currentProperty.purpose || '').toLowerCase().trim();
     const isRentProp = purposeLower.includes('loca') || purposeLower.includes('aluguel') || purposeLower.includes('rent');
 
-    setSelectedTemplate('feed_vertical');
+    setSelectedTemplate('feed_quadrado');
     setSelectedPhotoIndex(0);
     setMobileTab('preview');
 
@@ -122,7 +122,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
            (u.id && currentProperty.user_id && u.id.toLowerCase() === currentProperty.user_id.toLowerCase()) ||
            (u.email && currentProperty.user_id && u.email.toLowerCase() === currentProperty.user_id.toLowerCase()) ||
            (u.username && currentProperty.user_id && u.username.toLowerCase() === currentProperty.user_id.toLowerCase())
-    );
+     );
 
     // If logged in user is a captador promoting a property, default to their own WhatsApp contact
     const activeCaptador = (currentUser && currentUser.role === 'CAPTADOR')
@@ -143,7 +143,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
       whatsappNumber: effectivePhoneDisplay,
       specs: extractedSpecs,
       designTheme: 'ruby_premium',
-      layoutStyle: 'gallery',
+      layoutStyle: 'single',
       secondaryPhotos: secondary
     };
 
@@ -597,12 +597,12 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
             {/* 1.5. Design Theme Selection */}
             <div>
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
-                <span>Estilo Visual:</span>
+                <span>Estilo Visual (Identidade Lopes):</span>
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { id: 'ruby_premium', name: 'Lopes Rubi', color: 'from-[#E5094C] to-[#99002B]' },
-                  { id: 'gold_dark', name: 'Dark Gold', color: 'from-[#0F172A] to-[#334155]' }
+                  { id: 'ruby_premium', name: 'Lopes Rubi (Padrão)', color: 'from-[#E5094C] to-[#99002B]' },
+                  { id: 'gold_dark', name: 'Lopes Dark Gold', color: 'from-[#D4AF37] to-[#0F172A]' }
                 ].map((t) => {
                   const isSelected = (postData.designTheme || 'ruby_premium') === t.id;
                   return (
