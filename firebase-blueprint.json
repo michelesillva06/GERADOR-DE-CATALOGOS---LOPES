@@ -87,6 +87,22 @@
         "description": { "type": "string" }
       },
       "required": ["id", "user_id", "action", "description"]
+    },
+    "PushSubscription": {
+      "title": "PushSubscription",
+      "description": "Web Push VAPID subscription for browser and mobile notifications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "user_email": { "type": "string" },
+        "keys": { "type": "object" },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" }
+      },
+      "required": ["id", "endpoint", "user_id", "keys"]
     }
   },
   "firestore": {
@@ -113,6 +129,10 @@
     "/logs/{logId}": {
       "schema": { "$ref": "#/entities/AuditLog" },
       "description": "Audit logs"
+    },
+    "/push_subscriptions/{subId}": {
+      "schema": { "$ref": "#/entities/PushSubscription" },
+      "description": "Web Push notification subscriptions"
     }
   }
 }

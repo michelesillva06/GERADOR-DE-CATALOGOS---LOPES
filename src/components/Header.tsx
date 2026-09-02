@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Building2, User as UserIcon, LogOut, ExternalLink, ShieldAlert, Sparkles, ChevronDown, Bell } from 'lucide-react';
 import { LopesLogo } from './LopesLogo';
+import { PWAInstallButton } from './PWAInstallButton';
 import { getStoredUsers } from '../lib/storage';
 import { User } from '../types';
 
@@ -34,6 +35,9 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView, users
 
         {/* Header Right Actions */}
         <div className="flex items-center space-x-3">
+
+          {/* In-app PWA install button (hidden if already installed) */}
+          <PWAInstallButton />
 
           {/* Update Reminder Bell — reopens the daily "confirmar com o proprietário" reminder anytime */}
           {onOpenUpdateReminder && updateReminderCount > 0 && (

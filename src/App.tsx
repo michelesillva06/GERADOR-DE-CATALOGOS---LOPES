@@ -24,6 +24,7 @@ import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
 import { AIPostGeneratorModal } from './components/AIPostGeneratorModal';
+import { checkAndNotifyOverdueProperties } from './lib/mobileNotifications';
 import { buildWhatsAppUrl, getEffectiveWhatsApp } from './lib/whatsapp';
 import { Property, User, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './types';
 import { initialCompanySettings } from './data/mockData';
@@ -118,6 +119,52 @@ function MainApp() {
       localStorage.setItem(storageKey, today);
     }
   }, [user, overdueCount]);
+
+  // Mobile / PWA native notification trigger & Service Worker listener
+  useEffect(() => {
+    if (!user || overdueCount === 0) return;
+
+    // Check and trigger mobile notification if permission is granted
+    checkAndNotifyOverdueProperties(user, properties);
+
+    // Set up periodic check every 30 minutes
+    const interval = setInterval(() => {
+      checkAndNotifyOverdueProperties(user, properties);
+    }, 30 * 60 * 1000);
+
+    // Also check when tab/app becomes visible again (e.g. returning to PWA)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAndNotifyOverdueProperties(user, properties);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Handle clicks from ServiceWorker notifications
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NOTIFICATION_CLICKED') {
+        setShowUpdateReminder(true);
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+
+    // Check if opened via notification link URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('view') === 'reminder' && overdueCount > 0) {
+      setShowUpdateReminder(true);
+    }
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+    };
+  }, [user, overdueCount, properties]);
 
   // Fetch initial data
   const fetchData = async () => {

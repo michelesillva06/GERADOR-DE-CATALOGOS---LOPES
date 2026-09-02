@@ -3,6 +3,7 @@ import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
 import { buildWhatsAppUrl, getEffectiveWhatsApp } from '../lib/whatsapp';
 import { Building2, PlusCircle, Share2, FileSpreadsheet, ExternalLink, CheckCircle2, Copy, Check, Sparkles } from 'lucide-react';
+import { MobileNotificationSettings } from '../components/MobileNotificationSettings';
 
 interface CaptadorDashboardProps {
   user: User;
@@ -150,6 +151,9 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
           </a>
         </div>
       </div>
+
+      {/* Mobile Notifications / PWA Alert Manager */}
+      <MobileNotificationSettings />
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

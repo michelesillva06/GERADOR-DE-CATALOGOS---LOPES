@@ -36,6 +36,14 @@ cloudinary.config({
 });
 import { initialUsers, initialProperties, initialDemoProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData.js';
 import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types.js';
+import {
+  initializeWebPush,
+  getVapidPublicKey,
+  savePushSubscription,
+  removePushSubscription,
+  sendPushToUser,
+  checkAndDispatchOverduePropertyAlerts
+} from './src/server/webPushService.js';
 
 import { GoogleGenAI } from '@google/genai';
 
@@ -2044,6 +2052,186 @@ Instruções:
     return res.json({
       caption: `✨ ${req.body?.property?.title || 'Oportunidade Exclusiva Lopes Manaus'}\n📍 ${req.body?.property?.neighborhood || 'Manaus'}\n\nEntre em contato para saber mais detalhes!\n#LopesManaus #ImoveisManaus`
     });
+  }
+});
+
+/**
+ * ============================================================================
+ * WEB PUSH NOTIFICATIONS & VAPID SUBSCRIPTIONS (CLOUDINARY / FIRESTORE BACKEND)
+ * ============================================================================
+ */
+
+// Initialize Web Push after Firestore sync
+initializeWebPush(firestoreDb).catch(err => {
+  console.warn('[WebPush] Startup init warning:', err);
+});
+
+// Periodic background check for overdue properties (every 6 hours)
+setInterval(() => {
+  checkAndDispatchOverduePropertyAlerts(firestoreDb).catch(err => {
+    console.warn('[WebPush] Background overdue check error:', err);
+  });
+}, 6 * 60 * 60 * 1000);
+
+/**
+ * GET /api/notifications/vapid-public-key
+ * Returns the VAPID public key for the browser to create push subscriptions
+ */
+app.get('/api/notifications/vapid-public-key', async (req, res) => {
+  try {
+    let key = getVapidPublicKey();
+    if (!key) {
+      const init = await initializeWebPush(firestoreDb);
+      key = init.publicKey;
+    }
+    res.json({ publicKey: key });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao obter chave pública VAPID: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/notifications/subscribe
+ * Saves a browser Web Push subscription into Cloud Firestore
+ */
+app.post('/api/notifications/subscribe', async (req, res) => {
+  try {
+    const { subscription, user: clientUser } = req.body || {};
+    if (!subscription || !subscription.endpoint || !subscription.keys) {
+      return res.status(400).json({ error: 'Dados de assinatura push inválidos ou incompletos.' });
+    }
+
+    const authUser = extractUserFromRequest(req);
+    const targetUser = authUser || clientUser || { id: 'usr_guest', name: 'Convidado' };
+    const userAgent = (req.headers['user-agent'] as string) || '';
+
+    const result = await savePushSubscription(firestoreDb, subscription, targetUser, userAgent);
+    addAuditLog(targetUser.id, targetUser.name, 'Push Notification', 'Registrou dispositivo para Web Push Notifications', req);
+
+    res.json({
+      success: true,
+      id: result.id,
+      message: 'Dispositivo registrado com sucesso para notificações push!'
+    });
+  } catch (err: any) {
+    console.error('[WebPush] Error saving subscription:', err);
+    res.status(500).json({ error: 'Erro ao salvar assinatura push: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/notifications/unsubscribe
+ * Removes a browser Web Push subscription from Cloud Firestore
+ */
+app.post('/api/notifications/unsubscribe', async (req, res) => {
+  try {
+    const { endpoint, userId } = req.body || {};
+    const authUser = extractUserFromRequest(req);
+    const targetUserId = authUser?.id || userId || '';
+
+    if (!endpoint) {
+      return res.status(400).json({ error: 'Endpoint de assinatura não fornecido.' });
+    }
+
+    await removePushSubscription(firestoreDb, endpoint, targetUserId);
+    res.json({ success: true, message: 'Dispositivo removido das notificações push com sucesso.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao remover assinatura push: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/notifications/test
+ * Dispatches a test Web Push notification to the current user's active device(s)
+ */
+app.post('/api/notifications/test', async (req, res) => {
+  try {
+    const authUser = extractUserFromRequest(req);
+    const targetUser = authUser || req.body?.user;
+    if (!targetUser?.id) {
+      return res.status(400).json({ error: 'Usuário não autenticado.' });
+    }
+
+    const result = await sendPushToUser(firestoreDb, targetUser.id, {
+      title: '🔔 Teste de Notificação Web Push',
+      body: `Olá ${targetUser.name || 'Corretor'}! Suas notificações push da Lopes Captação estão ativas e funcionando perfeitamente.`,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: {
+        url: '/?view=reminder',
+        type: 'TEST_PUSH'
+      }
+    });
+
+    if (result.sent === 0 && result.total === 0) {
+      return res.json({
+        success: false,
+        message: 'Nenhum dispositivo registrado encontrado para este usuário. Ative as notificações no botão acima primeiro.'
+      });
+    }
+
+    res.json({
+      success: true,
+      deliveredCount: result.sent,
+      totalDevices: result.total,
+      message: `Notificação push entregue para ${result.sent} de ${result.total} dispositivo(s)!`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao disparar notificação push de teste: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/notifications/check-overdue
+ * Triggers full scan of properties in Firestore and delivers Web Push notifications
+ * to captadores with overdue properties (>30 days without update)
+ */
+app.post('/api/notifications/check-overdue', async (req, res) => {
+  try {
+    const result = await checkAndDispatchOverduePropertyAlerts(firestoreDb);
+    const authUser = extractUserFromRequest(req);
+    if (authUser) {
+      addAuditLog(
+        authUser.id,
+        authUser.name,
+        'Alerta de Imóveis Vencidos',
+        `Disparou verificação de imóveis vencidos. Notificou ${result.usersNotified} corretores (${result.notificationsDelivered} pushes enviados).`,
+        req
+      );
+    }
+    res.json({
+      success: true,
+      ...result,
+      message: `Verificação concluída: ${result.overduePropertiesCount} imóveis vencidos encontrados. ${result.usersNotified} corretor(es) notificado(s) via Web Push.`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao verificar imóveis vencidos: ' + err.message });
+  }
+});
+
+/**
+ * GET /api/notifications/status
+ * Returns current status of push subscriptions and overdue property counts
+ */
+app.get('/api/notifications/status', async (req, res) => {
+  try {
+    const subsSnap = await getDocs(collection(firestoreDb, 'push_subscriptions'));
+    const totalSubs = subsSnap.size;
+
+    const authUser = extractUserFromRequest(req);
+    let userSubsCount = 0;
+    if (authUser) {
+      userSubsCount = subsSnap.docs.filter(d => d.data()?.user_id === authUser.id).length;
+    }
+
+    res.json({
+      webPushActive: true,
+      totalSubscriptions: totalSubs,
+      userSubscriptions: userSubsCount,
+      hasVapidPublicKey: !!getVapidPublicKey()
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao consultar status do Web Push: ' + err.message });
   }
 });
 

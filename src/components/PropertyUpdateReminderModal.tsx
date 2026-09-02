@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Property } from '../types';
 import { needsStatusCheck } from './PropertyUpdateAlerts';
 import { AlertTriangle, CheckCircle2, Loader2, X, Home } from 'lucide-react';
+import { MobileNotificationSettings } from './MobileNotificationSettings';
 
 interface PropertyUpdateReminderModalProps {
   properties: Property[]; // pass only the properties this viewer should see reminders for
@@ -78,6 +79,8 @@ export const PropertyUpdateReminderModal: React.FC<PropertyUpdateReminderModalPr
         </div>
 
         <div className="overflow-y-auto p-4 space-y-2 flex-1">
+          <MobileNotificationSettings compact className="mb-3" />
+
           {overdue.map(property => {
             const thumb = property.main_image || property.images?.[0];
             return (
