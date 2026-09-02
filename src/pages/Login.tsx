@@ -106,40 +106,6 @@ export const Login: React.FC = () => {
           </button>
         </form>
 
-        {/* Quick Access Badges / Helper */}
-        <div className="mt-6 pt-4 border-t border-slate-100">
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center mb-2.5">
-            Acesso Rápido para Testes
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <button
-              type="button"
-              onClick={() => {
-                setLoginInput('admin');
-                setPasswordInput('Lopes@123');
-                setErrorMsg('');
-              }}
-              className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition cursor-pointer flex flex-col"
-            >
-              <span className="font-bold text-slate-800">Master Admin</span>
-              <span className="text-[10px] text-slate-500">admin • Lopes@123</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setLoginInput('michelesilva');
-                setPasswordInput('Lopes@2026');
-                setErrorMsg('');
-              }}
-              className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-left transition cursor-pointer flex flex-col"
-            >
-              <span className="font-bold text-slate-800">Michele Silva</span>
-              <span className="text-[10px] text-slate-500">michelesilva • Lopes@2026</span>
-            </button>
-          </div>
-        </div>
-
         {/* Brand Footer */}
         <div className="mt-6 pt-4 border-t border-slate-100 text-center text-[11px] text-slate-400">
           <p>© {new Date().getFullYear()} Lopes Imobiliária - Shopping Ponta Negra</p>
