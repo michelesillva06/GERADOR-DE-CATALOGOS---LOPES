@@ -9,6 +9,8 @@ interface GeneralCatalogPageProps {
   companySettings: CompanySettings;
   onOpenPdfCatalog: (prefilteredProps?: Property[]) => void;
   onViewProperty: (property: Property) => void;
+  onGenerateAiPost?: (property: Property) => void;
+  onGenerateSocialMedia?: (property: Property) => void;
 }
 
 export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
@@ -16,7 +18,9 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
   users,
   companySettings,
   onOpenPdfCatalog,
-  onViewProperty
+  onViewProperty,
+  onGenerateAiPost,
+  onGenerateSocialMedia
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPurpose, setSelectedPurpose] = useState<'todos' | 'venda' | 'locacao'>('todos');
@@ -361,12 +365,34 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
                       </span>
                     </div>
 
-                    <button
-                      onClick={() => onViewProperty(property)}
-                      className="px-3 py-1.5 bg-slate-900 hover:bg-[#F10F4D] text-white font-extrabold text-[11px] rounded-xl transition cursor-pointer"
-                    >
-                      Ver Detalhes
-                    </button>
+                    <div className="flex items-center space-x-1.5">
+                      {(onGenerateAiPost || onGenerateSocialMedia) && (
+                        <button
+                          type="button"
+                          id={`btn-gerar-post-ia-general-${property.id || property.code || 'item'}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onGenerateAiPost) {
+                              onGenerateAiPost(property);
+                            } else if (onGenerateSocialMedia) {
+                              onGenerateSocialMedia(property);
+                            }
+                          }}
+                          className="px-2.5 py-1.5 bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white font-extrabold text-[11px] rounded-xl flex items-center space-x-1 shadow-xs transition transform active:scale-95 cursor-pointer"
+                          title="Gerar Post para Redes Sociais"
+                        >
+                          <SparklesIcon className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                          <span>Gerar Post</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => onViewProperty(property)}
+                        className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[11px] rounded-xl transition cursor-pointer"
+                      >
+                        Ver Detalhes
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

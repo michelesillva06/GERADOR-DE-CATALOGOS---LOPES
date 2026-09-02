@@ -124,7 +124,10 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
            (u.username && currentProperty.user_id && u.username.toLowerCase() === currentProperty.user_id.toLowerCase())
     );
 
-    const activeCaptador = propertyCaptador || currentUser;
+    // If logged in user is a captador promoting a property, default to their own WhatsApp contact
+    const activeCaptador = (currentUser && currentUser.role === 'CAPTADOR')
+      ? currentUser
+      : (propertyCaptador || currentUser);
     const rawWa = getEffectiveWhatsApp(activeCaptador, companySettings);
     const effectivePhoneDisplay = formatPhoneDisplay(rawWa);
 

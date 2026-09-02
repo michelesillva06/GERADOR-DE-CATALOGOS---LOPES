@@ -31,6 +31,10 @@ export const PropertyUpdateReminderModal: React.FC<PropertyUpdateReminderModalPr
 
   const overdue = properties.filter(needsStatusCheck).sort((a, b) => daysSince(b) - daysSince(a));
 
+  if (overdue.length === 0) {
+    return null;
+  }
+
   const handleConfirm = async (propertyId: string) => {
     setConfirmingId(propertyId);
     try {

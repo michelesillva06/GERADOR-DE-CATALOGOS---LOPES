@@ -77,11 +77,20 @@ function MainApp() {
   const [pdfPrefilteredProps, setPdfPrefilteredProps] = useState<Property[] | undefined>(undefined);
   const [showUpdateReminder, setShowUpdateReminder] = useState(false);
 
-  // Only the current user's own properties for a captador; every property for admin/gestor
+  // Reminders only for regular captadores (never for Master Admin or Gestores)
+  // and strictly for the properties registered/owned by the current user.
   const updateReminderProperties = useMemo(() => {
     if (!user) return [];
     const isAdminOrGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
-    return isAdminOrGestor ? properties : properties.filter(p => p.user_id === user.id);
+    if (isAdminOrGestor) return [];
+
+    const isOwnedByCurrentUser = (p: Property) =>
+      p.user_id === user.id ||
+      p.user_id?.toLowerCase() === user.id?.toLowerCase() ||
+      p.user_id?.toLowerCase() === user.username?.toLowerCase() ||
+      p.user_id?.toLowerCase() === user.email?.toLowerCase();
+
+    return properties.filter(isOwnedByCurrentUser);
   }, [properties, user]);
 
   const overdueCount = useMemo(
@@ -89,9 +98,18 @@ function MainApp() {
     [updateReminderProperties]
   );
 
-  // Auto-open once per calendar day, per user
+  // Auto-open once per calendar day, per user — only if there are overdue properties and user is not admin/gestor
   useEffect(() => {
-    if (!user || overdueCount === 0) return;
+    if (!user || overdueCount === 0) {
+      setShowUpdateReminder(false);
+      return;
+    }
+    const isAdminOrGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
+    if (isAdminOrGestor) {
+      setShowUpdateReminder(false);
+      return;
+    }
+
     const today = new Date().toISOString().slice(0, 10);
     const storageKey = `lopes_update_reminder_shown_${user.id}`;
     const lastShown = localStorage.getItem(storageKey);
@@ -885,12 +903,12 @@ function MainApp() {
         onOpenUpdateReminder={() => setShowUpdateReminder(true)}
       />
 
-      {showUpdateReminder && (
+      {showUpdateReminder && overdueCount > 0 && !isMasterOrGestor && (
         <PropertyUpdateReminderModal
           properties={updateReminderProperties}
           onConfirmed={handlePropertyStatusConfirmed}
           onClose={() => setShowUpdateReminder(false)}
-          showOwnerName={user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA'}
+          showOwnerName={false}
         />
       )}
 
@@ -1003,6 +1021,8 @@ function MainApp() {
                 setIsPdfModalOpen(true);
               }}
               onViewProperty={handleViewPropertyDetails}
+              onGenerateAiPost={handleOpenAiPost}
+              onGenerateSocialMedia={handleGenerateSocialMedia}
             />
           )}
 
