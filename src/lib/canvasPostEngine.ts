@@ -2,7 +2,13 @@ import { Property, CompanySettings } from '../types';
 import { PostTemplateId } from '../components/postTemplates';
 import { extractPropertyImages } from './pdfGenerator';
 
-export type PostDesignTheme = 'ruby_premium' | 'gold_dark';
+export type PostDesignTheme =
+  | 'ruby_premium'
+  | 'lancamento_blue'
+  | 'oportunidade_amber'
+  | 'mobiliado_emerald'
+  | 'gold_dark'
+  | 'locacao_teal';
 export type PostLayoutStyle = 'single' | 'gallery';
 
 export interface CanvasPostData {
@@ -254,6 +260,159 @@ export function drawWhatsAppVectorIcon(
   ctx.restore();
 }
 
+export interface ThemeColorPalette {
+  badgeMainGrad: [string, string];
+  badgeMainText: string;
+  badgeSubBg: string;
+  badgeSubText: string;
+  priceGrad: [string, string];
+  priceLeftAccent: string;
+  priceText: string;
+  specIconColor: string;
+  specIconBg: [string, string];
+  specBorder: string;
+  cardBgGrad: [string, string, string, string];
+  cardTitleColor: string;
+  topAccentGrad: [string, string, string];
+  ctaGrad: [string, string];
+  ctaText: string;
+  ctaShadow: string;
+  footerLine: string;
+  isDark: boolean;
+}
+
+export function getThemePalette(theme: PostDesignTheme = 'ruby_premium'): ThemeColorPalette {
+  switch (theme) {
+    case 'lancamento_blue':
+      return {
+        badgeMainGrad: ['#0284C7', '#1D4ED8'],
+        badgeMainText: '#FFFFFF',
+        badgeSubBg: '#0F172A',
+        badgeSubText: '#38BDF8',
+        priceGrad: ['#0369A1', '#1E3A8A'],
+        priceLeftAccent: '#38BDF8',
+        priceText: '#FFFFFF',
+        specIconColor: '#0284C7',
+        specIconBg: ['#F0F9FF', '#E0F2FE'],
+        specBorder: '#BAE6FD',
+        cardBgGrad: ['#FFFFFF', '#F8FAFC', '#F0F9FF', '#E0F2FE'],
+        cardTitleColor: '#0F172A',
+        topAccentGrad: ['#0284C7', '#38BDF8', '#1D4ED8'],
+        ctaGrad: ['#0284C7', '#0369A1'],
+        ctaText: '#FFFFFF',
+        ctaShadow: 'rgba(2, 132, 199, 0.40)',
+        footerLine: '#38BDF8',
+        isDark: false
+      };
+    case 'oportunidade_amber':
+      return {
+        badgeMainGrad: ['#EA580C', '#B45309'],
+        badgeMainText: '#FFFFFF',
+        badgeSubBg: '#1C1917',
+        badgeSubText: '#FDE047',
+        priceGrad: ['#C2410C', '#78350F'],
+        priceLeftAccent: '#F59E0B',
+        priceText: '#FFFFFF',
+        specIconColor: '#D97706',
+        specIconBg: ['#FFFBEB', '#FEF3C7'],
+        specBorder: '#FDE68A',
+        cardBgGrad: ['#FFFFFF', '#FFFDF5', '#FFFBEB', '#FEF3C7'],
+        cardTitleColor: '#1C1917',
+        topAccentGrad: ['#EA580C', '#F59E0B', '#B45309'],
+        ctaGrad: ['#EA580C', '#C2410C'],
+        ctaText: '#FFFFFF',
+        ctaShadow: 'rgba(234, 88, 12, 0.40)',
+        footerLine: '#F59E0B',
+        isDark: false
+      };
+    case 'mobiliado_emerald':
+      return {
+        badgeMainGrad: ['#059669', '#065F46'],
+        badgeMainText: '#FFFFFF',
+        badgeSubBg: '#064E3B',
+        badgeSubText: '#A7F3D0',
+        priceGrad: ['#059669', '#064E3B'],
+        priceLeftAccent: '#34D399',
+        priceText: '#FFFFFF',
+        specIconColor: '#059669',
+        specIconBg: ['#ECFDF5', '#D1FAE5'],
+        specBorder: '#A7F3D0',
+        cardBgGrad: ['#FFFFFF', '#F7FDF9', '#ECFDF5', '#D1FAE5'],
+        cardTitleColor: '#064E3B',
+        topAccentGrad: ['#059669', '#34D399', '#065F46'],
+        ctaGrad: ['#059669', '#047857'],
+        ctaText: '#FFFFFF',
+        ctaShadow: 'rgba(5, 150, 105, 0.40)',
+        footerLine: '#34D399',
+        isDark: false
+      };
+    case 'locacao_teal':
+      return {
+        badgeMainGrad: ['#0D9488', '#115E59'],
+        badgeMainText: '#FFFFFF',
+        badgeSubBg: '#042F2E',
+        badgeSubText: '#5EEAD4',
+        priceGrad: ['#0F766E', '#134E4A'],
+        priceLeftAccent: '#2DD4BF',
+        priceText: '#FFFFFF',
+        specIconColor: '#0D9488',
+        specIconBg: ['#F0FDFA', '#CCFBF1'],
+        specBorder: '#99F6E4',
+        cardBgGrad: ['#FFFFFF', '#F6FEFD', '#F0FDFA', '#CCFBF1'],
+        cardTitleColor: '#042F2E',
+        topAccentGrad: ['#0D9488', '#2DD4BF', '#115E59'],
+        ctaGrad: ['#0D9488', '#0F766E'],
+        ctaText: '#FFFFFF',
+        ctaShadow: 'rgba(13, 148, 136, 0.40)',
+        footerLine: '#2DD4BF',
+        isDark: false
+      };
+    case 'gold_dark':
+      return {
+        badgeMainGrad: ['#D4AF37', '#AA771C'],
+        badgeMainText: '#0F172A',
+        badgeSubBg: '#1E293B',
+        badgeSubText: '#F3E5AB',
+        priceGrad: ['#0F172A', '#1E293B'],
+        priceLeftAccent: '#D4AF37',
+        priceText: '#F3E5AB',
+        specIconColor: '#F3E5AB',
+        specIconBg: ['#334155', '#1E293B'],
+        specBorder: '#334155',
+        cardBgGrad: ['#0B1120', '#0B1120', '#0F172A', '#080D1A'],
+        cardTitleColor: '#FFFFFF',
+        topAccentGrad: ['#AA771C', '#F3E5AB', '#D4AF37'],
+        ctaGrad: ['#059669', '#047857'],
+        ctaText: '#FFFFFF',
+        ctaShadow: 'rgba(5, 150, 105, 0.40)',
+        footerLine: '#D4AF37',
+        isDark: true
+      };
+    case 'ruby_premium':
+    default:
+      return {
+        badgeMainGrad: ['#F10F4D', '#B30030'],
+        badgeMainText: '#FFFFFF',
+        badgeSubBg: '#0F172A',
+        badgeSubText: '#FFFFFF',
+        priceGrad: ['#F10F4D', '#B30030'],
+        priceLeftAccent: '#FFFFFF',
+        priceText: '#FFFFFF',
+        specIconColor: '#F10F4D',
+        specIconBg: ['#FFF1F5', '#FFE4EC'],
+        specBorder: '#E2E8F0',
+        cardBgGrad: ['#FFFFFF', '#FBFBFC', '#F4F5F8', '#E9ECF2'],
+        cardTitleColor: '#090D16',
+        topAccentGrad: ['#F10F4D', '#FF4D7E', '#B30030'],
+        ctaGrad: ['#059669', '#047857'],
+        ctaText: '#FFFFFF',
+        ctaShadow: 'rgba(5, 150, 105, 0.40)',
+        footerLine: '#F10F4D',
+        isDark: false
+      };
+  }
+}
+
 /**
  * Draws a modern luxury property badge tag (Dual Capsule / Pill style).
  */
@@ -267,6 +426,7 @@ export function drawModernPropertyBadge(
 ) {
   ctx.save();
 
+  const palette = getThemePalette(theme);
   const mainStatusText = (status || 'VENDA').toUpperCase();
   const subStatusText = (subStatus || 'DISPONÍVEL').toUpperCase();
 
@@ -288,37 +448,29 @@ export function drawModernPropertyBadge(
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 10;
 
-  // Top Main Capsule Pill (Lopes Ruby Red or Luxury Dark Gradient)
+  // Top Main Capsule Pill
   drawRoundRect(ctx, x, y, badgeW, topH, [18, 18, subStatusText ? 4 : 18, 4]);
 
-  if (theme === 'gold_dark') {
-    const goldGrad = ctx.createLinearGradient(x, y, x + badgeW, y + topH);
-    goldGrad.addColorStop(0, '#D4AF37');
-    goldGrad.addColorStop(0.5, '#F3E5AB');
-    goldGrad.addColorStop(1, '#AA771C');
-    ctx.fillStyle = goldGrad;
-  } else {
-    const mainGrad = ctx.createLinearGradient(x, y, x + badgeW, y + topH);
-    mainGrad.addColorStop(0, '#F10F4D');
-    mainGrad.addColorStop(1, '#B30030');
-    ctx.fillStyle = mainGrad;
-  }
+  const mainGrad = ctx.createLinearGradient(x, y, x + badgeW, y + topH);
+  mainGrad.addColorStop(0, palette.badgeMainGrad[0]);
+  mainGrad.addColorStop(1, palette.badgeMainGrad[1]);
+  ctx.fillStyle = mainGrad;
   ctx.fill();
 
   ctx.shadowColor = 'transparent';
 
-  // White inner border highlight
-  ctx.strokeStyle = theme === 'gold_dark' ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.45)';
+  // White/subtle inner border highlight
+  ctx.strokeStyle = palette.isDark ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.45)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Main Status Text ("LOPES")
-  ctx.fillStyle = theme === 'gold_dark' ? '#0F172A' : '#FFFFFF';
+  // Main Status Text
+  ctx.fillStyle = palette.badgeMainText;
   ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', sans-serif";
   ctx.textAlign = 'center';
   ctx.fillText(mainStatusText, x + badgeW / 2, y + topH / 2 + 8);
 
-  // Sub Status Ribbon attached underneath ("MANAUS" with same 24px font)
+  // Sub Status Ribbon attached underneath
   if (subStatusText) {
     const subY = y + topH + 3;
     const subW = badgeW;
@@ -328,12 +480,12 @@ export function drawModernPropertyBadge(
     ctx.shadowOffsetY = 6;
 
     drawRoundRect(ctx, x, subY, subW, subH, [4, 4, 16, 16]);
-    ctx.fillStyle = theme === 'gold_dark' ? '#1E293B' : '#0F172A';
+    ctx.fillStyle = palette.badgeSubBg;
     ctx.fill();
 
     ctx.shadowColor = 'transparent';
-    ctx.fillStyle = theme === 'gold_dark' ? '#F3E5AB' : '#FFFFFF';
-    ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', sans-serif"; // Same font size as principal!
+    ctx.fillStyle = palette.badgeSubText;
+    ctx.font = "900 24px 'Plus Jakarta Sans', 'Inter', sans-serif";
     ctx.textAlign = 'center';
     ctx.fillText(subStatusText, x + subW / 2, subY + subH / 2 + 8);
   }
@@ -440,7 +592,9 @@ export function drawPriceAndLocationBanners(
 ) {
   ctx.save();
 
-  // 1. Red / Dark Gold Price Banner
+  const palette = getThemePalette(theme);
+
+  // 1. Theme Price Banner
   ctx.font = "900 44px 'Plus Jakarta Sans', 'Inter', sans-serif";
   const priceMetrics = ctx.measureText(priceText);
   const pricePadX = 30;
@@ -454,26 +608,19 @@ export function drawPriceAndLocationBanners(
 
   drawRoundRect(ctx, x, y, priceW, priceH, [0, 22, 22, 0]);
 
-  if (theme === 'gold_dark') {
-    const darkGrad = ctx.createLinearGradient(x, y, x + priceW, y + priceH);
-    darkGrad.addColorStop(0, '#0F172A');
-    darkGrad.addColorStop(1, '#1E293B');
-    ctx.fillStyle = darkGrad;
-  } else {
-    const rubyGrad = ctx.createLinearGradient(x, y, x + priceW, y + priceH);
-    rubyGrad.addColorStop(0, '#F10F4D');
-    rubyGrad.addColorStop(1, '#B30030');
-    ctx.fillStyle = rubyGrad;
-  }
+  const priceGrad = ctx.createLinearGradient(x, y, x + priceW, y + priceH);
+  priceGrad.addColorStop(0, palette.priceGrad[0]);
+  priceGrad.addColorStop(1, palette.priceGrad[1]);
+  ctx.fillStyle = priceGrad;
   ctx.fill();
 
-  // Left Gold/Ruby Accent Bar
+  // Left Accent Bar
   ctx.shadowColor = 'transparent';
-  ctx.fillStyle = theme === 'gold_dark' ? '#D4AF37' : '#FFFFFF';
+  ctx.fillStyle = palette.priceLeftAccent;
   ctx.fillRect(x, y, 7, priceH);
 
   // Price Text
-  ctx.fillStyle = theme === 'gold_dark' ? '#F3E5AB' : '#FFFFFF';
+  ctx.fillStyle = palette.priceText;
   ctx.fillText(priceText, x + pricePadX + 6, y + 52);
 
   // 2. Location Pill directly underneath (Bairro | Cidade)
@@ -495,7 +642,7 @@ export function drawPriceAndLocationBanners(
   ctx.shadowColor = 'transparent';
 
   // Map pin icon
-  ctx.fillStyle = '#F10F4D';
+  ctx.fillStyle = palette.isDark ? '#D4AF37' : '#F10F4D';
   ctx.font = "800 20px 'Plus Jakarta Sans', 'Inter', sans-serif";
   ctx.fillText('📍', x + 18, locY + 33);
 
@@ -895,13 +1042,15 @@ export function drawLopesManausFooterBar(
   const footerH = isSquare ? 88 : (isStory ? 110 : 96);
   const footerY = height - footerH;
 
+  const palette = getThemePalette(theme);
+
   // 1. Solid Dark Background Bar
-  const barBg = theme === 'gold_dark' ? '#090D16' : '#0F172A';
+  const barBg = palette.isDark ? '#090D16' : '#0F172A';
   ctx.fillStyle = barBg;
   ctx.fillRect(0, footerY, width, footerH);
 
-  // 2. Top Accent Line (4px thick in brand red or gold)
-  ctx.fillStyle = theme === 'gold_dark' ? '#D4AF37' : '#F10F4D';
+  // 2. Top Accent Line (4px thick matching theme)
+  ctx.fillStyle = palette.footerLine;
   ctx.fillRect(0, footerY, width, 4);
 
   const paddingX = isSquare ? 40 : 45;
@@ -1139,22 +1288,15 @@ async function drawInstagramStoryDedicatedLayout(
   const whatsappNum = (aiData?.whatsappNumber || companySettings.whatsapp || companySettings.phone || '').trim();
 
   const isGallery = aiData?.layoutStyle === 'gallery';
+  const palette = getThemePalette(theme);
 
   // 2. Full Background Canvas Fill
   ctx.save();
-  if (theme === 'gold_dark') {
-    const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-    bgGrad.addColorStop(0, '#0B1120');
-    bgGrad.addColorStop(0.5, '#0F172A');
-    bgGrad.addColorStop(1, '#080D1A');
-    ctx.fillStyle = bgGrad;
-  } else {
-    const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-    bgGrad.addColorStop(0, '#F8FAFC');
-    bgGrad.addColorStop(0.5, '#FFFFFF');
-    bgGrad.addColorStop(1, '#F1F5F9');
-    ctx.fillStyle = bgGrad;
-  }
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+  bgGrad.addColorStop(0, palette.cardBgGrad[0]);
+  bgGrad.addColorStop(0.5, palette.cardBgGrad[1]);
+  bgGrad.addColorStop(1, palette.cardBgGrad[3]);
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, width, height);
   ctx.restore();
 
@@ -1203,7 +1345,7 @@ async function drawInstagramStoryDedicatedLayout(
   ctx.restore(); // end clip
 
   // Crisp border frame accent
-  ctx.strokeStyle = theme === 'gold_dark' ? 'rgba(212, 175, 55, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+  ctx.strokeStyle = palette.isDark ? 'rgba(212, 175, 55, 0.6)' : 'rgba(255, 255, 255, 0.8)';
   ctx.lineWidth = 3;
   drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
   ctx.stroke();
@@ -1268,7 +1410,7 @@ async function drawInstagramStoryDedicatedLayout(
       }
       ctx.restore();
 
-      ctx.strokeStyle = theme === 'gold_dark' ? '#D4AF37' : '#FFFFFF';
+      ctx.strokeStyle = palette.isDark ? '#D4AF37' : '#FFFFFF';
       ctx.lineWidth = 3;
       drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 14);
       ctx.stroke();
@@ -1284,7 +1426,7 @@ async function drawInstagramStoryDedicatedLayout(
   const titleStartY = 1070;
   const maxTitleWidth = width - 80;
   const titleFontSizePx = 44;
-  const textColor = theme === 'gold_dark' ? '#FFFFFF' : '#0F172A';
+  const textColor = palette.cardTitleColor;
 
   const lastTitleY = drawCenteredWrappedHeadline(
     ctx,
@@ -1331,12 +1473,12 @@ async function drawInstagramStoryDedicatedLayout(
 
       // Card drop shadow
       ctx.save();
-      ctx.shadowColor = theme === 'gold_dark' ? 'rgba(0, 0, 0, 0.45)' : 'rgba(15, 23, 42, 0.08)';
+      ctx.shadowColor = palette.isDark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(15, 23, 42, 0.08)';
       ctx.shadowBlur = 14;
       ctx.shadowOffsetY = 4;
 
       drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
-      if (theme === 'gold_dark') {
+      if (palette.isDark) {
         const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX, badgeY + badgeH);
         badgeGrad.addColorStop(0, '#1E293B');
         badgeGrad.addColorStop(1, '#131D2E');
@@ -1351,7 +1493,7 @@ async function drawInstagramStoryDedicatedLayout(
       ctx.restore();
 
       ctx.save();
-      ctx.strokeStyle = theme === 'gold_dark' ? '#334155' : '#E2E8F0';
+      ctx.strokeStyle = palette.specBorder;
       ctx.lineWidth = 1.4;
       drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
       ctx.stroke();
@@ -1362,25 +1504,21 @@ async function drawInstagramStoryDedicatedLayout(
       const iconCircleX = badgeX + 10;
       const iconCircleY = badgeY + (badgeH - iconCircleSize) / 2;
       drawRoundRect(ctx, iconCircleX, iconCircleY, iconCircleSize, iconCircleSize, 14);
-      if (theme === 'gold_dark') {
-        ctx.fillStyle = '#334155';
-      } else {
-        const iconBgGrad = ctx.createLinearGradient(iconCircleX, iconCircleY, iconCircleX, iconCircleY + iconCircleSize);
-        iconBgGrad.addColorStop(0, '#FFF1F5');
-        iconBgGrad.addColorStop(1, '#FFE4EC');
-        ctx.fillStyle = iconBgGrad;
-      }
+      
+      const iconBgGrad = ctx.createLinearGradient(iconCircleX, iconCircleY, iconCircleX, iconCircleY + iconCircleSize);
+      iconBgGrad.addColorStop(0, palette.specIconBg[0]);
+      iconBgGrad.addColorStop(1, palette.specIconBg[1]);
+      ctx.fillStyle = iconBgGrad;
       ctx.fill();
 
       const iconSize = 30;
       const iconX = iconCircleX + (iconCircleSize - iconSize) / 2;
       const iconY = iconCircleY + (iconCircleSize - iconSize) / 2;
-      const iconColor = theme === 'gold_dark' ? '#F3E5AB' : '#F10F4D';
-      drawSpecIcon(ctx, item.icon, iconX, iconY, iconSize, iconColor);
+      drawSpecIcon(ctx, item.icon, iconX, iconY, iconSize, palette.specIconColor);
 
       // Label text - large and prominent
       const labelText = item.label.toUpperCase();
-      ctx.fillStyle = theme === 'gold_dark' ? '#FFFFFF' : '#0F172A';
+      ctx.fillStyle = palette.cardTitleColor;
 
       let fontSize = totalSpecsCount <= 3 ? 26 : 24;
       ctx.font = `900 ${fontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
@@ -1428,10 +1566,10 @@ async function drawInstagramStoryDedicatedLayout(
   const storyFooterY = 1680;
 
   ctx.save();
-  ctx.fillStyle = theme === 'gold_dark' ? '#090D16' : '#0F172A';
+  ctx.fillStyle = palette.isDark ? '#090D16' : '#0F172A';
   ctx.fillRect(0, storyFooterY, width, storyFooterH);
 
-  ctx.fillStyle = theme === 'gold_dark' ? '#D4AF37' : '#F10F4D';
+  ctx.fillStyle = palette.footerLine;
   ctx.fillRect(0, storyFooterY, width, 4);
 
   const paddingX = 45;
@@ -1591,31 +1729,24 @@ export async function renderPostToCanvas(
 
   const isGallery = aiData?.layoutStyle === 'gallery';
 
+  const palette = getThemePalette(theme);
+
   // 5. Bottom Information Card Background Container (Refined Luxury Multi-layer Background)
   const bottomCardY = photoHeight;
   const bottomCardH = height - photoHeight;
 
   ctx.save();
-  if (theme === 'gold_dark') {
-    const cardBgGrad = ctx.createLinearGradient(0, bottomCardY, 0, height);
-    cardBgGrad.addColorStop(0, '#0B1120');
-    cardBgGrad.addColorStop(0.4, '#0F172A');
-    cardBgGrad.addColorStop(1, '#080D1A');
-    ctx.fillStyle = cardBgGrad;
-  } else {
-    // Default Ruby Premium: Elegant warm slate & soft champagne pearl gradient with micro-depth
-    const cardBgGrad = ctx.createLinearGradient(0, bottomCardY, 0, height);
-    cardBgGrad.addColorStop(0, '#FFFFFF');
-    cardBgGrad.addColorStop(0.35, '#FBFBFC');
-    cardBgGrad.addColorStop(0.75, '#F4F5F8');
-    cardBgGrad.addColorStop(1, '#E9ECF2');
-    ctx.fillStyle = cardBgGrad;
-  }
+  const cardBgGrad = ctx.createLinearGradient(0, bottomCardY, 0, height);
+  cardBgGrad.addColorStop(0, palette.cardBgGrad[0]);
+  cardBgGrad.addColorStop(0.35, palette.cardBgGrad[1]);
+  cardBgGrad.addColorStop(0.75, palette.cardBgGrad[2]);
+  cardBgGrad.addColorStop(1, palette.cardBgGrad[3]);
+  ctx.fillStyle = cardBgGrad;
   ctx.fillRect(0, bottomCardY, width, bottomCardH);
 
   // Soft atmospheric radial glow under headline
   const radialGlow = ctx.createRadialGradient(width / 2, bottomCardY + 160, 20, width / 2, bottomCardY + 160, 480);
-  if (theme === 'gold_dark') {
+  if (palette.isDark) {
     radialGlow.addColorStop(0, 'rgba(212, 175, 55, 0.08)');
     radialGlow.addColorStop(1, 'rgba(15, 23, 42, 0)');
   } else {
@@ -1625,26 +1756,18 @@ export async function renderPostToCanvas(
   ctx.fillStyle = radialGlow;
   ctx.fillRect(0, bottomCardY, width, bottomCardH);
 
-  // Premium Top Accent Bar on Card (Dual-color metallic/ruby pill)
+  // Premium Top Accent Bar on Card (Dual-color metallic/ruby/theme pill)
   const topAccentW = 100;
   const topAccentH = 5;
   const topAccentX = (width - topAccentW) / 2;
   const topAccentY = bottomCardY + 10;
   drawRoundRect(ctx, topAccentX, topAccentY, topAccentW, topAccentH, 3);
   
-  if (theme === 'gold_dark') {
-    const goldLine = ctx.createLinearGradient(topAccentX, topAccentY, topAccentX + topAccentW, topAccentY);
-    goldLine.addColorStop(0, '#AA771C');
-    goldLine.addColorStop(0.5, '#F3E5AB');
-    goldLine.addColorStop(1, '#D4AF37');
-    ctx.fillStyle = goldLine;
-  } else {
-    const rubyLine = ctx.createLinearGradient(topAccentX, topAccentY, topAccentX + topAccentW, topAccentY);
-    rubyLine.addColorStop(0, '#F10F4D');
-    rubyLine.addColorStop(0.5, '#FF4D7E');
-    rubyLine.addColorStop(1, '#B30030');
-    ctx.fillStyle = rubyLine;
-  }
+  const accentLine = ctx.createLinearGradient(topAccentX, topAccentY, topAccentX + topAccentW, topAccentY);
+  accentLine.addColorStop(0, palette.topAccentGrad[0]);
+  accentLine.addColorStop(0.5, palette.topAccentGrad[1]);
+  accentLine.addColorStop(1, palette.topAccentGrad[2]);
+  ctx.fillStyle = accentLine;
   ctx.fill();
   ctx.restore();
 
@@ -1828,13 +1951,8 @@ export async function renderPostToCanvas(
 
       // Border stroke (with top gloss highlight)
       ctx.save();
-      if (theme === 'gold_dark') {
-        ctx.strokeStyle = '#334155';
-        ctx.lineWidth = 1.5;
-      } else {
-        ctx.strokeStyle = '#E2E8F0';
-        ctx.lineWidth = 1.4;
-      }
+      ctx.strokeStyle = palette.specBorder;
+      ctx.lineWidth = 1.4;
       drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, badgeRadius);
       ctx.stroke();
       ctx.restore();
@@ -1845,26 +1963,21 @@ export async function renderPostToCanvas(
       const iconCircleY = badgeY + (badgeH - iconCircleSize) / 2;
       drawRoundRect(ctx, iconCircleX, iconCircleY, iconCircleSize, iconCircleSize, isStory ? 14 : 12);
       
-      if (theme === 'gold_dark') {
-        ctx.fillStyle = '#334155';
-      } else {
-        const iconBgGrad = ctx.createLinearGradient(iconCircleX, iconCircleY, iconCircleX, iconCircleY + iconCircleSize);
-        iconBgGrad.addColorStop(0, '#FFF1F5');
-        iconBgGrad.addColorStop(1, '#FFE4EC');
-        ctx.fillStyle = iconBgGrad;
-      }
+      const iconBgGrad = ctx.createLinearGradient(iconCircleX, iconCircleY, iconCircleX, iconCircleY + iconCircleSize);
+      iconBgGrad.addColorStop(0, palette.specIconBg[0]);
+      iconBgGrad.addColorStop(1, palette.specIconBg[1]);
+      ctx.fillStyle = iconBgGrad;
       ctx.fill();
 
       // Vector Icon
       const iconSize = Math.min(isStory ? 32 : 28, iconCircleSize - 8);
       const iconX = iconCircleX + (iconCircleSize - iconSize) / 2;
       const iconY = iconCircleY + (iconCircleSize - iconSize) / 2;
-      const iconColor = theme === 'gold_dark' ? '#F3E5AB' : '#F10F4D';
-      drawSpecIcon(ctx, item.icon, iconX, iconY, iconSize, iconColor);
+      drawSpecIcon(ctx, item.icon, iconX, iconY, iconSize, palette.specIconColor);
 
       // Label with dynamic font size based on badge width
       const labelText = item.label.toUpperCase();
-      ctx.fillStyle = theme === 'gold_dark' ? '#FFFFFF' : '#0F172A';
+      ctx.fillStyle = palette.cardTitleColor;
 
       // Dynamic font sizing (much larger and readable)
       let fontSize = isStory

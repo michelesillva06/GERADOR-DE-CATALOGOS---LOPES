@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Property, User, CompanySettings } from '../types';
-import { Building2 as BuildingIcon, Search as SearchIcon, Filter as FilterIcon, FileText as FileTextIcon, MapPin as MapPinIcon, Bed as BedIcon, Bath as BathIcon, Car as CarIcon, Maximize2 as MaximizeIcon, ExternalLink as ExternalLinkIcon, CheckCircle2 as CheckCircleIcon, User as UserIconComponent, Image as ImageIcon } from 'lucide-react';
+import { PropertyTableView } from '../components/PropertyTableView';
+import { PropertyStatusBadge, PropertyPurposeBadge, PropertyCategoryBadge } from '../components/PropertyBadges';
+import { Building2 as BuildingIcon, Search as SearchIcon, Filter as FilterIcon, FileText as FileTextIcon, MapPin as MapPinIcon, Bed as BedIcon, Bath as BathIcon, Car as CarIcon, Maximize2 as MaximizeIcon, ExternalLink as ExternalLinkIcon, CheckCircle2 as CheckCircleIcon, User as UserIconComponent, Image as ImageIcon, LayoutGrid, List } from 'lucide-react';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
 
 interface GeneralCatalogPageProps {
@@ -27,6 +29,15 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
   const [selectedCaptador, setSelectedCaptador] = useState<string>('todos');
   const [selectedStatus, setSelectedStatus] = useState<string>('Disponível');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
+    const saved = localStorage.getItem('catalog_view_mode');
+    return saved === 'table' ? 'table' : 'grid';
+  });
+
+  const handleSetViewMode = (mode: 'grid' | 'table') => {
+    setViewMode(mode);
+    localStorage.setItem('catalog_view_mode', mode);
+  };
 
   const categoriesList = useMemo(() => {
     const set = new Set<string>();
@@ -212,25 +223,60 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
       </div>
 
       {/* Results Header */}
-      <div className="flex items-center justify-between text-xs font-bold text-slate-600 px-1">
-        <span>Mostrando <strong>{filteredProperties.length}</strong> de <strong>{properties.length}</strong> imóveis no catálogo geral</span>
-        {(searchTerm || selectedPurpose !== 'todos' || selectedCategory !== 'todos' || selectedCaptador !== 'todos' || selectedStatus !== 'Disponível') && (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-slate-600 px-1">
+        <div className="flex items-center space-x-3">
+          <span>Mostrando <strong>{filteredProperties.length}</strong> de <strong>{properties.length}</strong> imóveis no catálogo geral</span>
+          {(searchTerm || selectedPurpose !== 'todos' || selectedCategory !== 'todos' || selectedCaptador !== 'todos' || selectedStatus !== 'Disponível') && (
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setSelectedPurpose('todos');
+                setSelectedCategory('todos');
+                setSelectedCaptador('todos');
+                setSelectedStatus('Disponível');
+              }}
+              className="text-[#F10F4D] hover:underline font-extrabold text-xs cursor-pointer"
+            >
+              Limpar Filtros
+            </button>
+          )}
+        </div>
+
+        {/* View Mode Switcher */}
+        <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80 self-end sm:self-auto">
           <button
-            onClick={() => {
-              setSearchTerm('');
-              setSelectedPurpose('todos');
-              setSelectedCategory('todos');
-              setSelectedCaptador('todos');
-              setSelectedStatus('Disponível');
-            }}
-            className="text-[#F10F4D] hover:underline font-extrabold text-xs"
+            type="button"
+            id="btn-catalog-view-grid"
+            onClick={() => handleSetViewMode('grid')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer ${
+              viewMode === 'grid'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+            title="Visualização em Grade"
           >
-            Limpar Filtros
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span>Grade</span>
           </button>
-        )}
+
+          <button
+            type="button"
+            id="btn-catalog-view-table"
+            onClick={() => handleSetViewMode('table')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer ${
+              viewMode === 'table'
+                ? 'bg-white text-[#F10F4D] shadow-xs'
+                : 'text-slate-500 hover:text-slate-900'
+            }`}
+            title="Visualização em Tabela Compacta"
+          >
+            <List className="w-3.5 h-3.5" />
+            <span>Tabela</span>
+          </button>
+        </div>
       </div>
 
-      {/* Properties Cards Grid */}
+      {/* Properties Display: Grid or Table */}
       {filteredProperties.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-200/80 space-y-3">
           <BuildingIcon className="w-12 h-12 text-slate-300 mx-auto" />
@@ -239,6 +285,15 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
             Tente ajustar os filtros acima ou buscar por outro código ou bairro.
           </p>
         </div>
+      ) : viewMode === 'table' ? (
+        <PropertyTableView
+          properties={filteredProperties}
+          users={users}
+          currentUser={users[0]}
+          onView={onViewProperty}
+          onGenerateAiPost={onGenerateAiPost || onGenerateSocialMedia}
+          canEditAny={false}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProperties.map(property => {
@@ -266,26 +321,17 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
 
                   {/* Top Badges */}
                   <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
-                    <span className="px-2.5 py-1 bg-slate-900/90 text-white font-black text-[10px] uppercase rounded-xl tracking-wider backdrop-blur-md">
+                    <span className="px-2.5 py-1 bg-slate-900/90 text-white font-black text-[10px] uppercase rounded-lg tracking-wider backdrop-blur-md border border-white/20">
                       {property.code}
                     </span>
 
-                    <span className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-xl backdrop-blur-md ${
-                      property.status === 'Disponível'
-                        ? 'bg-emerald-500/90 text-white'
-                        : property.status === 'Reservado'
-                        ? 'bg-amber-500/90 text-white'
-                        : 'bg-rose-600/90 text-white'
-                    }`}>
-                      {property.status}
-                    </span>
+                    <PropertyStatusBadge status={property.status} variant="solid" size="xs" />
                   </div>
 
-                  {/* Purpose Tag */}
-                  <div className="absolute bottom-3 left-3">
-                    <span className="px-2.5 py-1 bg-white/95 text-slate-900 font-extrabold text-[10px] rounded-xl shadow-xs">
-                      {property.purpose || 'Venda'}
-                    </span>
+                  {/* Purpose & Category Tag */}
+                  <div className="absolute bottom-3 left-3 flex items-center space-x-1.5">
+                    <PropertyPurposeBadge purpose={property.purpose} variant="solid" size="xs" />
+                    <PropertyCategoryBadge category={property.category} variant="dark-glass" size="xs" />
                   </div>
                 </div>
 
@@ -365,7 +411,7 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center space-x-1.5">
+                    <div className="flex items-center space-x-1.5 shrink-0">
                       {(onGenerateAiPost || onGenerateSocialMedia) && (
                         <button
                           type="button"
@@ -378,17 +424,16 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
                               onGenerateSocialMedia(property);
                             }
                           }}
-                          className="px-2.5 py-1.5 bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white font-extrabold text-[11px] rounded-xl flex items-center space-x-1 shadow-xs transition transform active:scale-95 cursor-pointer"
+                          className="px-3 py-1.5 h-8 bg-[#F10F4D] hover:bg-[#d40d43] text-white font-extrabold text-[11px] whitespace-nowrap rounded-xl flex items-center justify-center shadow-xs transition transform active:scale-95 cursor-pointer shrink-0"
                           title="Gerar Post para Redes Sociais"
                         >
-                          <ImageIcon className="w-3.5 h-3.5 text-white" />
                           <span>Gerar Post</span>
                         </button>
                       )}
 
                       <button
                         onClick={() => onViewProperty(property)}
-                        className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[11px] rounded-xl transition cursor-pointer"
+                        className="px-3 py-1.5 h-8 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[11px] whitespace-nowrap rounded-xl transition cursor-pointer flex items-center justify-center shrink-0"
                       >
                         Ver Detalhes
                       </button>

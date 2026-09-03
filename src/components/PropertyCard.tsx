@@ -1,8 +1,9 @@
 import React from 'react';
 import { Property, User } from '../types';
-import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2 } from 'lucide-react';
 import { getPropertyMainImage, handleImageError } from '../lib/imageUtils';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
+import { PropertyStatusBadge, PropertyPurposeBadge, PropertyCategoryBadge } from './PropertyBadges';
 
 interface PropertyCardProps {
   property: Property;
@@ -44,15 +45,6 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
     }
   };
 
-  const statusColors: Record<string, string> = {
-    'Disponível': 'bg-emerald-600 text-white font-black shadow-md border-emerald-700',
-    'Reservado': 'bg-amber-500 text-slate-950 font-black shadow-md border-amber-600',
-    'Vendido': 'bg-rose-600 text-white font-black shadow-md border-rose-700',
-    'Alugado': 'bg-zinc-800 text-white font-black shadow-md border-zinc-900'
-  };
-
-  const defaultImage = 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80';
-
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group">
       
@@ -71,20 +63,14 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
 
         {/* Top Badges */}
         <div className="absolute top-3 right-3 pointer-events-none">
-          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg backdrop-blur-md border shadow-md ${statusColors[property.status] || 'bg-slate-100 text-slate-800'}`}>
-            {property.status}
-          </span>
+          <PropertyStatusBadge status={property.status} variant="solid" size="sm" />
         </div>
 
         {/* Purpose & Category Badge */}
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
           <div className="flex items-center space-x-1.5">
-            <span className="bg-[#F10F4D] text-white font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded shadow">
-              {property.purpose}
-            </span>
-            <span className="bg-slate-900/80 text-slate-200 text-[10px] font-semibold px-2 py-0.5 rounded backdrop-blur border border-slate-700">
-              {property.category}
-            </span>
+            <PropertyPurposeBadge purpose={property.purpose} variant="solid" size="xs" />
+            <PropertyCategoryBadge category={property.category} variant="dark-glass" size="xs" />
           </div>
 
           {property.views !== undefined && property.views > 0 && (
@@ -150,32 +136,31 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
         </div>
 
         {/* Price & Action Row */}
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-          <div>
-            <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
+          <div className="min-w-0 shrink">
+            <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
               {priceInfo.isBoth ? 'Venda / Aluguel' : (priceInfo.isRent ? 'Aluguel' : 'Valor')}
             </p>
-            <p className="text-base font-extrabold text-[#F10F4D]">
+            <p className="text-sm sm:text-base font-extrabold text-[#F10F4D] truncate">
               {displayPrimaryPrice}
             </p>
             {priceInfo.isBoth && priceInfo.rentPrice > 0 && priceInfo.salePrice > 0 && (
-              <p className="text-[10px] font-bold text-slate-600">
+              <p className="text-[10px] font-bold text-slate-600 truncate">
                 Locação: {displayRentPrice}
               </p>
             )}
           </div>
 
           {/* Quick Action Buttons */}
-          <div className="flex items-center space-x-1.5" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center space-x-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
             {(onGenerateAiPost || onGenerateSocialMedia) && (
               <button
                 type="button"
                 id={`btn-gerar-post-ia-card-${property.id || property.code || 'item'}`}
                 onClick={handleOpenAiPostModal}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white text-xs font-bold shadow-sm hover:shadow transition transform active:scale-95 cursor-pointer"
+                className="px-3 py-1.5 h-8 rounded-xl bg-[#F10F4D] hover:bg-[#d40d43] text-white text-xs font-bold whitespace-nowrap shadow-xs hover:shadow transition transform active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
                 title="Gerar Post para Redes Sociais"
               >
-                <ImageIcon className="w-3.5 h-3.5 text-white" />
                 <span>Gerar Post</span>
               </button>
             )}
@@ -186,7 +171,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
                 e.stopPropagation();
                 onView(property);
               }}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer flex items-center justify-center shrink-0"
               title="Ver Detalhes do Imóvel"
             >
               <Eye className="w-4 h-4" />
@@ -199,7 +184,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
                   e.stopPropagation();
                   onShareWhatsApp(property);
                 }}
-                className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition cursor-pointer flex items-center justify-center shrink-0"
                 title="Enviar por WhatsApp"
               >
                 <Share2 className="w-4 h-4" />

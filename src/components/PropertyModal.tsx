@@ -28,6 +28,7 @@ import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from '../l
 import { getPropertyImages, handleImageError } from '../lib/imageUtils';
 import { getPropertyPriceInfo, formatCurrencyBRL } from '../lib/priceUtils';
 import { getStoredSettings } from '../lib/storage';
+import { PropertyStatusBadge, PropertyPurposeBadge, PropertyCategoryBadge } from './PropertyBadges';
 
 interface PropertyModalProps {
   property: Property | null;
@@ -166,15 +167,9 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
 
           {/* Badges Overlay */}
           <div className="absolute bottom-3 left-3 flex items-center space-x-2">
-            <span className="bg-[#F10F4D] text-white text-xs font-extrabold px-3 py-1 rounded-lg shadow">
-              {property.purpose}
-            </span>
-            <span className="bg-slate-900/90 text-white text-xs font-semibold px-3 py-1 rounded-lg border border-slate-700">
-              {property.category}
-            </span>
-            <span className="bg-emerald-600 text-white font-extrabold text-xs px-3 py-1 rounded-lg shadow-md border border-emerald-700">
-              {property.status}
-            </span>
+            <PropertyPurposeBadge purpose={property.purpose} variant="solid" size="sm" />
+            <PropertyCategoryBadge category={property.category} variant="dark-glass" size="sm" />
+            <PropertyStatusBadge status={property.status} variant="solid" size="sm" />
           </div>
         </div>
 
@@ -454,10 +449,9 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
                       onGenerateAiPost(property);
                     }
                   }}
-                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-rose-900/20 transition transform active:scale-95 cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-[#d40d43] text-white font-bold text-xs whitespace-nowrap flex items-center justify-center shadow-xs transition transform active:scale-95 cursor-pointer"
                   title="Criar arte para Feed e Stories"
                 >
-                  <ImageIcon className="w-4 h-4 text-white" />
                   <span>Gerar Post</span>
                 </button>
               )}

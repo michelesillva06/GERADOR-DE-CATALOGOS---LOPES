@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
-import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin, FileCode } from 'lucide-react';
+import { PropertyTableView } from '../components/PropertyTableView';
+import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin, FileCode, LayoutGrid, List } from 'lucide-react';
 import { PROPERTY_CATEGORIES } from '../lib/constants';
 
 interface PropertyManagementProps {
@@ -40,6 +41,15 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   const [filterPurpose, setFilterPurpose] = useState('todos');
   const [filterStatus, setFilterStatus] = useState('todos');
   const [filterNeighborhood, setFilterNeighborhood] = useState('todos');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
+    const saved = localStorage.getItem('property_view_mode');
+    return saved === 'table' ? 'table' : 'grid';
+  });
+
+  const handleSetViewMode = (mode: 'grid' | 'table') => {
+    setViewMode(mode);
+    localStorage.setItem('property_view_mode', mode);
+  };
 
   const isMaster = currentUser.role === 'MASTER_ADMIN';
   const isGestor = currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
@@ -262,30 +272,83 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
 
         </div>
 
+        {/* View Mode & Count Bar */}
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+          <span className="text-xs text-slate-500 font-medium">
+            Mostrando <strong className="text-slate-800 font-bold">{filteredProperties.length}</strong> {filteredProperties.length === 1 ? 'imóvel' : 'imóveis'}
+          </span>
+
+          <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button
+              type="button"
+              id="btn-view-mode-grid"
+              onClick={() => handleSetViewMode('grid')}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer ${
+                viewMode === 'grid'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+              title="Visualização em Grade (Cards)"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Grade</span>
+            </button>
+
+            <button
+              type="button"
+              id="btn-view-mode-table"
+              onClick={() => handleSetViewMode('table')}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer ${
+                viewMode === 'table'
+                  ? 'bg-white text-[#F10F4D] shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+              title="Visualização em Tabela Compacta"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Tabela</span>
+            </button>
+          </div>
+        </div>
+
       </div>
 
-      {/* Property Cards Grid */}
+      {/* Property Display: Grid or Table */}
       {filteredProperties.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProperties.map(prop => {
-            const owner = users.find(u => u.id === prop.user_id);
-            const canEdit = isMaster || isGestor || isOwnedByCurrentUser(prop);
-            return (
-              <PropertyCard
-                key={prop.id}
-                property={prop}
-                captador={owner}
-                onView={onViewProperty}
-                onEdit={onEditProperty}
-                onDelete={onDeleteProperty}
-                onGenerateSocialMedia={onGenerateSocialMedia}
-                onGenerateAiPost={onGenerateAiPost}
-                canEdit={canEdit}
-                hidePerMonth={true}
-              />
-            );
-          })}
-        </div>
+        viewMode === 'table' ? (
+          <PropertyTableView
+            properties={filteredProperties}
+            users={users}
+            currentUser={currentUser}
+            onView={onViewProperty}
+            onEdit={onEditProperty}
+            onDelete={onDeleteProperty}
+            onShareWhatsApp={onShareWhatsApp}
+            onGenerateAiPost={onGenerateAiPost}
+            canEditAny={isMaster || isGestor}
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProperties.map(prop => {
+              const owner = users.find(u => u.id === prop.user_id);
+              const canEdit = isMaster || isGestor || isOwnedByCurrentUser(prop);
+              return (
+                <PropertyCard
+                  key={prop.id}
+                  property={prop}
+                  captador={owner}
+                  onView={onViewProperty}
+                  onEdit={onEditProperty}
+                  onDelete={onDeleteProperty}
+                  onGenerateSocialMedia={onGenerateSocialMedia}
+                  onGenerateAiPost={onGenerateAiPost}
+                  canEdit={canEdit}
+                  hidePerMonth={true}
+                />
+              );
+            })}
+          </div>
+        )
       ) : (
         <div className="bg-white rounded-3xl p-10 sm:p-12 text-center border border-slate-200 space-y-4 max-w-xl mx-auto shadow-xs">
           <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto text-slate-400">
