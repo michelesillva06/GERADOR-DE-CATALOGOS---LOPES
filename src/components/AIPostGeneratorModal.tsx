@@ -592,97 +592,31 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
               </div>
             </div>
 
-            {/* 1.5. Design Theme & Pre-defined Visual Templates Selection */}
+            {/* 1.5. Design Theme Selection */}
             <div>
               <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
-                <span>Template Visual & Paleta Instagram:</span>
-                <span className="text-[10px] text-slate-500 font-normal">Contraste calibrado</span>
+                <span>Estilo Visual (Identidade Lopes):</span>
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {[
-                  {
-                    id: 'ruby_premium',
-                    name: 'Lopes Rubi',
-                    subtitle: 'Venda Padrão',
-                    color: 'from-[#E5094C] to-[#99002B]',
-                    statusTag: 'VENDA',
-                    subStatus: 'EXCLUSIVO',
-                    cta: 'AGENDE SUA VISITA'
-                  },
-                  {
-                    id: 'lancamento_blue',
-                    name: 'Lançamento',
-                    subtitle: 'Novo Empreendimento',
-                    color: 'from-[#2563EB] to-[#1E3A8A]',
-                    statusTag: 'LANÇAMENTO',
-                    subStatus: 'PLANTA OU PRONTO',
-                    cta: 'GARANTA SUA UNIDADE'
-                  },
-                  {
-                    id: 'oportunidade_amber',
-                    name: 'Oportunidade',
-                    subtitle: 'Preço Reduzido',
-                    color: 'from-[#F59E0B] to-[#B45309]',
-                    statusTag: 'OPORTUNIDADE',
-                    subStatus: 'PREÇO REDUZIDO',
-                    cta: 'CONSULTE CONDIÇÕES'
-                  },
-                  {
-                    id: 'mobiliado_emerald',
-                    name: 'Imóvel Mobiliado',
-                    subtitle: 'Porteira Fechada',
-                    color: 'from-[#10B981] to-[#065F46]',
-                    statusTag: '100% MOBILIADO',
-                    subStatus: 'ALTO PADRÃO',
-                    cta: 'AGENDE SUA VISITA'
-                  },
-                  {
-                    id: 'locacao_teal',
-                    name: 'Locação / Aluguel',
-                    subtitle: 'Aluguel Mensal',
-                    color: 'from-[#0EA5E9] to-[#0F766E]',
-                    statusTag: 'LOCAÇÃO',
-                    subStatus: 'DISPONÍVEL',
-                    cta: 'AGENDE SUA VISITA'
-                  },
-                  {
-                    id: 'gold_dark',
-                    name: 'Dark Gold',
-                    subtitle: 'Alto Padrão / Luxo',
-                    color: 'from-[#D4AF37] to-[#0F172A]',
-                    statusTag: 'ALTO PADRÃO',
-                    subStatus: 'EXCLUSIVO',
-                    cta: 'AGENDE SUA VISITA'
-                  }
+                  { id: 'ruby_premium', name: 'Lopes Rubi (Padrão)', color: 'from-[#E5094C] to-[#99002B]' },
+                  { id: 'gold_dark', name: 'Lopes Dark Gold', color: 'from-[#D4AF37] to-[#0F172A]' }
                 ].map((t) => {
                   const isSelected = (postData.designTheme || 'ruby_premium') === t.id;
                   return (
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => {
-                        setPostData(prev => ({
-                          ...prev,
-                          designTheme: t.id as any,
-                          statusTag: t.statusTag,
-                          subStatus: t.subStatus,
-                          ctaText: prev.ctaText || t.cta
-                        }));
-                      }}
-                      className={`p-2 rounded-xl border text-left transition flex flex-col justify-between gap-1 cursor-pointer ${
+                      onClick={() => setPostData({ ...postData, designTheme: t.id as any })}
+                      className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 cursor-pointer ${
                         isSelected
                           ? 'bg-slate-900 border-[#F10F4D] text-white shadow-md ring-2 ring-[#F10F4D]/30'
                           : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                       }`}
                     >
-                      <div className={`h-2 w-full rounded-full bg-gradient-to-r ${t.color}`} />
-                      <div className="min-w-0">
-                        <div className={`font-bold text-[11px] truncate leading-tight ${isSelected ? 'text-white' : 'text-slate-900'}`}>
-                          {t.name}
-                        </div>
-                        <div className={`text-[9px] truncate ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
-                          {t.subtitle}
-                        </div>
+                      <div className={`h-2.5 w-full rounded-full bg-gradient-to-r ${t.color}`} />
+                      <div className={`font-bold text-xs truncate ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                        {t.name}
                       </div>
                     </button>
                   );

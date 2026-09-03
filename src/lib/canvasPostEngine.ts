@@ -2,13 +2,7 @@ import { Property, CompanySettings } from '../types';
 import { PostTemplateId } from '../components/postTemplates';
 import { extractPropertyImages } from './pdfGenerator';
 
-export type PostDesignTheme =
-  | 'ruby_premium'
-  | 'lancamento_blue'
-  | 'oportunidade_amber'
-  | 'mobiliado_emerald'
-  | 'gold_dark'
-  | 'locacao_teal';
+export type PostDesignTheme = 'ruby_premium' | 'gold_dark';
 export type PostLayoutStyle = 'single' | 'gallery';
 
 export interface CanvasPostData {
@@ -282,135 +276,49 @@ export interface ThemeColorPalette {
 }
 
 export function getThemePalette(theme: PostDesignTheme = 'ruby_premium'): ThemeColorPalette {
-  switch (theme) {
-    case 'lancamento_blue':
-      return {
-        badgeMainGrad: ['#0284C7', '#1D4ED8'],
-        badgeMainText: '#FFFFFF',
-        badgeSubBg: '#0F172A',
-        badgeSubText: '#38BDF8',
-        priceGrad: ['#0369A1', '#1E3A8A'],
-        priceLeftAccent: '#38BDF8',
-        priceText: '#FFFFFF',
-        specIconColor: '#0284C7',
-        specIconBg: ['#F0F9FF', '#E0F2FE'],
-        specBorder: '#BAE6FD',
-        cardBgGrad: ['#FFFFFF', '#F8FAFC', '#F0F9FF', '#E0F2FE'],
-        cardTitleColor: '#0F172A',
-        topAccentGrad: ['#0284C7', '#38BDF8', '#1D4ED8'],
-        ctaGrad: ['#0284C7', '#0369A1'],
-        ctaText: '#FFFFFF',
-        ctaShadow: 'rgba(2, 132, 199, 0.40)',
-        footerLine: '#38BDF8',
-        isDark: false
-      };
-    case 'oportunidade_amber':
-      return {
-        badgeMainGrad: ['#EA580C', '#B45309'],
-        badgeMainText: '#FFFFFF',
-        badgeSubBg: '#1C1917',
-        badgeSubText: '#FDE047',
-        priceGrad: ['#C2410C', '#78350F'],
-        priceLeftAccent: '#F59E0B',
-        priceText: '#FFFFFF',
-        specIconColor: '#D97706',
-        specIconBg: ['#FFFBEB', '#FEF3C7'],
-        specBorder: '#FDE68A',
-        cardBgGrad: ['#FFFFFF', '#FFFDF5', '#FFFBEB', '#FEF3C7'],
-        cardTitleColor: '#1C1917',
-        topAccentGrad: ['#EA580C', '#F59E0B', '#B45309'],
-        ctaGrad: ['#EA580C', '#C2410C'],
-        ctaText: '#FFFFFF',
-        ctaShadow: 'rgba(234, 88, 12, 0.40)',
-        footerLine: '#F59E0B',
-        isDark: false
-      };
-    case 'mobiliado_emerald':
-      return {
-        badgeMainGrad: ['#059669', '#065F46'],
-        badgeMainText: '#FFFFFF',
-        badgeSubBg: '#064E3B',
-        badgeSubText: '#A7F3D0',
-        priceGrad: ['#059669', '#064E3B'],
-        priceLeftAccent: '#34D399',
-        priceText: '#FFFFFF',
-        specIconColor: '#059669',
-        specIconBg: ['#ECFDF5', '#D1FAE5'],
-        specBorder: '#A7F3D0',
-        cardBgGrad: ['#FFFFFF', '#F7FDF9', '#ECFDF5', '#D1FAE5'],
-        cardTitleColor: '#064E3B',
-        topAccentGrad: ['#059669', '#34D399', '#065F46'],
-        ctaGrad: ['#059669', '#047857'],
-        ctaText: '#FFFFFF',
-        ctaShadow: 'rgba(5, 150, 105, 0.40)',
-        footerLine: '#34D399',
-        isDark: false
-      };
-    case 'locacao_teal':
-      return {
-        badgeMainGrad: ['#0D9488', '#115E59'],
-        badgeMainText: '#FFFFFF',
-        badgeSubBg: '#042F2E',
-        badgeSubText: '#5EEAD4',
-        priceGrad: ['#0F766E', '#134E4A'],
-        priceLeftAccent: '#2DD4BF',
-        priceText: '#FFFFFF',
-        specIconColor: '#0D9488',
-        specIconBg: ['#F0FDFA', '#CCFBF1'],
-        specBorder: '#99F6E4',
-        cardBgGrad: ['#FFFFFF', '#F6FEFD', '#F0FDFA', '#CCFBF1'],
-        cardTitleColor: '#042F2E',
-        topAccentGrad: ['#0D9488', '#2DD4BF', '#115E59'],
-        ctaGrad: ['#0D9488', '#0F766E'],
-        ctaText: '#FFFFFF',
-        ctaShadow: 'rgba(13, 148, 136, 0.40)',
-        footerLine: '#2DD4BF',
-        isDark: false
-      };
-    case 'gold_dark':
-      return {
-        badgeMainGrad: ['#D4AF37', '#AA771C'],
-        badgeMainText: '#0F172A',
-        badgeSubBg: '#1E293B',
-        badgeSubText: '#F3E5AB',
-        priceGrad: ['#0F172A', '#1E293B'],
-        priceLeftAccent: '#D4AF37',
-        priceText: '#F3E5AB',
-        specIconColor: '#F3E5AB',
-        specIconBg: ['#334155', '#1E293B'],
-        specBorder: '#334155',
-        cardBgGrad: ['#0B1120', '#0B1120', '#0F172A', '#080D1A'],
-        cardTitleColor: '#FFFFFF',
-        topAccentGrad: ['#AA771C', '#F3E5AB', '#D4AF37'],
-        ctaGrad: ['#059669', '#047857'],
-        ctaText: '#FFFFFF',
-        ctaShadow: 'rgba(5, 150, 105, 0.40)',
-        footerLine: '#D4AF37',
-        isDark: true
-      };
-    case 'ruby_premium':
-    default:
-      return {
-        badgeMainGrad: ['#F10F4D', '#B30030'],
-        badgeMainText: '#FFFFFF',
-        badgeSubBg: '#0F172A',
-        badgeSubText: '#FFFFFF',
-        priceGrad: ['#F10F4D', '#B30030'],
-        priceLeftAccent: '#FFFFFF',
-        priceText: '#FFFFFF',
-        specIconColor: '#F10F4D',
-        specIconBg: ['#FFF1F5', '#FFE4EC'],
-        specBorder: '#E2E8F0',
-        cardBgGrad: ['#FFFFFF', '#FBFBFC', '#F4F5F8', '#E9ECF2'],
-        cardTitleColor: '#090D16',
-        topAccentGrad: ['#F10F4D', '#FF4D7E', '#B30030'],
-        ctaGrad: ['#059669', '#047857'],
-        ctaText: '#FFFFFF',
-        ctaShadow: 'rgba(5, 150, 105, 0.40)',
-        footerLine: '#F10F4D',
-        isDark: false
-      };
+  if (theme === 'gold_dark') {
+    return {
+      badgeMainGrad: ['#D4AF37', '#AA771C'],
+      badgeMainText: '#0F172A',
+      badgeSubBg: '#1E293B',
+      badgeSubText: '#F3E5AB',
+      priceGrad: ['#0F172A', '#1E293B'],
+      priceLeftAccent: '#D4AF37',
+      priceText: '#F3E5AB',
+      specIconColor: '#F3E5AB',
+      specIconBg: ['#334155', '#1E293B'],
+      specBorder: '#334155',
+      cardBgGrad: ['#0B1120', '#0B1120', '#0F172A', '#080D1A'],
+      cardTitleColor: '#FFFFFF',
+      topAccentGrad: ['#AA771C', '#F3E5AB', '#D4AF37'],
+      ctaGrad: ['#059669', '#047857'],
+      ctaText: '#FFFFFF',
+      ctaShadow: 'rgba(5, 150, 105, 0.40)',
+      footerLine: '#D4AF37',
+      isDark: true
+    };
   }
+
+  return {
+    badgeMainGrad: ['#F10F4D', '#B30030'],
+    badgeMainText: '#FFFFFF',
+    badgeSubBg: '#0F172A',
+    badgeSubText: '#FFFFFF',
+    priceGrad: ['#F10F4D', '#B30030'],
+    priceLeftAccent: '#FFFFFF',
+    priceText: '#FFFFFF',
+    specIconColor: '#F10F4D',
+    specIconBg: ['#FFF1F5', '#FFE4EC'],
+    specBorder: '#E2E8F0',
+    cardBgGrad: ['#FFFFFF', '#FBFBFC', '#F4F5F8', '#E9ECF2'],
+    cardTitleColor: '#090D16',
+    topAccentGrad: ['#F10F4D', '#FF4D7E', '#B30030'],
+    ctaGrad: ['#059669', '#047857'],
+    ctaText: '#FFFFFF',
+    ctaShadow: 'rgba(5, 150, 105, 0.40)',
+    footerLine: '#F10F4D',
+    isDark: false
+  };
 }
 
 /**
