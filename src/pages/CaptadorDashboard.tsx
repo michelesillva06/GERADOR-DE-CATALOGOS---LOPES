@@ -214,6 +214,7 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
                 onGenerateSocialMedia={onGenerateSocialMedia}
                 onGenerateAiPost={onGenerateAiPost}
                 canEdit={true}
+                hidePerMonth={true}
               />
             ))}
           </div>

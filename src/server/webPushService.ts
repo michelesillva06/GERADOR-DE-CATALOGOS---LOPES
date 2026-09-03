@@ -252,45 +252,49 @@ export async function checkAndDispatchOverduePropertyAlerts(db: Firestore): Prom
     const allUsers = usersSnap.docs.map(d => d.data() as User);
 
     const now = Date.now();
-    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-    // Filter properties older than 30 days without update
+    // Filter properties older than 7 days without update (or completing 7 days since registration/check)
     const overdueProperties = allProperties.filter(p => {
       // Only check active listings (Disponível / Reservado)
       if (p.status !== 'Disponível' && p.status !== 'Reservado') {
         return false;
       }
-      const lastCheck = new Date(p.updated_at || p.created_at).getTime();
-      return (now - lastCheck) > THIRTY_DAYS_MS;
+      const lastCheckDate = p.last_status_check || p.updated_at || p.created_at;
+      const lastCheck = lastCheckDate ? new Date(lastCheckDate).getTime() : 0;
+      return (now - lastCheck) >= SEVEN_DAYS_MS;
     });
 
     // Group overdue properties by captador (user_id)
     const overdueByUser: Record<string, Property[]> = {};
     for (const p of overdueProperties) {
-      if (!overdueByUser[p.user_id]) {
-        overdueByUser[p.user_id] = [];
+      if (p.user_id) {
+        if (!overdueByUser[p.user_id]) {
+          overdueByUser[p.user_id] = [];
+        }
+        overdueByUser[p.user_id].push(p);
       }
-      overdueByUser[p.user_id].push(p);
     }
 
     let usersNotified = 0;
     let notificationsDelivered = 0;
     const details: Array<{ user_id: string; user_name: string; overdue_count: number; delivered: boolean }> = [];
 
-    // Dispatch Web Push to each captador with overdue properties
+    // Dispatch Web Push to each captador with overdue properties (daily alert until all updated)
     for (const [userId, userOverdueProps] of Object.entries(overdueByUser)) {
-      const user = allUsers.find(u => u.id === userId);
-      const userName = user?.name || 'Corretor';
+      const user = allUsers.find(u => u.id === userId || u.username?.toLowerCase() === userId?.toLowerCase());
+      const userName = user?.name || 'Captador';
       const count = userOverdueProps.length;
 
       const title = count === 1
-        ? `🔔 1 Imóvel precisa de atualização!`
-        : `🔔 ${count} Imóveis precisam de atualização!`;
+        ? `🔔 1 imóvel precisa de atualização (7 dias)`
+        : `🔔 ${count} imóveis precisam de atualização (7 dias)`;
 
       const firstTitle = userOverdueProps[0]?.title || 'Imóvel em carteira';
+      const firstCode = userOverdueProps[0]?.code ? `[${userOverdueProps[0].code}] ` : '';
       const body = count === 1
-        ? `"${firstTitle}" está há mais de 30 dias sem confirmação. Toque para verificar disponibilidade.`
-        : `Você tem ${count} imóveis pendentes de confirmação com o proprietário. Toque para atualizar.`;
+        ? `O imóvel ${firstCode}"${firstTitle}" completou 7 dias sem atualização. Confirme o status com o proprietário.`
+        : `Você possui ${count} imóveis pendentes de atualização (a cada 7 dias). Toque para confirmar e manter tudo em dia.`;
 
       const pushResult = await sendPushToUser(db, userId, {
         title,
@@ -303,9 +307,9 @@ export async function checkAndDispatchOverduePropertyAlerts(db: Firestore): Prom
           overdueCount: count
         },
         actions: [
-          { action: 'open_reminder', title: 'Ver Imóveis Pendentes' }
+          { action: 'open_reminder', title: 'Atualizar Imóveis' }
         ],
-        tag: `overdue-alert-${userId}-${new Date().toISOString().slice(0, 10)}`
+        tag: `overdue-7days-alert-${userId}-${new Date().toISOString().slice(0, 10)}`
       });
 
       if (pushResult.sent > 0) {

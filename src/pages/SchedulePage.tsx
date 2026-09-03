@@ -214,7 +214,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
     setFormError(null);
 
     if (officialHolidayName && !holidayOverride && formData.type !== 'FERIADO') {
-      setFormError(`Data Bloqueada! Em feriados oficiais (${officialHolidayName}) não é permitido agendar sem autorização prévia da Gestão / Larissa Maia. Confirme a caixa de autorização especial para prosseguir.`);
+      setFormError(`Data Bloqueada! Em feriados oficiais (${officialHolidayName}) não é permitido agendar sem autorização prévia da Gestão. Confirme a caixa de autorização especial para prosseguir.`);
       return;
     }
 
@@ -444,12 +444,18 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                         <span>{event.start_time} - {event.end_time}</span>
                       </div>
 
-                      {!isHoliday && (
-                        <div className="flex items-center space-x-1 text-slate-600">
-                          <Users className="w-3.5 h-3.5 text-slate-400" />
-                          <span>Captador: {event.user_name}</span>
-                        </div>
-                      )}
+                      {!isHoliday && (() => {
+                        const eventUser = users.find(u => u.id === event.user_id || u.name === event.user_name);
+                        const isUserManager = eventUser?.role === 'GESTOR' || eventUser?.role === 'GESTORA' || eventUser?.role === 'MASTER_ADMIN' || eventUser?.role === 'MASTER';
+                        const isTrainingOrMeeting = event.type === 'TREINAMENTO' || event.type === 'EVENTO';
+                        const roleLabel = (isUserManager || isTrainingOrMeeting) ? 'Gestor' : 'Captador';
+                        return (
+                          <div className="flex items-center space-x-1 text-slate-600">
+                            <Users className="w-3.5 h-3.5 text-slate-400" />
+                            <span>{roleLabel}: {event.user_name}</span>
+                          </div>
+                        );
+                      })()}
 
                       {event.client_name && (
                         <div className="flex items-center space-x-1 text-slate-600">
@@ -469,13 +475,6 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                       <p className="text-[11px] text-slate-500 font-medium italic pt-1">
                         "{event.notes}"
                       </p>
-                    )}
-
-                    {!isHoliday && (
-                      <div className="pt-1.5 flex items-center space-x-2 text-[11px] font-bold text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60 w-fit">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                        <span>Acompanhamento: <strong>Gestão Larissa Maia</strong></span>
-                      </div>
                     )}
                   </div>
                 </div>
@@ -548,7 +547,7 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                     onChange={(e) => setHolidayOverride(e.target.checked)}
                     className="w-4 h-4 accent-[#F10F4D] rounded"
                   />
-                  <span className="text-[11px]">Confirmo autorização da Gestão / Larissa Maia</span>
+                  <span className="text-[11px]">Confirmo autorização prévia da Gestão</span>
                 </label>
               </div>
             )}

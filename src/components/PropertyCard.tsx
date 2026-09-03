@@ -14,6 +14,7 @@ interface PropertyCardProps {
   onGenerateSocialMedia?: (property: Property) => void;
   onGenerateAiPost?: (property: Property) => void;
   canEdit?: boolean;
+  hidePerMonth?: boolean;
 }
 
 export const PropertyCard: React.FC<PropertyCardProps> = ({
@@ -25,9 +26,16 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
   onShareWhatsApp,
   onGenerateSocialMedia,
   onGenerateAiPost,
-  canEdit = false
+  canEdit = false,
+  hidePerMonth = false
 }) => {
   const priceInfo = getPropertyPriceInfo(property);
+  const displayPrimaryPrice = hidePerMonth
+    ? priceInfo.primaryFormatted.replace(/\s*\/\s*mês/gi, '').replace(/\/mês/gi, '').trim()
+    : priceInfo.primaryFormatted;
+  const displayRentPrice = hidePerMonth
+    ? priceInfo.rentFormatted.replace(/\s*\/\s*mês/gi, '').replace(/\/mês/gi, '').trim()
+    : priceInfo.rentFormatted;
 
   const handleOpenAiPostModal = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -148,11 +156,11 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               {priceInfo.isBoth ? 'Venda / Aluguel' : (priceInfo.isRent ? 'Aluguel' : 'Valor')}
             </p>
             <p className="text-base font-extrabold text-[#F10F4D]">
-              {priceInfo.primaryFormatted}
+              {displayPrimaryPrice}
             </p>
             {priceInfo.isBoth && priceInfo.rentPrice > 0 && priceInfo.salePrice > 0 && (
               <p className="text-[10px] font-bold text-slate-600">
-                Locação: {priceInfo.rentFormatted}
+                Locação: {displayRentPrice}
               </p>
             )}
           </div>

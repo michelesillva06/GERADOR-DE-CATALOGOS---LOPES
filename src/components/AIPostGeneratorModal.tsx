@@ -255,13 +255,11 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
 
   const handleShareWhatsApp = () => {
     if (!currentProperty) return;
-    const phone = companySettings.whatsapp || companySettings.phone || '';
-    const cleanPhone = phone.replace(/\D/g, '');
     const priceText = postData.priceFormatted || formatCurrencyBRL(currentProperty.price || currentProperty.rent_price || 0);
 
     const message = `*Confira este imóvel na Lopes Manaus!* 🏡\n\n*${postData.headlineLine1} ${postData.headlineLine2}*\n📍 Localização: ${postData.locationTag}\n💰 Valor: *${priceText}*\n\n📲 Fale conosco para agendar sua visita!`;
     const encoded = encodeURIComponent(message);
-    const url = cleanPhone ? `https://wa.me/55${cleanPhone}?text=${encoded}` : `https://api.whatsapp.com/send?text=${encoded}`;
+    const url = `https://api.whatsapp.com/send?text=${encoded}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 

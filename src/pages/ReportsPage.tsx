@@ -598,7 +598,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         <div className="space-y-2 max-w-2xl">
           <div className="inline-flex items-center space-x-2 bg-[#F10F4D]/20 text-rose-300 border border-[#F10F4D]/40 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
             <Target className="w-3.5 h-3.5 text-[#F10F4D]" />
-            <span>Relatório Semanal Executivo para o Diretor</span>
+            <span>Relatório Semanal Executivo</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
             Desempenho Semanal do Time de Imóveis Prontos
@@ -611,18 +611,9 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto shrink-0">
           <button
-            onClick={handleSendDirectorWhatsApp}
-            className="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-emerald-950/40 transition flex items-center justify-center space-x-2 cursor-pointer transform active:scale-95"
-            title="Enviar resumo formatado pelo WhatsApp"
-          >
-            <Send className="w-4 h-4" />
-            <span>Enviar ao Diretor (WhatsApp)</span>
-          </button>
-
-          <button
             onClick={handleDownloadPDF}
             disabled={downloadingFormat !== null}
-            className="px-4 py-3 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-50 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-rose-950/40 transition flex items-center justify-center space-x-2 transform active:scale-95 cursor-pointer"
+            className="px-6 py-3.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-50 text-white font-extrabold text-xs sm:text-sm rounded-2xl shadow-lg shadow-rose-950/40 transition flex items-center justify-center space-x-2 transform active:scale-95 cursor-pointer"
           >
             {downloadingFormat === 'pdf' ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -635,10 +626,10 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
           <button
             onClick={handleDownloadXLSX}
             disabled={downloadingFormat !== null}
-            className="px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-extrabold text-xs rounded-2xl transition flex items-center justify-center space-x-2 cursor-pointer"
+            className="px-4 py-3.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-extrabold text-xs rounded-2xl transition flex items-center justify-center space-x-2 cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>Excel (.xlsx)</span>
+            <span>Planilha Excel (.xlsx)</span>
           </button>
         </div>
       </div>
@@ -1075,85 +1066,50 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
 
           </div>
 
-          {/* TWO COLUMNS: CANAIS DE CAPTAÇÃO + WHATSAPP EXECUTIVO */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* CANAIS DE CAPTAÇÃO UTILIZADOS NA SEMANA */}
-            <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-xs space-y-4 lg:col-span-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Compass className="w-5 h-5 text-[#F10F4D]" />
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                    Origem das Captações & Prospecções do Time
-                  </h3>
-                </div>
-                <span className="text-xs font-bold text-slate-400">Total no período</span>
+          {/* ORIGEM DAS CAPTAÇÕES E CANAIS UTILIZADOS NA SEMANA */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Compass className="w-5 h-5 text-[#F10F4D]" />
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                  Origem das Captações & Prospecções do Time
+                </h3>
               </div>
+              <span className="text-xs font-bold text-slate-400">Total consolidado no período</span>
+            </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {[
-                  { id: 'portal', label: 'Portais Imobiliários', icon: '🌐', desc: 'VivaReal, ZAP, OLX' },
-                  { id: 'placa_rua', label: 'Placa / Prospecção de Rua', icon: '🚩', desc: 'Captação de Campo' },
-                  { id: 'indicacao', label: 'Indicações', icon: '🤝', desc: 'Porteiros & Síndicos' },
-                  { id: 'redes_sociais', label: 'Instagram / Redes', icon: '📸', desc: 'Redes Sociais & Anúncios' },
-                  { id: 'telefone_ativo', label: 'Telefone / WhatsApp', icon: '📞', desc: 'Prospecção Ativa' },
-                  { id: 'parceria', label: 'Parcerias', icon: '🏢', desc: 'Outros Corretores' },
-                ].map(ch => {
-                  const count = Number(teamWeeklyPerformance.teamChannels[ch.id] || 0);
-                  const total = Object.values(teamWeeklyPerformance.teamChannels).reduce<number>((a, b) => a + Number(b || 0), 0) || 1;
-                  const pct = ((count / total) * 100).toFixed(0);
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {[
+                { id: 'portal', label: 'Portais Imobiliários', icon: '🌐', desc: 'VivaReal, ZAP, OLX' },
+                { id: 'placa_rua', label: 'Placa / Rua', icon: '🚩', desc: 'Captação de Campo' },
+                { id: 'indicacao', label: 'Indicações', icon: '🤝', desc: 'Porteiros & Síndicos' },
+                { id: 'redes_sociais', label: 'Instagram / Redes', icon: '📸', desc: 'Redes Sociais & Ads' },
+                { id: 'telefone_ativo', label: 'Telefone / WhatsApp', icon: '📞', desc: 'Prospecção Ativa' },
+                { id: 'parceria', label: 'Parcerias', icon: '🏢', desc: 'Outros Corretores' },
+              ].map(ch => {
+                const count = Number(teamWeeklyPerformance.teamChannels[ch.id] || 0);
+                const total = Object.values(teamWeeklyPerformance.teamChannels).reduce<number>((a, b) => a + Number(b || 0), 0) || 1;
+                const pct = ((count / total) * 100).toFixed(0);
 
-                  return (
-                    <div key={ch.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+                return (
+                  <div key={ch.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2 flex flex-col justify-between">
+                    <div>
                       <div className="flex items-center justify-between">
                         <span className="text-xl">{ch.icon}</span>
                         <span className="text-base font-black text-slate-900">{count}</span>
                       </div>
-                      <div>
+                      <div className="mt-1">
                         <p className="text-xs font-extrabold text-slate-800">{ch.label}</p>
                         <p className="text-[10px] text-slate-400">{ch.desc}</p>
                       </div>
-                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-[#F10F4D] h-full rounded-full" style={{ width: `${Math.max(5, Number(pct))}%` }}></div>
-                      </div>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden mt-2">
+                      <div className="bg-[#F10F4D] h-full rounded-full" style={{ width: `${Math.max(5, Number(pct))}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            {/* CARD DE ENVIO DIRETO AO DIRETOR VIA WHATSAPP */}
-            <div className="bg-slate-900 text-white rounded-3xl p-6 border border-slate-800 shadow-xl space-y-4 flex flex-col justify-between">
-              <div className="space-y-2">
-                <div className="inline-flex items-center space-x-1.5 bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider">
-                  <Send className="w-3 h-3" />
-                  <span>Despacho com a Diretoria</span>
-                </div>
-                <h3 className="text-base font-black">Enviar Relatório ao Diretor</h3>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Gera uma mensagem executiva pré-formatada com o levantamento de imóveis captados, leads prospectados, ranking individual e canais de prospecção do time de Imóveis Prontos.
-                </p>
-              </div>
-
-              <div className="space-y-2.5 pt-2">
-                <button
-                  onClick={handleSendDirectorWhatsApp}
-                  className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs rounded-2xl shadow-lg transition flex items-center justify-center space-x-2 cursor-pointer"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Abrir no WhatsApp do Diretor</span>
-                </button>
-
-                <button
-                  onClick={handleCopyWhatsApp}
-                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center space-x-2 cursor-pointer"
-                >
-                  {copiedWhatsapp ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                  <span>{copiedWhatsapp ? 'Texto Copiado!' : 'Copiar Texto da Mensagem'}</span>
-                </button>
-              </div>
-            </div>
-
           </div>
 
           {/* MATRIZ DE DESEMPENHO INDIVIDUAL DOS CAPTADORES */}

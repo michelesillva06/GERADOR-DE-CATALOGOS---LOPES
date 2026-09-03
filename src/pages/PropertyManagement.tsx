@@ -281,6 +281,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
                 onGenerateSocialMedia={onGenerateSocialMedia}
                 onGenerateAiPost={onGenerateAiPost}
                 canEdit={canEdit}
+                hidePerMonth={true}
               />
             );
           })}

@@ -173,7 +173,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const testWaUrl = buildWhatsAppUrl(whatsapp || companyForm.whatsapp, 'Olá! Teste de WhatsApp configurado com sucesso na Lopes Captação.');
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl pb-32 sm:pb-12">
       <div>
         <h1 className="text-2xl font-black text-slate-900">Configurações do Perfil & Sistema</h1>
         <p className="text-xs text-slate-500">
@@ -347,7 +347,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           </div>
 
           {/* Test WhatsApp Link Button */}
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center space-x-2">
               <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
               <div className="text-xs">
@@ -359,11 +359,26 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               href={testWaUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow transition"
+              className="w-full sm:w-auto text-center px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 shadow transition cursor-pointer"
             >
               <span>Testar Link do WhatsApp</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
+          </div>
+
+          {/* Quick Save Profile Button (Dedicated for Mobile and Desktop) */}
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+            <p className="text-[11px] text-slate-500 font-medium">
+              Suas alterações de perfil são sincronizadas em tempo real.
+            </p>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center space-x-2 shadow-lg shadow-rose-900/20 transition transform active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>{loading ? 'Salvando...' : 'Salvar Alterações de Perfil'}</span>
+            </button>
           </div>
         </div>
 

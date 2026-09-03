@@ -815,15 +815,26 @@ app.post('/api/users', requireMasterAdmin, async (req, res) => {
 });
 
 /**
- * USERS: UPDATE (MASTER ADMIN ONLY)
+ * USERS: UPDATE (MASTER ADMIN OR SELF)
  */
-app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
+app.put('/api/users/:id', requireAuth, async (req, res) => {
   await refreshUsers();
   const { id } = req.params;
+  const reqUser = (req as any).user as User;
+
   const index = users.findIndex(u => u.id === id);
   if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   const existing = users[index];
+
+  // If not master admin, the user can only update their own profile
+  const isMaster = reqUser.role === 'MASTER_ADMIN';
+  const isSelf = reqUser.id === existing.id || reqUser.username?.toLowerCase() === existing.username?.toLowerCase();
+
+  if (!isMaster && !isSelf) {
+    return res.status(403).json({ error: 'Permissão negada. Você só pode alterar seu próprio perfil.' });
+  }
+
   const { name, email, username, phone, whatsapp, role, position, url_slug, status, photo_url, creci, instagram, password } = req.body;
 
   if (username && username.toLowerCase().trim() !== existing.username?.toLowerCase().trim()) {
@@ -851,10 +862,11 @@ app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
     username: username !== undefined ? username.toLowerCase().trim() : existing.username,
     phone: phone !== undefined ? phone : existing.phone,
     whatsapp: whatsapp !== undefined ? whatsapp : existing.whatsapp,
-    role: role !== undefined ? role : existing.role,
+    // Only master admin can change role or status
+    role: isMaster && role !== undefined ? role : existing.role,
     position: position !== undefined ? position : existing.position,
     url_slug: cleanSlug || existing.url_slug,
-    status: status !== undefined ? status : existing.status,
+    status: isMaster && status !== undefined ? status : existing.status,
     photo_url: photo_url !== undefined ? photo_url : existing.photo_url,
     creci: creci !== undefined ? creci : existing.creci,
     instagram: instagram !== undefined ? instagram : existing.instagram
@@ -868,13 +880,12 @@ app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
   await safeFirestoreDocSet('users', id, updatedUser, true);
   saveLocalDatabase();
 
-  const reqUser = (req as any).user as User;
   addAuditLog(reqUser.id, reqUser.name, 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
 
   const cleanResponseUser = { ...updatedUser };
   delete (cleanResponseUser as any).password;
 
-  res.json({ user: cleanResponseUser, message: 'Dados do usuário atualizados com sucesso!' });
+  res.json({ user: cleanResponseUser, message: 'Dados do perfil atualizados com sucesso!' });
 });
 
 /**

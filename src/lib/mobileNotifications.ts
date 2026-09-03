@@ -399,16 +399,18 @@ export async function checkAndNotifyOverdueProperties(
   }
 
   const count = overdueProperties.length;
-  const title = `🔔 ${count} ${count > 1 ? 'imóveis precisam' : 'imóvel precisa'} de atualização`;
+  const title = count === 1
+    ? `🔔 1 imóvel precisa de atualização (7 dias)`
+    : `🔔 ${count} imóveis precisam de atualização (7 dias)`;
   const body =
     count === 1
-      ? `O imóvel ${overdueProperties[0].code} está há mais de 30 dias sem confirmação com o proprietário.`
-      : `Você possui ${count} imóveis há mais de 30 dias sem confirmação de status com o proprietário.`;
+      ? `O imóvel ${overdueProperties[0].code ? `[${overdueProperties[0].code}] ` : ''}"${overdueProperties[0].title}" completou 7 dias sem confirmação. Atualize o status com o proprietário.`
+      : `Você possui ${count} imóveis pendentes de atualização (completaram 7 dias ou mais). Atualize para manter sua carteira ativa.`;
 
   const sent = await sendMobileNotification({
     title,
     body,
-    tag: 'lopes-overdue-reminder',
+    tag: `lopes-overdue-7days-${new Date().toISOString().slice(0, 10)}`,
     data: {
       url: '/?view=reminder',
       type: 'OVERDUE_ALERT',
