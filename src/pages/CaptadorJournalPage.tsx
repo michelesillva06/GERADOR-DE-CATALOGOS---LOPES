@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Plus,
   Save,
-  Sparkles,
   TrendingUp,
   Clock,
   Trash2,
@@ -565,7 +564,7 @@ export const CaptadorJournalPage: React.FC<CaptadorJournalPageProps> = ({
                 onClick={handleAutoFillSummary}
                 className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-[#F10F4D] font-extrabold text-xs rounded-xl border border-rose-200 transition flex items-center justify-center space-x-2 cursor-pointer"
               >
-                <Sparkles className="w-4 h-4" />
+                <FileText className="w-4 h-4" />
                 <span>Preencher Resumo Automaticamente</span>
               </button>
             </div>

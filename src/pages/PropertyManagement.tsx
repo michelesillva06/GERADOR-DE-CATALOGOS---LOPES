@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
-import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin, FileCode, Sparkles } from 'lucide-react';
+import { Search, Filter, Plus, FileSpreadsheet, Building2, Layers, MapPin, FileCode } from 'lucide-react';
 import { PROPERTY_CATEGORIES } from '../lib/constants';
 
 interface PropertyManagementProps {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Property, User } from '../types';
-import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2, Sparkles } from 'lucide-react';
+import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2, Image as ImageIcon } from 'lucide-react';
 import { getPropertyMainImage, handleImageError } from '../lib/imageUtils';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
 
@@ -175,7 +175,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white text-xs font-bold shadow-sm hover:shadow transition transform active:scale-95 cursor-pointer"
                 title="Gerar Post para Redes Sociais"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                <ImageIcon className="w-3.5 h-3.5 text-white" />
                 <span>Gerar Post</span>
               </button>
             )}

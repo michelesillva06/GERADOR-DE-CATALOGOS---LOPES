@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Property, User, CompanySettings } from '../types';
-import { Building2 as BuildingIcon, Search as SearchIcon, Filter as FilterIcon, FileText as FileTextIcon, MapPin as MapPinIcon, Bed as BedIcon, Bath as BathIcon, Car as CarIcon, Maximize2 as MaximizeIcon, ExternalLink as ExternalLinkIcon, CheckCircle2 as CheckCircleIcon, User as UserIconComponent, Sparkles as SparklesIcon } from 'lucide-react';
+import { Building2 as BuildingIcon, Search as SearchIcon, Filter as FilterIcon, FileText as FileTextIcon, MapPin as MapPinIcon, Bed as BedIcon, Bath as BathIcon, Car as CarIcon, Maximize2 as MaximizeIcon, ExternalLink as ExternalLinkIcon, CheckCircle2 as CheckCircleIcon, User as UserIconComponent, Image as ImageIcon } from 'lucide-react';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
 
 interface GeneralCatalogPageProps {
@@ -98,7 +98,7 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center space-x-2 bg-rose-500/20 border border-rose-400/30 px-3 py-1 rounded-full text-xs font-extrabold text-rose-300 mb-2">
-              <SparklesIcon className="w-3.5 h-3.5 text-rose-400" />
+              <BuildingIcon className="w-3.5 h-3.5 text-rose-400" />
               <span>Vitrine Completa da Imobiliária</span>
             </div>
             <h1 className="text-2xl font-black tracking-tight">Catálogo Geral de Imóveis Prontos</h1>
@@ -381,7 +381,7 @@ export const GeneralCatalogPage: React.FC<GeneralCatalogPageProps> = ({
                           className="px-2.5 py-1.5 bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white font-extrabold text-[11px] rounded-xl flex items-center space-x-1 shadow-xs transition transform active:scale-95 cursor-pointer"
                           title="Gerar Post para Redes Sociais"
                         >
-                          <SparklesIcon className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                          <ImageIcon className="w-3.5 h-3.5 text-white" />
                           <span>Gerar Post</span>
                         </button>
                       )}

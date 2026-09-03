@@ -49,7 +49,7 @@ import {
   PhoneCall,
   Flame,
   ArrowUpRight,
-  Sparkles,
+  BookOpen,
   Activity,
   Layers
 } from 'lucide-react';
@@ -1186,7 +1186,7 @@ export const ReportsPage: React.FC<ReportsPageProps> = ({
                   {/* Highlights from Daily Journal */}
                   <div className="space-y-1 text-xs">
                     <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
-                      <Sparkles className="w-3 h-3 text-amber-500" />
+                      <BookOpen className="w-3 h-3 text-slate-500" />
                       <span>Atividades no Diário:</span>
                     </p>
                     <p className="text-[11px] text-slate-700 leading-tight line-clamp-3 bg-white/70 p-2.5 rounded-xl border border-slate-200/50">

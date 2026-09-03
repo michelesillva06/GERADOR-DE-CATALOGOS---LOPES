@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Building2, User as UserIcon, LogOut, ExternalLink, ShieldAlert, Sparkles, ChevronDown, Bell } from 'lucide-react';
+import { Building2, User as UserIcon, LogOut, ExternalLink, ShieldAlert, ChevronDown, Bell } from 'lucide-react';
 import { LopesLogo } from './LopesLogo';
 import { PWAInstallButton } from './PWAInstallButton';
 import { getStoredUsers } from '../lib/storage';
@@ -74,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView, users
                 onClick={() => setShowUserSwitcher(!showUserSwitcher)}
                 className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200/80 flex items-center space-x-1.5 transition cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <UserIcon className="w-3.5 h-3.5 text-[#F10F4D]" />
                 <span className="hidden lg:inline">Alternar Perfil</span>
                 <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>

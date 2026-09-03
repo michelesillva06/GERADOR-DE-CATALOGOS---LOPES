@@ -20,7 +20,7 @@ import {
   User as UserIcon,
   Edit3,
   Trash2,
-  Sparkles
+  Image as ImageIcon
 } from 'lucide-react';
 import { generateQRCodeDataUrl } from '../lib/qrCode';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
@@ -457,7 +457,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
                   className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F10F4D] via-[#d40d43] to-[#99002B] hover:brightness-110 text-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md shadow-rose-900/20 transition transform active:scale-95 cursor-pointer"
                   title="Criar arte para Feed e Stories"
                 >
-                  <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <ImageIcon className="w-4 h-4 text-white" />
                   <span>Gerar Post</span>
                 </button>
               )}

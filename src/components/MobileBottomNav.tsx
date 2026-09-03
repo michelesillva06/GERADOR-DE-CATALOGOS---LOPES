@@ -19,7 +19,6 @@ import {
   ExternalLink,
   FileCode,
   BarChart3,
-  Sparkles,
   FileSignature
 } from 'lucide-react';
 
@@ -156,7 +155,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-slate-800 flex items-center space-x-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-[#F10F4D]" />
+                  <BookOpen className="w-3.5 h-3.5 text-[#F10F4D]" />
                   <span>Catálogo Digital</span>
                 </span>
                 <a

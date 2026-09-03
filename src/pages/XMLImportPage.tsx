@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  Sparkles,
   Search,
   Filter,
   ArrowRight,
@@ -23,6 +22,7 @@ import {
   Building2,
   UserCheck,
   RefreshCw,
+  Plus,
   Eye,
   Check,
   X,
@@ -329,7 +329,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-rose-300 backdrop-blur-xs">
-              <Sparkles className="w-3.5 h-3.5 text-[#F10F4D]" />
+              <FileCode className="w-3.5 h-3.5 text-[#F10F4D]" />
               <span>Sincronização & Integração de Portais</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
@@ -555,7 +555,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                   disabled={!xmlContent.trim() || isProcessing}
                   className="px-6 py-2.5 bg-[#F10F4D] hover:bg-rose-600 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-2 cursor-pointer"
                 >
-                  {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                  {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
                   <span>Processar XML</span>
                 </button>
               </div>
@@ -640,7 +640,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                   Serão Cadastrados
                 </div>
                 <p className="text-xs font-bold text-emerald-800 uppercase flex items-center space-x-1">
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                  <Plus className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Novos Imóveis</span>
                 </p>
                 <p className="text-3xl font-black text-emerald-600 mt-1">
@@ -855,7 +855,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                         <td className="p-3.5 whitespace-nowrap">
                           {isNew ? (
                             <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase">
-                              <Sparkles className="w-3 h-3 text-emerald-600" />
+                              <Plus className="w-3 h-3 text-emerald-600" />
                               <span>NOVO</span>
                             </span>
                           ) : (

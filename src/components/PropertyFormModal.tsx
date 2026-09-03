@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Property, User, PropertyCategory, PropertyPurpose, PropertyStatus } from '../types';
-import { X, Plus, Trash2, Image as ImageIcon, Sparkles, Upload, Zap } from 'lucide-react';
+import { X, Plus, Trash2, Image as ImageIcon, Upload, Zap } from 'lucide-react';
 import { MANAUS_NEIGHBORHOODS, PROPERTY_CATEGORIES } from '../lib/constants';
 import { compressMultipleImages } from '../utils/imageCompressor';
 

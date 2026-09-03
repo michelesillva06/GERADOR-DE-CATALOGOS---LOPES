@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
-  Sparkles,
+  Palette,
   Copy,
   Check,
   Download,
@@ -332,7 +332,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
         <div className="shrink-0 px-4 sm:px-6 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/90">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-[#F10F4D] flex items-center justify-center shadow-sm shrink-0">
-              <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              <Palette className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900">
               Gerador de Post

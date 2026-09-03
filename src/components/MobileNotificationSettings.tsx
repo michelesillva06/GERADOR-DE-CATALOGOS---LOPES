@@ -12,7 +12,7 @@ import {
   isRunningAsPWA,
   NotificationSupportStatus
 } from '../lib/mobileNotifications';
-import { Bell, BellRing, BellOff, CheckCircle2, Smartphone, Sparkles, Loader2, Info, RefreshCw, Send } from 'lucide-react';
+import { Bell, BellRing, BellOff, CheckCircle2, Smartphone, Loader2, Info, RefreshCw, Send } from 'lucide-react';
 
 interface MobileNotificationSettingsProps {
   compact?: boolean;

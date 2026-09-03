@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Property, User, CompanySettings } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
-import { buildWhatsAppUrl, getEffectiveWhatsApp } from '../lib/whatsapp';
-import { Building2, PlusCircle, Share2, FileSpreadsheet, ExternalLink, CheckCircle2, Copy, Check, Sparkles } from 'lucide-react';
-import { MobileNotificationSettings } from '../components/MobileNotificationSettings';
+import { Building2, PlusCircle, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 
 interface CaptadorDashboardProps {
   user: User;
@@ -34,8 +32,6 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
   onGenerateAiPost,
   onPropertyConfirmed
 }) => {
-  const [copied, setCopied] = useState(false);
-
   const isOwnedByCurrentUser = (p: Property) =>
     p.user_id === user.id ||
     p.user_id?.toLowerCase() === user.id?.toLowerCase() ||
@@ -46,21 +42,6 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
 
   const availableCount = myProperties.filter(p => p.status === 'Disponível').length;
   const soldCount = myProperties.filter(p => p.status === 'Vendido' || p.status === 'Alugado').length;
-
-  const publicUrl = `${window.location.origin}/catalogo/${user.url_slug || user.username}`;
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(publicUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleShareCatalogWhatsApp = () => {
-    const text = `Olá! Confira meu catálogo de imóveis atualizado na Lopes Captação: ${publicUrl}`;
-    const targetWa = getEffectiveWhatsApp(user, companySettings);
-    const waUrl = buildWhatsAppUrl(targetWa, text);
-    window.open(waUrl, '_blank');
-  };
 
   return (
     <div className="space-y-6">
@@ -104,56 +85,6 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
           </button>
         </div>
       </div>
-
-      {/* Public Catalog Action Box */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-[#F10F4D] shrink-0">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-sm font-extrabold text-slate-900">Catálogo Digital do Captador</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Sua vitrine online com seus imóveis exclusivos para envio a clientes</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
-          <button
-            onClick={handleCopyLink}
-            className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-2 transition cursor-pointer ${
-              copied
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200/90'
-            }`}
-            title="Copiar link da página pública"
-          >
-            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4 text-slate-600" />}
-            <span>{copied ? 'Link Copiado!' : 'Copiar Link'}</span>
-          </button>
-
-          <button
-            onClick={handleShareCatalogWhatsApp}
-            className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center space-x-2 shadow-xs transition cursor-pointer"
-            title="Enviar catálogo no WhatsApp"
-          >
-            <Share2 className="w-4 h-4" />
-            <span>Enviar via WhatsApp</span>
-          </button>
-
-          <a
-            href={publicUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition flex items-center justify-center cursor-pointer"
-            title="Abrir página pública em nova aba"
-          >
-            <ExternalLink className="w-4 h-4" />
-          </a>
-        </div>
-      </div>
-
-      {/* Mobile Notifications / PWA Alert Manager */}
-      <MobileNotificationSettings />
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
