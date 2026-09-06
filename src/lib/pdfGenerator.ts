@@ -624,59 +624,15 @@ export async function renderHorizontalPropertyCanvas(
     }
   });
 
-  // =========================================================================
-  // DYNAMIC CTA BLOCK (VER DETALHES BUTTON & QR CODE)
-  // =========================================================================
-  const ctaY = gridY + 2 * cardH + gapY + 20;
-
-  // Draw background container
-  ctx.fillStyle = '#FFF1F2'; // Subtle light rose background
-  ctx.strokeStyle = '#FFE4E6'; // Subtle border
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.roundRect(rightX, ctaY, rightW, 150, 16);
-  ctx.fill();
-  ctx.stroke();
-
-  // Draw left texts
-  ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 28px sans-serif';
-  ctx.fillText('QUER SABER MAIS DETALHES E VER OUTRAS FOTOS?', rightX + 40, ctaY + 62);
-
-  ctx.fillStyle = TEXT_MUTED;
-  ctx.font = '600 22px sans-serif';
-  ctx.fillText('Acesse a página deste imóvel no site clicando no botão ao lado.', rightX + 40, ctaY + 105);
-
-  // Draw "VER DETALHES" Button — widened to fill the space the QR Code used to occupy. The QR
-  // was too small to scan reliably from a printed/shared PDF and added no value once the button
-  // itself is already a working link, so it was removed rather than shrunk further.
-  const btnX = rightX + 1060;
-  const btnY = ctaY + 35;
-  const btnW = 480;
-  const btnH = 80;
-
-  ctx.fillStyle = LOPES_RED;
-  ctx.beginPath();
-  ctx.roundRect(btnX, btnY, btnW, btnH, 12);
-  ctx.fill();
-
-  // Draw white text inside the button
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 26px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('VER DETALHES', btnX + (btnW / 2), btnY + 48);
-  ctx.textAlign = 'left';
-
   // Prefer the official Lopes site page for this specific property when the captador has pasted
   // one. When it's missing, point to the Lopes Manaus homepage instead of our own internal
-  // catalog page — a stranger clicking the button recognizes manaus.lopes.com.br, not an
-  // unfamiliar internal URL, even though it won't land on that exact property's page.
+  // catalog page.
   const propertyPublicUrl = prop.official_site_url && prop.official_site_url.trim()
     ? prop.official_site_url.trim()
     : 'https://manaus.lopes.com.br/';
 
   // =========================================================================
-  // LOWER GALLERY & DESCRIPTION ROW
+  // LOWER GALLERY & CTA DETAILS BOX ROW
   // =========================================================================
   const lowerY = 1240;
 
@@ -705,14 +661,14 @@ export async function renderHorizontalPropertyCanvas(
     ctx.textAlign = 'left';
   });
 
-  // Description Box ("SOBRE O IMÓVEL") on bottom right
+  // CTA & Website Details Box on bottom right (Replaces "Sobre o imóvel")
   const descX = 1835;
   const descW = 1015;
   const descH = 410;
 
   // Box Background
-  ctx.fillStyle = BG_LIGHT;
-  ctx.strokeStyle = BORDER_COLOR;
+  ctx.fillStyle = '#FFF5F5';
+  ctx.strokeStyle = '#FECDD3';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(descX, lowerY, descW, descH, 16);
@@ -725,54 +681,37 @@ export async function renderHorizontalPropertyCanvas(
   ctx.roundRect(descX, lowerY, 8, descH, [16, 0, 0, 16]);
   ctx.fill();
 
-  // Header inside Box: House icon + "SOBRE O IMÓVEL"
-  const descHeaderX = descX + 45;
-  const descHeaderY = lowerY + 60;
-
-  ctx.strokeStyle = LOPES_RED;
-  ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  ctx.moveTo(descHeaderX, descHeaderY - 5);
-  ctx.lineTo(descHeaderX + 16, descHeaderY - 22);
-  ctx.lineTo(descHeaderX + 32, descHeaderY - 5);
-  ctx.stroke();
-  ctx.strokeRect(descHeaderX + 5, descHeaderY - 5, 22, 18);
-
+  // Title inside Box
   ctx.fillStyle = TEXT_DARK;
-  ctx.font = '900 36px sans-serif';
-  ctx.fillText('SOBRE O IMÓVEL', descHeaderX + 48, descHeaderY + 8);
+  ctx.font = '900 32px sans-serif';
+  ctx.fillText('QUER SABER MAIS DETALHES DO IMÓVEL?', descX + 48, lowerY + 75);
 
-  // Description Paragraph Text
-  const defaultDesc = `Imóvel de alto padrão com excelente projeto arquitetônico e acabamento impecável. Projetado para oferecer conforto, segurança e funcionalidade para toda a família. Ambientes amplos e integrados, excelente iluminação natural e localização privilegiada no bairro ${prop.neighborhood || 'Parque 10'}, próximo a escolas, supermercados, serviços e vias principais de Manaus.`;
-  
-  const rawDesc = prop.description && prop.description.trim().length > 30 ? prop.description : defaultDesc;
-  
-  ctx.fillStyle = '#334155';
-  ctx.font = '600 30px sans-serif';
-  
-  const descWords = rawDesc.split(' ');
-  let line = '';
-  let lineY = descHeaderY + 68;
-  let lineCount = 0;
+  // Subtitle / Instruction inside Box
+  ctx.fillStyle = TEXT_MUTED;
+  ctx.font = '600 24px sans-serif';
+  ctx.fillText('Clique no botão abaixo para acessar o nosso site.', descX + 48, lowerY + 125);
 
-  for (let n = 0; n < descWords.length; n++) {
-    const testLine = line + descWords[n] + ' ';
-    if (ctx.measureText(testLine).width > (descW - 90) && n > 0) {
-      ctx.fillText(line.trim(), descHeaderX, lineY);
-      line = descWords[n] + ' ';
-      lineY += 46;
-      lineCount++;
-      if (lineCount >= 7) {
-        ctx.fillText(line.trim() + '...', descHeaderX, lineY);
-        break;
-      }
-    } else {
-      line = testLine;
-    }
-  }
-  if (lineCount < 7 && line.trim()) {
-    ctx.fillText(line.trim(), descHeaderX, lineY);
-  }
+  ctx.fillStyle = '#64748B';
+  ctx.font = '500 20px sans-serif';
+  ctx.fillText('Consulte a ficha completa, fotos em alta resolução e fale com o corretor.', descX + 48, lowerY + 165);
+
+  // "VER DETALHES" Button
+  const btnW = 580;
+  const btnH = 88;
+  const btnX = descX + (descW - btnW) / 2;
+  const btnY = lowerY + 225;
+
+  ctx.fillStyle = LOPES_RED;
+  ctx.beginPath();
+  ctx.roundRect(btnX, btnY, btnW, btnH, 14);
+  ctx.fill();
+
+  // Button text
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 28px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('VER DETALHES ↗', btnX + (btnW / 2), btnY + 54);
+  ctx.textAlign = 'left';
 
   // =========================================================================
   // FOOTER ZONE (Dark Navy Bar across bottom)
@@ -889,60 +828,8 @@ export async function generateCatalogPDF(options: {
     // Clickable link on the footer logo area for website/WhatsApp
     doc.link(10, 190, 80, 20, { url: whatsappDirectUrl });
 
-    // Calculate exact gridY to match renderHorizontalPropertyCanvas for precise CTA box link placement
-    const rightW = 1590;
-    const canvasTemp = document.createElement('canvas');
-    const ctxTemp = canvasTemp.getContext('2d');
-    let titleY = 235;
-    if (ctxTemp) {
-      ctxTemp.font = '900 82px Georgia, "Times New Roman", serif';
-      const titleWords = prop.title.split(' ');
-      let titleLine1 = '';
-      let titleLine2 = '';
-      for (let w = 0; w < titleWords.length; w++) {
-        const testLine = titleLine1 + titleWords[w] + ' ';
-        if (ctxTemp.measureText(testLine).width > (rightW - 40) && w > 0) {
-          titleLine2 = titleWords.slice(w).join(' ');
-          break;
-        } else {
-          titleLine1 = testLine;
-        }
-      }
-      if (titleLine2) titleY += 90;
-    } else {
-      if (prop.title.length > 25) titleY += 90;
-    }
-
-    titleY += 55; // Subtitle start
-
-    if (ctxTemp) {
-      ctxTemp.font = '600 36px sans-serif';
-      const subtitle = `Conforto, localização e qualidade de vida no bairro ${prop.neighborhood || 'Parque 10'} em Manaus.`;
-      const subWords = subtitle.split(' ');
-      let subLine1 = '';
-      let subLine2 = '';
-      for (let w = 0; w < subWords.length; w++) {
-        const testLine = subLine1 + subWords[w] + ' ';
-        if (ctxTemp.measureText(testLine).width > (rightW - 40) && w > 0) {
-          subLine2 = subWords.slice(w).join(' ');
-          break;
-        } else {
-          subLine1 = testLine;
-        }
-      }
-      if (subLine2) titleY += 48;
-    } else {
-      titleY += 48;
-    }
-
-    titleY += 30; // Red bar accent
-    const gridY = titleY + 50;
-    const cardH = 225;
-    const gapY = 30;
-    const ctaY = gridY + 2 * cardH + gapY + 20;
-
-    // Register active link exactly covering the visual "VER DETALHES" banner (from X = 126mm to 285mm, Y = ctaY / 10 to (ctaY + 150) / 10)
-    doc.link(126, ctaY / 10, 159, 15, { url: propertyPublicUrl });
+    // Register active link covering the "QUER SABER MAIS / VER DETALHES" box on the bottom right (183.5mm to 285mm, Y = 124mm to 165mm)
+    doc.link(183.5, 124, 101.5, 41, { url: propertyPublicUrl });
 
     // Keep footer slogan area link as fallback
     doc.link(120, 190, 160, 20, { url: propertyPublicUrl });

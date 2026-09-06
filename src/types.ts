@@ -186,7 +186,13 @@ export interface JournalEntry {
   updated_at: string;
 }
 
-export type ScheduleEventType = 'VISITA' | 'TREINAMENTO' | 'EVENTO' | 'FERIADO';
+export type ScheduleEventType = 'VISITA' | 'TREINAMENTO' | 'EVENTO' | 'REUNIAO' | 'FERIADO';
+
+export interface ScheduleEventAttendee {
+  user_id: string;
+  user_name: string;
+  confirmed_at: string;
+}
 
 export interface ScheduleEvent {
   id: string;
@@ -195,8 +201,11 @@ export interface ScheduleEvent {
   date: string; // YYYY-MM-DD
   start_time: string; // HH:MM e.g. "09:00"
   end_time: string; // HH:MM e.g. "10:00"
-  user_id: string; // Captador ID
+  user_id: string; // Captador ID or Creator ID
   user_name: string;
+  created_by_role?: UserRole;
+  created_by_user_id?: string;
+  created_by_user_name?: string;
   property_id?: string;
   property_code?: string;
   client_name?: string;
@@ -204,7 +213,10 @@ export interface ScheduleEvent {
   location?: string;
   notes?: string;
   exclusive_visit?: boolean; // true = "Ir Só" (No concurrent visit allowed for this property), false = "Pode Ir Acompanhado"
+  confirmed_attendees?: string[]; // Array of user IDs who confirmed attendance
+  confirmed_attendees_details?: ScheduleEventAttendee[];
   created_at: string;
+  updated_at?: string;
 }
 
 export interface PDFExportOptions {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Header } from './components/Header';
 import { PropertyUpdateReminderModal } from './components/PropertyUpdateReminderModal';
+import { UnifiedDailyAlertsModal } from './components/UnifiedDailyAlertsModal';
 import { needsStatusCheck } from './components/PropertyUpdateAlerts';
 import { Sidebar } from './components/Sidebar';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -24,7 +25,12 @@ import { PropertyModal } from './components/PropertyModal';
 import { PropertyFormModal } from './components/PropertyFormModal';
 import { PDFCatalogModal } from './components/PDFCatalogModal';
 import { AIPostGeneratorModal } from './components/AIPostGeneratorModal';
-import { checkAndNotifyOverdueProperties } from './lib/mobileNotifications';
+import {
+  checkAndNotifyOverdueProperties,
+  checkAndNotifyScheduleAlerts,
+  getUserScheduleAlertsData,
+  triggerBackendScheduleCheck
+} from './lib/mobileNotifications';
 import { buildWhatsAppUrl, getEffectiveWhatsApp } from './lib/whatsapp';
 import { Property, User, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './types';
 import { initialCompanySettings } from './data/mockData';
@@ -99,43 +105,67 @@ function MainApp() {
     [updateReminderProperties]
   );
 
-  // Auto-open once per calendar day, per user — only if there are overdue properties and user is not admin/gestor
-  useEffect(() => {
-    if (!user || overdueCount === 0) {
-      setShowUpdateReminder(false);
-      return;
+  // User Schedule Alerts (Visits day before/today, unconfirmed gestor events/meetings)
+  const scheduleAlerts = useMemo(() => {
+    return getUserScheduleAlertsData(user, scheduleEvents);
+  }, [user, scheduleEvents]);
+
+  // Combined active alerts count
+  const totalAlertsCount = useMemo(() => {
+    if (!user) return 0;
+    const isGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
+    if (isGestor) {
+      return scheduleAlerts.unconfirmedGestorEvents.length;
     }
-    const isAdminOrGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
-    if (isAdminOrGestor) {
+    return overdueCount + scheduleAlerts.totalAlertsCount;
+  }, [user, overdueCount, scheduleAlerts]);
+
+  // Auto-open once per calendar day if user has pending alerts
+  useEffect(() => {
+    if (!user || totalAlertsCount === 0) {
       setShowUpdateReminder(false);
       return;
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const storageKey = `lopes_update_reminder_shown_${user.id}`;
+    const storageKey = `lopes_daily_unified_alerts_${user.id}_${today}`;
     const lastShown = localStorage.getItem(storageKey);
-    if (lastShown !== today) {
+    if (!lastShown) {
       setShowUpdateReminder(true);
       localStorage.setItem(storageKey, today);
     }
-  }, [user, overdueCount]);
+  }, [user, totalAlertsCount]);
 
   // Mobile / PWA native notification trigger & Service Worker listener
   useEffect(() => {
-    if (!user || overdueCount === 0) return;
+    if (!user) return;
 
-    // Check and trigger mobile notification if permission is granted
-    checkAndNotifyOverdueProperties(user, properties);
-
-    // Set up periodic check every 30 minutes
-    const interval = setInterval(() => {
+    // 1. Check and trigger mobile notification for overdue properties
+    if (overdueCount > 0) {
       checkAndNotifyOverdueProperties(user, properties);
-    }, 30 * 60 * 1000);
+    }
+
+    // 2. Check and trigger mobile notification for visits & meetings
+    if (scheduleEvents.length > 0) {
+      checkAndNotifyScheduleAlerts(user, scheduleEvents);
+    }
+
+    // 3. Ping backend to dispatch server-side push notifications
+    triggerBackendScheduleCheck();
+
+    // Set up periodic check every 15 minutes
+    const interval = setInterval(() => {
+      if (overdueCount > 0) checkAndNotifyOverdueProperties(user, properties);
+      if (scheduleEvents.length > 0) checkAndNotifyScheduleAlerts(user, scheduleEvents);
+      triggerBackendScheduleCheck();
+    }, 15 * 60 * 1000);
 
     // Also check when tab/app becomes visible again (e.g. returning to PWA)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        checkAndNotifyOverdueProperties(user, properties);
+        if (overdueCount > 0) checkAndNotifyOverdueProperties(user, properties);
+        if (scheduleEvents.length > 0) checkAndNotifyScheduleAlerts(user, scheduleEvents);
+        triggerBackendScheduleCheck();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -143,6 +173,10 @@ function MainApp() {
     // Handle clicks from ServiceWorker notifications
     const handleSwMessage = (event: MessageEvent) => {
       if (event.data?.type === 'NOTIFICATION_CLICKED') {
+        const payloadType = event.data?.payload?.type;
+        if (payloadType === 'EVENT_REMINDER' || payloadType === 'VISIT_TODAY' || payloadType === 'VISIT_TOMORROW') {
+          setActiveView('schedule');
+        }
         setShowUpdateReminder(true);
       }
     };
@@ -153,7 +187,11 @@ function MainApp() {
 
     // Check if opened via notification link URL parameter
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('view') === 'reminder' && overdueCount > 0) {
+    const viewParam = urlParams.get('view');
+    if (viewParam === 'reminder' || viewParam === 'schedule' || viewParam === 'alerts') {
+      if (viewParam === 'schedule') {
+        setActiveView('schedule');
+      }
       setShowUpdateReminder(true);
     }
 
@@ -164,7 +202,7 @@ function MainApp() {
         navigator.serviceWorker.removeEventListener('message', handleSwMessage);
       }
     };
-  }, [user, overdueCount, properties]);
+  }, [user, overdueCount, properties, scheduleEvents]);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -909,6 +947,56 @@ function MainApp() {
     setScheduleEvents(currentSchedule);
   };
 
+  const handleConfirmPresence = async (eventId: string) => {
+    if (!user) return;
+
+    // Optimistic local state update
+    const currentSchedule = getStoredSchedule();
+    const updatedSchedule = currentSchedule.map(ev => {
+      if (ev.id === eventId) {
+        const attendees = ev.confirmed_attendees || [];
+        if (!attendees.includes(user.id)) {
+          const newAttendees = [...attendees, user.id];
+          const newDetails = [
+            ...(ev.confirmed_attendees_details || []),
+            {
+              user_id: user.id,
+              user_name: user.name,
+              user_role: user.role,
+              confirmed_at: new Date().toISOString()
+            }
+          ];
+          return {
+            ...ev,
+            confirmed_attendees: newAttendees,
+            confirmed_attendees_details: newDetails
+          };
+        }
+      }
+      return ev;
+    });
+
+    saveStoredSchedule(updatedSchedule);
+    setScheduleEvents(updatedSchedule);
+
+    if (isBackendHealthy) {
+      try {
+        const res = await fetch(`/api/schedule/${eventId}/confirm-presence`, {
+          method: 'POST',
+          headers: getAuthHeaders(true)
+        });
+        if (res.ok) {
+          const d = await res.json();
+          if (d.event) {
+            setScheduleEvents(prev => prev.map(ev => ev.id === eventId ? d.event : ev));
+          }
+        }
+      } catch (e) {
+        console.warn('Backend API error during presence confirmation:', e);
+      }
+    }
+  };
+
   const handlePropertiesImported = (newPropsList: Property[], message: string) => {
     if (Array.isArray(newPropsList) && newPropsList.length > 0) {
       setProperties(newPropsList);
@@ -946,16 +1034,23 @@ function MainApp() {
         activeView={activeView}
         setActiveView={setActiveView}
         users={users}
-        updateReminderCount={overdueCount}
+        updateReminderCount={totalAlertsCount}
         onOpenUpdateReminder={() => setShowUpdateReminder(true)}
       />
 
-      {showUpdateReminder && overdueCount > 0 && !isMasterOrGestor && (
-        <PropertyUpdateReminderModal
+      {showUpdateReminder && totalAlertsCount > 0 && (
+        <UnifiedDailyAlertsModal
+          user={user}
           properties={updateReminderProperties}
-          onConfirmed={handlePropertyStatusConfirmed}
+          scheduleEvents={scheduleEvents}
+          isOpen={showUpdateReminder}
+          onConfirmPropertyStatus={handlePropertyStatusConfirmed}
+          onConfirmEventPresence={(ev) => handleConfirmPresence(ev.id)}
+          onNavigateToSchedule={() => {
+            setShowUpdateReminder(false);
+            setActiveView('schedule');
+          }}
           onClose={() => setShowUpdateReminder(false)}
-          showOwnerName={false}
         />
       )}
 
@@ -1006,6 +1101,7 @@ function MainApp() {
               scheduleEvents={scheduleEvents}
               onAddEvent={handleAddScheduleEvent}
               onDeleteEvent={handleDeleteScheduleEvent}
+              onConfirmPresence={handleConfirmPresence}
             />
           )}
 

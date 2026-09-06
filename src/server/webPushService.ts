@@ -10,7 +10,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
-import { User, Property } from '../types';
+import { User, Property, ScheduleEvent } from '../types';
 
 let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
 let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';
@@ -234,6 +234,49 @@ export async function sendPushToUser(
 }
 
 /**
+ * Send Web Push to all registered devices of all active users (or excluding a specific user if desired)
+ * Used for Gestor-created events, meetings, and team announcements.
+ */
+export async function sendPushToAllUsers(
+  db: Firestore,
+  payload: PushPayload,
+  excludeUserId?: string
+): Promise<{ sent: number; total: number; userCount: number }> {
+  try {
+    const snap = await getDocs(collection(db, 'push_subscriptions'));
+    if (snap.empty) {
+      return { sent: 0, total: 0, userCount: 0 };
+    }
+
+    let sent = 0;
+    const notifiedUserIds = new Set<string>();
+
+    for (const d of snap.docs) {
+      const data = d.data() as any;
+      if (excludeUserId && data.user_id === excludeUserId) {
+        continue;
+      }
+      if (data.endpoint && data.keys) {
+        const success = await sendWebPushNotification(
+          db,
+          { id: d.id, endpoint: data.endpoint, keys: data.keys },
+          payload
+        );
+        if (success) {
+          sent++;
+          if (data.user_id) notifiedUserIds.add(data.user_id);
+        }
+      }
+    }
+
+    return { sent, total: snap.size, userCount: notifiedUserIds.size };
+  } catch (err) {
+    console.error('[WebPush] Error broadcasting push to all users:', err);
+    return { sent: 0, total: 0, userCount: 0 };
+  }
+}
+
+/**
  * Automated Checker: Scans all properties in Firestore, identifies overdue listings,
  * and delivers real Web Push notifications to the respective captadores.
  */
@@ -336,4 +379,190 @@ export async function checkAndDispatchOverduePropertyAlerts(db: Firestore): Prom
     console.error('[WebPush] Error during automated overdue property check:', err);
     throw err;
   }
+}
+
+function formatBrDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+}
+
+/**
+ * Automated Checker for Schedule & Agenda:
+ * 1) Gestor Events/Meetings/Trainings:
+ *    - Sends daily push reminders to all captadores and other gestores until the date concludes
+ *      and the user confirms attendance.
+ * 2) Captador Visits & Appointments:
+ *    - Strictly alerts ONLY the assigned captador (never other users).
+ *    - Sends notification 1 day before the visit (tomorrow).
+ *    - Sends notification on the day of the visit (today).
+ */
+export async function checkAndDispatchScheduleAlerts(db: Firestore): Promise<{
+  gestorEventsChecked: number;
+  unconfirmedUsersNotified: number;
+  visitsTodayCount: number;
+  visitsTomorrowCount: number;
+  totalNotificationsDelivered: number;
+  details: Array<{ type: string; title: string; user_id: string; delivered: boolean }>;
+}> {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrowObj = new Date();
+    tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+    const tomorrow = tomorrowObj.toISOString().slice(0, 10);
+
+    // Fetch all schedule events
+    const scheduleSnap = await getDocs(collection(db, 'schedule'));
+    const allEvents: ScheduleEvent[] = scheduleSnap.docs.map(d => ({ ...d.data(), id: d.id } as ScheduleEvent));
+
+    // Fetch all active users
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const allUsers: User[] = usersSnap.docs.map(d => ({ ...d.data(), id: d.id } as User));
+    const activeUsers = allUsers.filter(u => u.status !== 'blocked');
+
+    let gestorEventsChecked = 0;
+    let unconfirmedUsersNotified = 0;
+    let visitsTodayCount = 0;
+    let visitsTomorrowCount = 0;
+    let totalNotificationsDelivered = 0;
+    const details: Array<{ type: string; title: string; user_id: string; delivered: boolean }> = [];
+
+    // 1. Process Gestor Events, Meetings & Trainings (daily reminder until date passed and presence confirmed)
+    const gestorEventTypes = ['EVENTO', 'REUNIAO', 'TREINAMENTO'];
+    const activeGestorEvents = allEvents.filter(
+      ev => gestorEventTypes.includes(ev.type) && ev.date >= today
+    );
+
+    gestorEventsChecked = activeGestorEvents.length;
+
+    for (const event of activeGestorEvents) {
+      const confirmedUserIds = new Set(event.confirmed_attendees || []);
+      const typeLabel = event.type === 'REUNIAO' ? 'Reunião' : event.type === 'TREINAMENTO' ? 'Treinamento' : 'Evento';
+
+      for (const targetUser of activeUsers) {
+        // If user already confirmed presence, stop reminding them!
+        if (confirmedUserIds.has(targetUser.id)) {
+          continue;
+        }
+
+        const isToday = event.date === today;
+        const pushResult = await sendPushToUser(db, targetUser.id, {
+          title: `🔔 ${isToday ? 'Hoje: ' : 'Lembrete: '}${typeLabel} - ${event.title}`,
+          body: `${isToday ? 'Hoje' : formatBrDate(event.date)} às ${event.start_time}${event.location ? ` | ${event.location}` : ''}. Confirme sua presença no app!`,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          tag: `event-reminder-${event.id}-${today}`,
+          data: {
+            url: `/?view=schedule&event=${event.id}`,
+            type: 'EVENT_REMINDER',
+            eventId: event.id
+          }
+        });
+
+        if (pushResult.sent > 0) {
+          unconfirmedUsersNotified++;
+          totalNotificationsDelivered += pushResult.sent;
+        }
+
+        details.push({
+          type: event.type,
+          title: event.title,
+          user_id: targetUser.id,
+          delivered: pushResult.sent > 0
+        });
+      }
+    }
+
+    // 2. Process Captador Visits (strictly for the assigned captador only, 1 day before and day of)
+    const visitEvents = allEvents.filter(ev => ev.type === 'VISITA');
+
+    for (const visit of visitEvents) {
+      if (!visit.user_id) continue;
+
+      if (visit.date === today) {
+        // Today's visit reminder
+        visitsTodayCount++;
+        const pushResult = await sendPushToUser(db, visit.user_id, {
+          title: `🔔 Você tem Visita Hoje às ${visit.start_time}!`,
+          body: `Cliente: ${visit.client_name || 'Agendado'}${visit.property_code ? ` | Imóvel ${visit.property_code}` : ''}${visit.location ? ` | ${visit.location}` : ''}`,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          tag: `visit-today-${visit.id}-${today}`,
+          data: {
+            url: `/?view=schedule&event=${visit.id}`,
+            type: 'VISIT_TODAY',
+            eventId: visit.id
+          }
+        });
+
+        if (pushResult.sent > 0) {
+          totalNotificationsDelivered += pushResult.sent;
+        }
+
+        details.push({
+          type: 'VISITA_HOJE',
+          title: visit.title,
+          user_id: visit.user_id,
+          delivered: pushResult.sent > 0
+        });
+      } else if (visit.date === tomorrow) {
+        // Tomorrow's visit reminder (1 day before)
+        visitsTomorrowCount++;
+        const pushResult = await sendPushToUser(db, visit.user_id, {
+          title: `📅 Visita Amanhã às ${visit.start_time}`,
+          body: `Cliente: ${visit.client_name || 'Agendado'}${visit.property_code ? ` | Imóvel ${visit.property_code}` : ''}. Prepare o atendimento e documentação!`,
+          icon: '/icon-192.png',
+          badge: '/icon-192.png',
+          tag: `visit-tomorrow-${visit.id}-${today}`,
+          data: {
+            url: `/?view=schedule&event=${visit.id}`,
+            type: 'VISIT_TOMORROW',
+            eventId: visit.id
+          }
+        });
+
+        if (pushResult.sent > 0) {
+          totalNotificationsDelivered += pushResult.sent;
+        }
+
+        details.push({
+          type: 'VISITA_AMANHA',
+          title: visit.title,
+          user_id: visit.user_id,
+          delivered: pushResult.sent > 0
+        });
+      }
+    }
+
+    return {
+      gestorEventsChecked,
+      unconfirmedUsersNotified,
+      visitsTodayCount,
+      visitsTomorrowCount,
+      totalNotificationsDelivered,
+      details
+    };
+  } catch (err) {
+    console.error('[WebPush] Error during automated schedule alerts check:', err);
+    throw err;
+  }
+}
+
+/**
+ * Master automated dispatcher that runs both overdue property reminders and schedule alerts
+ */
+export async function checkAndDispatchAllDailyAlerts(db: Firestore): Promise<{
+  overdueProperties: any;
+  scheduleAlerts: any;
+}> {
+  const [overdueResult, scheduleResult] = await Promise.allSettled([
+    checkAndDispatchOverduePropertyAlerts(db),
+    checkAndDispatchScheduleAlerts(db)
+  ]);
+
+  return {
+    overdueProperties: overdueResult.status === 'fulfilled' ? overdueResult.value : { error: overdueResult.reason },
+    scheduleAlerts: scheduleResult.status === 'fulfilled' ? scheduleResult.value : { error: scheduleResult.reason }
+  };
 }

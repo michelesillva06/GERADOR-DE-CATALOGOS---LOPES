@@ -39,15 +39,15 @@ export const Header: React.FC<HeaderProps> = ({ activeView, setActiveView, users
           {/* In-app PWA install button (hidden if already installed) */}
           <PWAInstallButton />
 
-          {/* Update Reminder Bell — reopens the daily "confirmar com o proprietário" reminder anytime */}
+          {/* Daily Unified Alerts Bell (Visits, Events, Properties) */}
           {onOpenUpdateReminder && updateReminderCount > 0 && (
             <button
               onClick={onOpenUpdateReminder}
-              className="relative p-2 rounded-xl hover:bg-slate-100 transition"
-              title={`${updateReminderCount} imóvel(is) precisam de confirmação de status`}
+              className="relative p-2 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+              title={`${updateReminderCount} alerta(s) pendente(s) (visitas, reuniões ou atualizações)`}
             >
-              <Bell className="w-5 h-5 text-slate-500" />
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center">
+              <Bell className="w-5 h-5 text-slate-600 animate-swing" />
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#F10F4D] text-white text-[10px] font-black flex items-center justify-center shadow-xs">
                 {updateReminderCount}
               </span>
             </button>

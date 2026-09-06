@@ -3,7 +3,8 @@ import { PostTemplateId } from '../components/postTemplates';
 import { extractPropertyImages } from './pdfGenerator';
 
 export type PostDesignTheme = 'ruby_premium' | 'gold_dark';
-export type PostLayoutStyle = 'single' | 'gallery';
+export type PostLayoutStyle = 'single' | 'mosaic' | 'gallery';
+export type MosaicLayoutVariant = 'top_two_bottom' | 'left_two_right' | 'top_three_bottom';
 
 export interface CanvasPostData {
   headlineLine1?: string;
@@ -19,6 +20,7 @@ export interface CanvasPostData {
   hook?: string;
   designTheme?: PostDesignTheme;
   layoutStyle?: PostLayoutStyle;
+  mosaicVariant?: MosaicLayoutVariant;
   secondaryPhotos?: string[];
 }
 
@@ -557,6 +559,136 @@ export function drawPriceAndLocationBanners(
   ctx.fillStyle = '#FFFFFF';
   ctx.font = "800 22px 'Plus Jakarta Sans', 'Inter', sans-serif";
   ctx.fillText(locationText, x + 48, locY + 33);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the modern, balanced Two-Column bottom area:
+ * - Left Side: Valor do Imóvel (Price in prominent typography) + Bairro/Localização (with map pin)
+ * - Right Side: CTA Button ("AGENDE SUA VISITA") + WhatsApp contact line
+ */
+export function drawTwoColumnBottomActionSection(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  centerY: number,
+  priceText: string,
+  locationText: string,
+  ctaText: string,
+  whatsappNum: string,
+  theme: PostDesignTheme = 'ruby_premium',
+  isStory: boolean = false,
+  isSquare: boolean = false
+): void {
+  ctx.save();
+  const palette = getThemePalette(theme);
+
+  const paddingX = 45;
+  const colGap = 24;
+  const totalUsableW = width - (paddingX * 2);
+  const leftColW = Math.floor((totalUsableW - colGap) * 0.48); // ~465px
+  const rightColW = totalUsableW - leftColW - colGap; // ~500px
+
+  const leftX = paddingX;
+  const rightX = leftX + leftColW + colGap;
+  const rightCenterX = rightX + Math.floor(rightColW / 2);
+
+  const isDark = palette.isDark;
+
+  // ----------------------------------------------------
+  // 1. LEFT COLUMN: VALOR & BAIRRO
+  // ----------------------------------------------------
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  const labelText = priceText.toLowerCase().includes('/mês') ? 'VALOR DE LOCAÇÃO' : 'VALOR DO IMÓVEL';
+  
+  // Category / Purpose Tag Label
+  ctx.fillStyle = isDark ? '#94A3B8' : '#64748B';
+  const labelFontSize = isSquare ? 13 : 15;
+  ctx.font = `800 ${labelFontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+  ctx.fillText(labelText, leftX, centerY - (isSquare ? 28 : 34));
+
+  // High-impact Price Typography
+  const priceFontSize = isSquare ? 34 : (isStory ? 44 : 40);
+  ctx.font = `900 ${priceFontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+  ctx.fillStyle = theme === 'gold_dark' 
+    ? '#F3E5AB' 
+    : (isDark ? '#FFFFFF' : '#F10F4D');
+  ctx.fillText(priceText, leftX, centerY + (isSquare ? 2 : 4));
+
+  // Location / Bairro Row below price
+  const locY = centerY + (isSquare ? 34 : 42);
+  const locFontSize = isSquare ? 18 : 21;
+  ctx.font = `800 ${locFontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+  
+  // Pin Icon
+  ctx.fillStyle = theme === 'gold_dark' ? '#D4AF37' : '#F10F4D';
+  ctx.fillText('📍', leftX, locY);
+
+  // Bairro | Cidade text
+  ctx.fillStyle = isDark ? '#CBD5E1' : '#1E293B';
+  let locDisplay = locationText;
+  if (ctx.measureText(locDisplay).width > leftColW - 35) {
+    // Truncate cleanly if locationText is overly long
+    while (locDisplay.length > 5 && ctx.measureText(locDisplay + '...').width > leftColW - 35) {
+      locDisplay = locDisplay.slice(0, -1);
+    }
+    locDisplay += '...';
+  }
+  ctx.fillText(locDisplay, leftX + 28, locY);
+
+  // ----------------------------------------------------
+  // 2. RIGHT COLUMN: CTA BUTTON & WHATSAPP
+  // ----------------------------------------------------
+  // CTA Button
+  const btnW = Math.min(rightColW, isSquare ? 420 : 460);
+  const btnH = isSquare ? 54 : (isStory ? 66 : 60);
+  const btnX = rightCenterX - Math.floor(btnW / 2);
+  const btnY = centerY - (whatsappNum ? (isSquare ? 26 : 32) : Math.floor(btnH / 2));
+
+  // Button Shadow
+  ctx.shadowColor = theme === 'gold_dark' ? 'rgba(212, 175, 55, 0.35)' : 'rgba(241, 15, 77, 0.35)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 6;
+
+  // Button Background Gradient
+  drawRoundRect(ctx, btnX, btnY, btnW, btnH, isSquare ? 14 : 16);
+  const ctaGrad = ctx.createLinearGradient(btnX, btnY, btnX + btnW, btnY);
+  ctaGrad.addColorStop(0, palette.ctaGrad[0]);
+  ctaGrad.addColorStop(1, palette.ctaGrad[1]);
+  ctx.fillStyle = ctaGrad;
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+
+  // Button Text + Arrow
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = palette.ctaText;
+  const ctaFontSize = isSquare ? 18 : 20;
+  ctx.font = `900 ${ctaFontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+  ctx.fillText(`${ctaText.toUpperCase()} →`, rightCenterX, btnY + Math.floor(btnH / 2));
+
+  // WhatsApp Row under CTA Button
+  if (whatsappNum) {
+    const waY = btnY + btnH + (isSquare ? 18 : 22);
+    const waText = `WhatsApp: ${whatsappNum}`;
+    const waFontSize = isSquare ? 16 : 18;
+    const waIconSize = isSquare ? 20 : 24;
+
+    ctx.font = `800 ${waFontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
+    const waMetrics = ctx.measureText(waText);
+    const waTotalW = waIconSize + 8 + waMetrics.width;
+    const waStartX = rightCenterX - Math.floor(waTotalW / 2);
+
+    drawWhatsAppVectorIcon(ctx, waStartX, waY - Math.floor(waIconSize / 2), waIconSize);
+
+    ctx.fillStyle = isDark ? '#F3E5AB' : '#0F172A';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(waText, waStartX + waIconSize + 8, waY);
+  }
 
   ctx.restore();
 }
@@ -1153,6 +1285,144 @@ function drawCenteredWrappedHeadline(
 }
 
 /**
+ * Renders a high-resolution Photo Mosaic / Collage directly to Canvas 2D
+ * Supported layouts:
+ * - 'top_two_bottom': 1 Top Hero photo + 2 bottom equal columns (Total 3 photos)
+ * - 'left_two_right': 1 Left Tall Hero photo + 2 right stacked photos (Total 3 photos)
+ * - 'top_three_bottom': 1 Top Hero photo + 3 bottom equal columns (Total 4 photos)
+ */
+export async function drawPhotoMosaic(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+  mainPhotoUrl: string,
+  secondaryUrls: string[],
+  variant: MosaicLayoutVariant = 'top_two_bottom',
+  theme: PostDesignTheme = 'ruby_premium'
+): Promise<void> {
+  const gap = 5;
+  // Strictly deduplicate and exclude main photo
+  const cleanSecUrls = Array.from(new Set(secondaryUrls))
+    .filter(u => u && u.trim() !== mainPhotoUrl.trim());
+
+  ctx.save();
+  if (radius > 0) {
+    drawRoundRect(ctx, x, y, w, h, radius);
+    ctx.clip();
+  }
+
+  // Divider background color
+  ctx.fillStyle = theme === 'gold_dark' ? '#0B1120' : '#FFFFFF';
+  ctx.fillRect(x, y, w, h);
+
+  // If no secondary photos, render single full photo
+  if (cleanSecUrls.length === 0) {
+    try {
+      const img = await loadImageSafely(mainPhotoUrl);
+      drawImageCover(ctx, img, x, y, w, h);
+    } catch {
+      ctx.fillStyle = '#1E293B';
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // Pre-load all photos in parallel
+  const [mainImg, ...secImgs] = await Promise.all([
+    loadImageSafely(mainPhotoUrl).catch(() => null),
+    ...cleanSecUrls.map(u => loadImageSafely(u).catch(() => null))
+  ]);
+
+  if (variant === 'left_two_right') {
+    // LAYOUT: 1 Left Hero (58% width) + 2 or 3 Right Stacked
+    const leftW = Math.round(w * 0.58) - Math.floor(gap / 2);
+    const rightX = x + leftW + gap;
+    const rightW = w - leftW - gap;
+
+    // 1. Left Main Photo
+    if (mainImg) {
+      drawImageCover(ctx, mainImg, x, y, leftW, h);
+    } else {
+      ctx.fillStyle = '#1E293B';
+      ctx.fillRect(x, y, leftW, h);
+    }
+
+    // Soft gradient on bottom of left photo for price banner legibility
+    const leftGrad = ctx.createLinearGradient(0, y + h - 180, 0, y + h);
+    leftGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
+    leftGrad.addColorStop(1, 'rgba(15, 23, 42, 0.78)');
+    ctx.fillStyle = leftGrad;
+    ctx.fillRect(x, y + h - 180, leftW, 180);
+
+    // 2. Right Stacked Secondary Photos
+    const count = Math.min(3, Math.max(1, secImgs.length));
+    const cellH = Math.floor((h - gap * (count - 1)) / count);
+
+    for (let i = 0; i < count; i++) {
+      const cellY = y + i * (cellH + gap);
+      const curH = (i === count - 1) ? (y + h - cellY) : cellH;
+      const sImg = secImgs[i];
+      if (sImg) {
+        drawImageCover(ctx, sImg, rightX, cellY, rightW, curH);
+      } else {
+        ctx.fillStyle = '#1E293B';
+        ctx.fillRect(rightX, cellY, rightW, curH);
+      }
+    }
+  } else {
+    // LAYOUT: 1 Top Hero (58% height) + 2 or 3 Bottom Columns
+    const topH = Math.round(h * 0.58) - Math.floor(gap / 2);
+    const bottomY = y + topH + gap;
+    const bottomH = h - topH - gap;
+
+    // 1. Top Main Photo
+    if (mainImg) {
+      drawImageCover(ctx, mainImg, x, y, w, topH);
+    } else {
+      ctx.fillStyle = '#1E293B';
+      ctx.fillRect(x, y, w, topH);
+    }
+
+    // Soft gradient on bottom of top photo for price banner legibility
+    const topGrad = ctx.createLinearGradient(0, y + topH - 150, 0, y + topH);
+    topGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
+    topGrad.addColorStop(1, 'rgba(15, 23, 42, 0.78)');
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(x, y + topH - 150, w, 150);
+
+    // 2. Bottom Secondary Photos (2 or 3 columns)
+    const targetCount = variant === 'top_three_bottom' ? 3 : 2;
+    const count = Math.min(targetCount, Math.max(1, secImgs.length));
+    const cellW = Math.floor((w - gap * (count - 1)) / count);
+
+    for (let i = 0; i < count; i++) {
+      const cellX = x + i * (cellW + gap);
+      const curW = (i === count - 1) ? (x + w - cellX) : cellW;
+      const sImg = secImgs[i];
+      if (sImg) {
+        drawImageCover(ctx, sImg, cellX, bottomY, curW, bottomH);
+      } else {
+        ctx.fillStyle = '#1E293B';
+        ctx.fillRect(cellX, bottomY, curW, bottomH);
+      }
+    }
+  }
+
+  // Top header vignette overlay for status badge contrast
+  const headerGrad = ctx.createLinearGradient(0, y, 0, y + 150);
+  headerGrad.addColorStop(0, 'rgba(15, 23, 42, 0.55)');
+  headerGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+  ctx.fillStyle = headerGrad;
+  ctx.fillRect(x, y, w, 150);
+
+  ctx.restore();
+}
+
+/**
  * Dedicated Instagram Story Renderer (9:16 - 1080x1920)
  * Engineered with strict safe-zones for Instagram UI (top 200px header & bottom 150px input overlay)
  * Features a portrait hero photo card, floating badges, balanced specs grid, CTA & Footer.
@@ -1195,7 +1465,8 @@ async function drawInstagramStoryDedicatedLayout(
   const ctaText = aiData?.ctaText || 'AGENDE SUA VISITA';
   const whatsappNum = (aiData?.whatsappNumber || companySettings.whatsapp || companySettings.phone || '').trim();
 
-  const isGallery = aiData?.layoutStyle === 'gallery';
+  const isMosaic = aiData?.layoutStyle === 'mosaic' || aiData?.layoutStyle === 'gallery';
+  const mosaicVariant = aiData?.mosaicVariant || 'top_two_bottom';
   const palette = getThemePalette(theme);
 
   // 2. Full Background Canvas Fill
@@ -1223,111 +1494,73 @@ async function drawInstagramStoryDedicatedLayout(
   ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
   ctx.shadowBlur = 30;
   ctx.shadowOffsetY = 12;
-
   drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
   ctx.fillStyle = '#1E293B';
   ctx.fill();
-  ctx.shadowColor = 'transparent';
-
-  // Clip photo inside card
-  ctx.save();
-  ctx.beginPath();
-  drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
-  ctx.clip();
-
-  try {
-    const bgImg = await loadImageSafely(photoUrl);
-    drawImageCover(ctx, bgImg, cardX, cardY, cardW, cardH);
-  } catch (e) {
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(cardX, cardY, cardW, cardH);
-  }
-
-  // Soft bottom dark gradient inside photo card for legibility of floating banners
-  const photoGrad = ctx.createLinearGradient(0, cardY + cardH - 220, 0, cardY + cardH);
-  photoGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
-  photoGrad.addColorStop(1, 'rgba(15, 23, 42, 0.75)');
-  ctx.fillStyle = photoGrad;
-  ctx.fillRect(cardX, cardY + cardH - 220, cardW, 220);
-
-  ctx.restore(); // end clip
-
-  // Crisp border frame accent
-  ctx.strokeStyle = palette.isDark ? 'rgba(212, 175, 55, 0.6)' : 'rgba(255, 255, 255, 0.8)';
-  ctx.lineWidth = 3;
-  drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
-  ctx.stroke();
-
   ctx.restore();
 
-  // 5. Floating Banners inside / on bottom edge of Photo Card
   const secondaryList = aiData?.secondaryPhotos || [];
-  let thumbUrls: string[] = secondaryList.filter(img => img && img !== photoUrl);
-  if (isGallery && thumbUrls.length < 3) {
+  let thumbUrls: string[] = secondaryList.filter(img => img && img.trim() !== photoUrl.trim());
+  if (isMosaic && thumbUrls.length < (mosaicVariant === 'top_three_bottom' ? 3 : 2)) {
     const propImgs = extractPropertyImages(property);
     for (const img of propImgs) {
-      if (thumbUrls.length >= 3) break;
-      if (img !== photoUrl && !thumbUrls.includes(img)) {
+      if (thumbUrls.length >= (mosaicVariant === 'top_three_bottom' ? 3 : 2)) break;
+      if (img.trim() !== photoUrl.trim() && !thumbUrls.includes(img)) {
         thumbUrls.push(img);
       }
     }
   }
+  thumbUrls = Array.from(new Set(thumbUrls)).filter(img => img.trim() !== photoUrl.trim());
 
-  const thumbCount = isGallery ? Math.min(3, thumbUrls.length) : 0;
-  const hasThumbnails = isGallery && thumbCount > 0;
-
-  if (hasThumbnails) {
-    // Gallery Thumbnails anchored at bottom edge of photo card (Y = 860px to Y = 1010px)
-    const thumbPadX = cardX + 20;
-    const gap = 14;
-    const availW = cardW - 40;
-    const thumbW = Math.floor((availW - gap * (thumbCount - 1)) / thumbCount);
-    const thumbH = 150;
-    const thumbY = cardY + cardH - 170;
-
-    // Draw Price & Location floating above thumbnails
-    drawPriceAndLocationBanners(ctx, cardX + 20, thumbY - 110, priceFormatted, locationText, theme);
-
-    const loadedThumbs = await Promise.all(
-      thumbUrls.slice(0, thumbCount).map(url => loadImageSafely(url).catch(() => null))
+  if (isMosaic && thumbUrls.length > 0) {
+    await drawPhotoMosaic(
+      ctx,
+      cardX,
+      cardY,
+      cardW,
+      cardH,
+      cardRadius,
+      photoUrl,
+      thumbUrls,
+      mosaicVariant,
+      theme
     );
 
-    loadedThumbs.forEach((tImg, idx) => {
-      const tx = thumbPadX + idx * (thumbW + gap);
-
-      ctx.save();
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.40)';
-      ctx.shadowBlur = 16;
-      ctx.shadowOffsetY = 6;
-
-      drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 14);
-      ctx.fillStyle = '#1E293B';
-      ctx.fill();
-      ctx.shadowColor = 'transparent';
-
-      ctx.save();
-      ctx.beginPath();
-      drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 14);
-      ctx.clip();
-
-      if (tImg) {
-        drawImageCover(ctx, tImg, tx, thumbY, thumbW, thumbH);
-      } else {
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(tx, thumbY, thumbW, thumbH);
-      }
-      ctx.restore();
-
-      ctx.strokeStyle = palette.isDark ? '#D4AF37' : '#FFFFFF';
-      ctx.lineWidth = 3;
-      drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 14);
-      ctx.stroke();
-
-      ctx.restore();
-    });
+    // Crisp border frame accent
+    ctx.save();
+    ctx.strokeStyle = palette.isDark ? 'rgba(212, 175, 55, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 3;
+    drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+    ctx.stroke();
+    ctx.restore();
   } else {
-    // Single photo mode: Price & Location floating near bottom of photo card
-    drawPriceAndLocationBanners(ctx, cardX + 24, cardY + cardH - 120, priceFormatted, locationText, theme);
+    // Single photo inside card
+    ctx.save();
+    ctx.beginPath();
+    drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+    ctx.clip();
+
+    try {
+      const bgImg = await loadImageSafely(photoUrl);
+      drawImageCover(ctx, bgImg, cardX, cardY, cardW, cardH);
+    } catch (e) {
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(cardX, cardY, cardW, cardH);
+    }
+
+    const photoGrad = ctx.createLinearGradient(0, cardY + cardH - 220, 0, cardY + cardH);
+    photoGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
+    photoGrad.addColorStop(1, 'rgba(15, 23, 42, 0.75)');
+    ctx.fillStyle = photoGrad;
+    ctx.fillRect(cardX, cardY + cardH - 220, cardW, 220);
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = palette.isDark ? 'rgba(212, 175, 55, 0.6)' : 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 3;
+    drawRoundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // 6. Property Title (Y = 1070px)
@@ -1445,29 +1678,19 @@ async function drawInstagramStoryDedicatedLayout(
   });
   ctx.restore();
 
-  // 8. Call to Action & WhatsApp Area (Anchored safely at Y = 1520px)
-  const ctaCenterY = 1520;
-  drawCtaBannerCentered(ctx, width / 2, ctaCenterY, ctaText, theme, true);
-
-  if (whatsappNum) {
-    ctx.save();
-    const waY = 1620;
-    const waText = `WhatsApp: ${whatsappNum}`;
-    const waFontSize = 25;
-    const waIconSize = 32;
-
-    ctx.font = `800 ${waFontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
-    const waTextMetrics = ctx.measureText(waText);
-    const waTotalW = waIconSize + 12 + waTextMetrics.width;
-    const waStartX = (width - waTotalW) / 2;
-
-    drawWhatsAppVectorIcon(ctx, waStartX, waY - Math.floor(waIconSize / 2 + 5), waIconSize);
-
-    ctx.fillStyle = theme === 'gold_dark' ? '#F3E5AB' : '#0F172A';
-    ctx.textAlign = 'left';
-    ctx.fillText(waText, waStartX + waIconSize + 12, waY);
-    ctx.restore();
-  }
+  // 8. Bottom Action Section (Two-Column: Left = Valor + Bairro, Right = CTA + WhatsApp)
+  drawTwoColumnBottomActionSection(
+    ctx,
+    width,
+    1550,
+    priceFormatted,
+    locationText,
+    ctaText,
+    whatsappNum,
+    theme,
+    true,
+    false
+  );
 
   // 9. Footer Bar (Anchored at Y = 1680px to Y = 1790px - ABOVE bottom Instagram safe zone!)
   const storyFooterH = 110;
@@ -1576,30 +1799,61 @@ export async function renderPostToCanvas(
   const photoHeightRatio = 0.50; // Always half of post height (50%)
   const photoHeight = Math.round(height * photoHeightRatio);
 
-  // 1. Draw Background Photo
-  try {
-    const bgImg = await loadImageSafely(photoUrl);
-    drawImageCover(ctx, bgImg, 0, 0, width, photoHeight + 35); // Overlap slightly under card
-  } catch (e) {
-    console.warn('Failed to load photo, drawing placeholder:', e);
-    ctx.fillStyle = '#1E293B';
-    ctx.fillRect(0, 0, width, photoHeight);
+  const isMosaic = aiData?.layoutStyle === 'mosaic' || aiData?.layoutStyle === 'gallery';
+  const mosaicVariant = aiData?.mosaicVariant || 'top_two_bottom';
+
+  const secondaryList = aiData?.secondaryPhotos || [];
+  let thumbUrls: string[] = secondaryList.filter(img => img && img.trim() !== photoUrl.trim());
+  if (isMosaic && thumbUrls.length < (mosaicVariant === 'top_three_bottom' ? 3 : 2)) {
+    const propImgs = extractPropertyImages(property);
+    for (const img of propImgs) {
+      if (thumbUrls.length >= (mosaicVariant === 'top_three_bottom' ? 3 : 2)) break;
+      if (img.trim() !== photoUrl.trim() && !thumbUrls.includes(img)) {
+        thumbUrls.push(img);
+      }
+    }
   }
+  thumbUrls = Array.from(new Set(thumbUrls)).filter(img => img.trim() !== photoUrl.trim());
 
-  // 2. Photographic Vignette Top Gradient
-  const topGrad = ctx.createLinearGradient(0, 0, 0, 240);
-  topGrad.addColorStop(0, 'rgba(15, 23, 42, 0.60)');
-  topGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
-  ctx.fillStyle = topGrad;
-  ctx.fillRect(0, 0, width, 240);
+  // 1. Draw Photos (Single Photo or Mosaic Collage)
+  if (isMosaic && thumbUrls.length > 0) {
+    await drawPhotoMosaic(
+      ctx,
+      0,
+      0,
+      width,
+      photoHeight,
+      0,
+      photoUrl,
+      thumbUrls,
+      mosaicVariant,
+      theme
+    );
+  } else {
+    try {
+      const bgImg = await loadImageSafely(photoUrl);
+      drawImageCover(ctx, bgImg, 0, 0, width, photoHeight + 35); // Overlap slightly under card
+    } catch (e) {
+      console.warn('Failed to load photo, drawing placeholder:', e);
+      ctx.fillStyle = '#1E293B';
+      ctx.fillRect(0, 0, width, photoHeight);
+    }
 
-  // 3. Bottom Gradient Transition Overlay on Photo
-  const transitionGrad = ctx.createLinearGradient(0, photoHeight - 200, 0, photoHeight);
-  transitionGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
-  transitionGrad.addColorStop(0.5, 'rgba(15, 23, 42, 0.50)');
-  transitionGrad.addColorStop(1, 'rgba(15, 23, 42, 0.88)');
-  ctx.fillStyle = transitionGrad;
-  ctx.fillRect(0, photoHeight - 200, width, 200);
+    // Photographic Vignette Top Gradient
+    const topGrad = ctx.createLinearGradient(0, 0, 0, 240);
+    topGrad.addColorStop(0, 'rgba(15, 23, 42, 0.60)');
+    topGrad.addColorStop(1, 'rgba(15, 23, 42, 0)');
+    ctx.fillStyle = topGrad;
+    ctx.fillRect(0, 0, width, 240);
+
+    // Bottom Gradient Transition Overlay on Photo
+    const transitionGrad = ctx.createLinearGradient(0, photoHeight - 200, 0, photoHeight);
+    transitionGrad.addColorStop(0, 'rgba(15, 23, 42, 0)');
+    transitionGrad.addColorStop(0.5, 'rgba(15, 23, 42, 0.50)');
+    transitionGrad.addColorStop(1, 'rgba(15, 23, 42, 0.88)');
+    ctx.fillStyle = transitionGrad;
+    ctx.fillRect(0, photoHeight - 200, width, 200);
+  }
 
   // 4. Process Variables
   const purposeLower = (property.purpose || '').toLowerCase().trim();
@@ -1634,8 +1888,6 @@ export async function renderPostToCanvas(
 
   const ctaText = aiData?.ctaText || 'AGENDE SUA VISITA';
   const whatsappNum = (aiData?.whatsappNumber || companySettings.whatsapp || companySettings.phone || '').trim();
-
-  const isGallery = aiData?.layoutStyle === 'gallery';
 
   const palette = getThemePalette(theme);
 
@@ -1679,100 +1931,14 @@ export async function renderPostToCanvas(
   ctx.fill();
   ctx.restore();
 
-  // 6. Overlaid Elements on Photo & Card Junction (Badge + Price/Location + Gallery Thumbnails on TOP)
+  // 6. Overlaid Element on Photo (Modern Status Badge - No banners blocking photo!)
   drawModernPropertyBadge(ctx, 45, 40, statusText, subStatusText, theme);
 
-  if (isGallery) {
-    // 6.1 Build secondary photos array without repeating the main photoUrl
-    const secondaryList = aiData?.secondaryPhotos || [];
-    let thumbUrls: string[] = secondaryList.filter(img => img && img !== photoUrl);
-
-    if (thumbUrls.length < 3) {
-      const propImgs = extractPropertyImages(property);
-      for (const img of propImgs) {
-        if (thumbUrls.length >= 3) break;
-        if (img !== photoUrl && !thumbUrls.includes(img)) {
-          thumbUrls.push(img);
-        }
-      }
-    }
-
-    const thumbCount = Math.min(3, thumbUrls.length);
-
-    // 6.2 Placement of Thumbnails ON TOP of the photo & description card junction (Taller rectangular frame)
-    const thumbH = isSquare ? 160 : (isStory ? 240 : 200);
-    const thumbY = photoHeight - 55;
-
-    // Price & Location Banner positioned cleanly above thumbnails so Location Pill is 100% visible!
-    const priceBannerY = thumbCount > 0 ? (thumbY - 144) : (photoHeight - 140);
-    drawPriceAndLocationBanners(ctx, 45, priceBannerY, priceFormatted, locationText, theme);
-
-    if (thumbCount > 0) {
-      // 6.3 Draw available thumbnails on top of both main photo and description card
-      const padX = 24;
-      const gap = 12;
-      const availW = width - padX * 2;
-      const thumbW = Math.floor((availW - gap * (thumbCount - 1)) / thumbCount);
-
-      const loadedThumbs = await Promise.all(
-        thumbUrls.slice(0, thumbCount).map(url => loadImageSafely(url).catch(() => null))
-      );
-
-      loadedThumbs.forEach((tImg, idx) => {
-        const tx = padX + idx * (thumbW + gap);
-
-        ctx.save();
-        // Rich drop shadow so thumbnail pops ON TOP of the white background
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-        ctx.shadowBlur = 20;
-        ctx.shadowOffsetY = 8;
-
-        drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 2);
-        ctx.fillStyle = '#1E293B';
-        ctx.fill();
-        ctx.shadowColor = 'transparent';
-
-        // Clip image inside crisp 2px rectangular frame (no rounded squishing)
-        ctx.save();
-        ctx.beginPath();
-        drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 2);
-        ctx.clip();
-
-        if (tImg) {
-          drawImageCover(ctx, tImg, tx, thumbY, thumbW, thumbH);
-        } else {
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(tx, thumbY, thumbW, thumbH);
-        }
-        ctx.restore();
-
-        // Crisp border frame accent
-        ctx.strokeStyle = theme === 'gold_dark' ? '#D4AF37' : '#FFFFFF';
-        ctx.lineWidth = 4;
-        drawRoundRect(ctx, tx, thumbY, thumbW, thumbH, 2);
-        ctx.stroke();
-
-        ctx.restore();
-      });
-    }
-  } else {
-    // Single Photo Standard Banner Position
-    drawPriceAndLocationBanners(ctx, 45, photoHeight - 140, priceFormatted, locationText, theme);
-  }
-
-  // 7. Main Property Headline (Extra Bold / Impactful, placed cleanly below thumbnails with guaranteed gap)
-  const secondaryList = aiData?.secondaryPhotos || [];
-  const hasThumbnails = isGallery && secondaryList.length > 0;
-  const thumbH = isSquare ? 160 : (isStory ? 240 : 200);
-  const thumbY = photoHeight - 55;
-  const thumbsBottomY = hasThumbnails ? (thumbY + thumbH) : photoHeight;
-
+  // 7. Main Property Headline (Extra Bold / Impactful, placed cleanly with spacious layout)
   ctx.save();
   const titleCenterX = width / 2;
-  const titleGap = hasThumbnails
-    ? (isSquare ? 65 : (isStory ? 90 : 75))
-    : (isSquare ? 90 : (isStory ? 125 : 105));
-  const titleStartY = thumbsBottomY + titleGap;
+  const titleGap = isSquare ? 80 : 100;
+  const titleStartY = photoHeight + titleGap;
   const maxTitleWidth = width - 100; // 50px inner padding on left & right
   const titleFontSizePx = isSquare ? 38 : (isStory ? 46 : 42);
   const textColor = theme === 'gold_dark' ? '#FFFFFF' : '#090D16';
@@ -1788,10 +1954,8 @@ export async function renderPostToCanvas(
   );
   ctx.restore();
 
-  // 8. Specifications & Features Cards Grid (Custom spacing for single photo vs gallery mode)
-  const specsGap = hasThumbnails
-    ? (isSquare ? 50 : (isStory ? 75 : 65))
-    : (isSquare ? 75 : (isStory ? 95 : 95));
+  // 8. Specifications & Features Cards Grid
+  const specsGap = isSquare ? 70 : (isStory ? 95 : 90);
   const specsY = lastTitleY + specsGap;
   const totalSpecsCount = specs.length;
 
@@ -1909,38 +2073,26 @@ export async function renderPostToCanvas(
   });
   ctx.restore();
 
-  // 9. Prominent CTA Button, WhatsApp & Footer anchored near the bottom with generous spacing
+  // 9. Prominent Two-Column Action Section (Left: Valor + Bairro, Right: CTA + WhatsApp)
   const footerH = isSquare ? 80 : (isStory ? 100 : 90);
   const footerBarY = height - footerH;
 
-  // Lift WhatsApp & CTA higher in Stories layout to fill white space cleanly
-  const waY = footerBarY - (isSquare ? 30 : (isStory ? 68 : 36));
-  const ctaCenterY = whatsappNum
-    ? (waY - (isSquare ? 70 : (isStory ? 105 : 76)))
-    : (footerBarY - (isStory ? 120 : 70));
+  // Position the 2-column section centered in the space between specs grid and footer bar
+  const sectionAvailableH = footerBarY - lastRowBottomY;
+  const sectionCenterY = Math.round(lastRowBottomY + (sectionAvailableH / 2));
 
-  // Draw CTA Button
-  drawCtaBannerCentered(ctx, width / 2, ctaCenterY, ctaText, theme, isStory);
-
-  // Draw WhatsApp Row
-  if (whatsappNum) {
-    ctx.save();
-    const waText = `WhatsApp: ${whatsappNum}`;
-
-    const waFontSize = isStory ? 25 : 20;
-    const waIconSize = isStory ? 32 : 26;
-    ctx.font = `800 ${waFontSize}px 'Plus Jakarta Sans', 'Inter', sans-serif`;
-    const waTextMetrics = ctx.measureText(waText);
-    const waTotalW = waIconSize + 12 + waTextMetrics.width;
-    const waStartX = (width - waTotalW) / 2;
-
-    drawWhatsAppVectorIcon(ctx, waStartX, waY - Math.floor(waIconSize / 2 + 5), waIconSize);
-
-    ctx.fillStyle = theme === 'gold_dark' ? '#F3E5AB' : '#0F172A';
-    ctx.textAlign = 'left';
-    ctx.fillText(waText, waStartX + waIconSize + 12, waY);
-    ctx.restore();
-  }
+  drawTwoColumnBottomActionSection(
+    ctx,
+    width,
+    sectionCenterY,
+    priceFormatted,
+    locationText,
+    ctaText,
+    whatsappNum,
+    theme,
+    isStory,
+    isSquare
+  );
 
   // Draw Lopes Manaus Solid Dark Footer Bar
   drawLopesManausFooterBar(ctx, width, height, theme, isSquare, isStory);

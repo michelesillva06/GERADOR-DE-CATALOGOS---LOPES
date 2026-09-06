@@ -1,4 +1,4 @@
-import { User, Property } from '../types';
+import { User, Property, ScheduleEvent } from '../types';
 import { needsStatusCheck } from '../components/PropertyUpdateAlerts';
 
 export type NotificationSupportStatus = 'granted' | 'denied' | 'default' | 'unsupported';
@@ -424,4 +424,213 @@ export async function checkAndNotifyOverdueProperties(
   }
 
   return sent;
+}
+
+/**
+ * Helper to get user's visits today, visits tomorrow, and unconfirmed gestor events
+ */
+export function getUserScheduleAlertsData(
+  user: User | null,
+  events: ScheduleEvent[]
+): {
+  visitsToday: ScheduleEvent[];
+  visitsTomorrow: ScheduleEvent[];
+  unconfirmedGestorEvents: ScheduleEvent[];
+  totalAlertsCount: number;
+} {
+  if (!user || !Array.isArray(events)) {
+    return {
+      visitsToday: [],
+      visitsTomorrow: [],
+      unconfirmedGestorEvents: [],
+      totalAlertsCount: 0
+    };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrowObj = new Date();
+  tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+  const tomorrow = tomorrowObj.toISOString().slice(0, 10);
+
+  // 1. Visits strictly for the current user (never shows other captador visits)
+  const isMyVisit = (ev: ScheduleEvent) =>
+    ev.type === 'VISITA' &&
+    (ev.user_id === user.id ||
+      ev.user_id?.toLowerCase() === user.id?.toLowerCase() ||
+      ev.user_id?.toLowerCase() === user.username?.toLowerCase() ||
+      ev.user_id?.toLowerCase() === user.email?.toLowerCase());
+
+  const visitsToday = events.filter(ev => isMyVisit(ev) && ev.date === today);
+  const visitsTomorrow = events.filter(ev => isMyVisit(ev) && ev.date === tomorrow);
+
+  // 2. Gestor events/meetings/trainings where the current user hasn't confirmed attendance
+  const gestorTypes = ['EVENTO', 'REUNIAO', 'TREINAMENTO'];
+  const unconfirmedGestorEvents = events.filter(ev => {
+    if (!gestorTypes.includes(ev.type)) return false;
+    if (ev.date < today) return false; // past events don't need reminder
+    const confirmed = ev.confirmed_attendees || [];
+    return !confirmed.includes(user.id);
+  });
+
+  const totalAlertsCount = visitsToday.length + visitsTomorrow.length + unconfirmedGestorEvents.length;
+
+  return {
+    visitsToday,
+    visitsTomorrow,
+    unconfirmedGestorEvents,
+    totalAlertsCount
+  };
+}
+
+/**
+ * Client-side local notification dispatcher for schedule alerts (Visits & Gestor Events)
+ */
+export async function checkAndNotifyScheduleAlerts(
+  user: User | null,
+  events: ScheduleEvent[],
+  force: boolean = false
+): Promise<{ visitsNotified: number; eventsNotified: number }> {
+  if (!user || getNotificationPermission() !== 'granted') {
+    return { visitsNotified: 0, eventsNotified: 0 };
+  }
+
+  const { visitsToday, visitsTomorrow, unconfirmedGestorEvents } = getUserScheduleAlertsData(user, events);
+  const today = new Date().toISOString().slice(0, 10);
+  const now = Date.now();
+  const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+
+  let visitsNotified = 0;
+  let eventsNotified = 0;
+
+  // 1. Notify today's visits
+  if (visitsToday.length > 0) {
+    const keyToday = `lopes_notif_visit_today_${user.id}_${today}`;
+    const lastNotified = localStorage.getItem(keyToday);
+    if (force || !lastNotified || now - parseInt(lastNotified, 10) > FOUR_HOURS_MS) {
+      const v = visitsToday[0];
+      const title = visitsToday.length === 1
+        ? `🔔 Você tem Visita Hoje às ${v.start_time}!`
+        : `🔔 Você tem ${visitsToday.length} Visitas Hoje!`;
+      const body = visitsToday.length === 1
+        ? `Cliente: ${v.client_name || 'Agendado'}${v.property_code ? ` | Imóvel ${v.property_code}` : ''}${v.location ? ` | Local: ${v.location}` : ''}`
+        : `Primeira visita às ${v.start_time} com ${v.client_name || 'Cliente'}. Verifique sua agenda.`;
+
+      const sent = await sendMobileNotification({
+        title,
+        body,
+        tag: `lopes-visit-today-${today}`,
+        data: { url: '/?view=schedule', type: 'VISIT_ALERT' }
+      });
+      if (sent) {
+        localStorage.setItem(keyToday, String(now));
+        visitsNotified += visitsToday.length;
+      }
+    }
+  }
+
+  // 2. Notify tomorrow's visits (1 day before)
+  if (visitsTomorrow.length > 0) {
+    const keyTomorrow = `lopes_notif_visit_tomorrow_${user.id}_${today}`;
+    const lastNotified = localStorage.getItem(keyTomorrow);
+    if (force || !lastNotified || now - parseInt(lastNotified, 10) > FOUR_HOURS_MS) {
+      const v = visitsTomorrow[0];
+      const title = visitsTomorrow.length === 1
+        ? `📅 Visita Amanhã às ${v.start_time}`
+        : `📅 Você tem ${visitsTomorrow.length} Visitas Amanhã`;
+      const body = `Cliente: ${v.client_name || 'Agendado'}${v.property_code ? ` | Imóvel ${v.property_code}` : ''}. Prepare o atendimento!`;
+
+      const sent = await sendMobileNotification({
+        title,
+        body,
+        tag: `lopes-visit-tomorrow-${today}`,
+        data: { url: '/?view=schedule', type: 'VISIT_ALERT' }
+      });
+      if (sent) {
+        localStorage.setItem(keyTomorrow, String(now));
+        visitsNotified += visitsTomorrow.length;
+      }
+    }
+  }
+
+  // 3. Notify Gestor Events/Meetings/Trainings without confirmed presence
+  if (unconfirmedGestorEvents.length > 0) {
+    const keyEvent = `lopes_notif_unconfirmed_event_${user.id}_${today}`;
+    const lastNotified = localStorage.getItem(keyEvent);
+    if (force || !lastNotified || now - parseInt(lastNotified, 10) > FOUR_HOURS_MS) {
+      const ev = unconfirmedGestorEvents[0];
+      const typeLabel = ev.type === 'REUNIAO' ? 'Reunião' : ev.type === 'TREINAMENTO' ? 'Treinamento' : 'Evento';
+      const isEventToday = ev.date === today;
+
+      const title = isEventToday
+        ? `🔔 ${typeLabel} Hoje às ${ev.start_time}: ${ev.title}`
+        : `📢 Lembrete de ${typeLabel}: ${ev.title}`;
+      const body = `${isEventToday ? 'Hoje' : ev.date} às ${ev.start_time}. Confirme sua presença no app da Lopes!`;
+
+      const sent = await sendMobileNotification({
+        title,
+        body,
+        tag: `lopes-event-reminder-${ev.id}-${today}`,
+        data: { url: '/?view=schedule', type: 'EVENT_REMINDER', eventId: ev.id }
+      });
+      if (sent) {
+        localStorage.setItem(keyEvent, String(now));
+        eventsNotified++;
+      }
+    }
+  }
+
+  return { visitsNotified, eventsNotified };
+}
+
+/**
+ * Triggers backend schedule alerts check via API
+ */
+export async function triggerBackendScheduleCheck(): Promise<{
+  success: boolean;
+  totalNotificationsDelivered?: number;
+  visitsTodayCount?: number;
+  visitsTomorrowCount?: number;
+  message?: string;
+}> {
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('lopes_auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/notifications/check-schedule', {
+      method: 'POST',
+      headers
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error('Error triggering backend schedule check:', err);
+    return { success: false, message: err.message };
+  }
+}
+
+/**
+ * Triggers full backend check for both overdue properties and schedule alerts
+ */
+export async function triggerBackendCheckAll(): Promise<{
+  success: boolean;
+  message?: string;
+  overdueProperties?: any;
+  scheduleAlerts?: any;
+}> {
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('lopes_auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch('/api/notifications/check-all', {
+      method: 'POST',
+      headers
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error('Error triggering backend check all:', err);
+    return { success: false, message: err.message };
+  }
 }

@@ -31,6 +31,7 @@ interface SchedulePageProps {
   scheduleEvents: ScheduleEvent[];
   onAddEvent: (eventData: Partial<ScheduleEvent>) => Promise<{ success: boolean; error?: string }>;
   onDeleteEvent: (id: string) => Promise<void>;
+  onConfirmPresence?: (eventId: string) => Promise<void>;
 }
 
 // Helper to add minutes to time
@@ -86,7 +87,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
   properties,
   scheduleEvents,
   onAddEvent,
-  onDeleteEvent
+  onDeleteEvent,
+  onConfirmPresence
 }) => {
   const isMasterOrGestor = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
 
@@ -254,12 +256,33 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
     }
   };
 
+  const [confirmingPresenceId, setConfirmingPresenceId] = useState<string | null>(null);
+
+  const handleConfirmPresence = async (eventId: string) => {
+    setConfirmingPresenceId(eventId);
+    try {
+      if (onConfirmPresence) {
+        await onConfirmPresence(eventId);
+      } else {
+        const token = localStorage.getItem('token') || localStorage.getItem('lopes_auth_token');
+        await fetch(`/api/schedule/${eventId}/confirm-presence`, {
+          method: 'POST',
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+      }
+    } finally {
+      setConfirmingPresenceId(null);
+    }
+  };
+
   const getBadgeStyle = (type: ScheduleEventType) => {
     switch (type) {
       case 'VISITA':
         return 'bg-rose-50 text-[#F10F4D] border-rose-200';
+      case 'REUNIAO':
+        return 'bg-indigo-50 text-indigo-700 border-indigo-200';
       case 'TREINAMENTO':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'EVENTO':
         return 'bg-purple-50 text-purple-700 border-purple-200';
       case 'FERIADO':
@@ -273,6 +296,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
     switch (type) {
       case 'VISITA':
         return Building2;
+      case 'REUNIAO':
+        return Users;
       case 'TREINAMENTO':
         return GraduationCap;
       case 'EVENTO':
@@ -292,13 +317,13 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
         <div className="space-y-1.5 max-w-2xl">
           <div className="inline-flex items-center space-x-2 bg-rose-50 text-[#F10F4D] px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider">
             <CalendarIcon className="w-3.5 h-3.5" />
-            <span>Agenda Geral de Visitas & Eventos</span>
+            <span>Agenda & Alertas Push</span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">
             Agenda e Calendário da Imobiliária
           </h1>
           <p className="text-xs text-slate-500 leading-relaxed">
-            Agendamentos de visitas, treinamentos e datas oficiais do ano. Feriados possuem bloqueio automático de agendamentos.
+            Visitas dos captadores com lembretes automáticos no celular, e eventos/reuniões da gestão com notificações diárias para a equipe.
           </p>
         </div>
 
@@ -310,6 +335,73 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
           <span>Agendar Novo Compromisso</span>
         </button>
       </div>
+
+      {/* QUICK PERSONAL ALERTS BANNER FOR LOGGED IN USER */}
+      {(() => {
+        const today = new Date().toISOString().slice(0, 10);
+        const tomorrowObj = new Date();
+        tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+        const tomorrow = tomorrowObj.toISOString().slice(0, 10);
+
+        const isMyVisit = (ev: ScheduleEvent) =>
+          ev.type === 'VISITA' &&
+          (ev.user_id === currentUser.id ||
+            ev.user_id?.toLowerCase() === currentUser.id?.toLowerCase() ||
+            ev.user_id?.toLowerCase() === currentUser.username?.toLowerCase() ||
+            ev.user_id?.toLowerCase() === currentUser.email?.toLowerCase());
+
+        const myVisitsToday = scheduleEvents.filter(ev => isMyVisit(ev) && ev.date === today);
+        const myVisitsTomorrow = scheduleEvents.filter(ev => isMyVisit(ev) && ev.date === tomorrow);
+        const gestorEvents = scheduleEvents.filter(ev =>
+          ['EVENTO', 'REUNIAO', 'TREINAMENTO'].includes(ev.type) && ev.date >= today
+        );
+        const unconfirmedGestorEvents = gestorEvents.filter(ev => !(ev.confirmed_attendees || []).includes(currentUser.id));
+
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-4 rounded-3xl bg-rose-50/70 border border-rose-200/80 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#F10F4D]">Suas Visitas Hoje</span>
+                <p className="text-xl font-black text-slate-900">{myVisitsToday.length}</p>
+                <p className="text-[11px] text-slate-500 truncate max-w-[200px]">
+                  {myVisitsToday.length > 0 ? `${myVisitsToday[0].start_time} - ${myVisitsToday[0].client_name || myVisitsToday[0].title}` : 'Nenhuma visita hoje'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-[#F10F4D]/10 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-[#F10F4D]" />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-3xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">Suas Visitas Amanhã</span>
+                <p className="text-xl font-black text-slate-900">{myVisitsTomorrow.length}</p>
+                <p className="text-[11px] text-slate-500 truncate max-w-[200px]">
+                  {myVisitsTomorrow.length > 0 ? `${myVisitsTomorrow[0].start_time} - ${myVisitsTomorrow[0].client_name || myVisitsTomorrow[0].title}` : 'Nenhuma visita amanhã'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                <Clock className="w-5 h-5 text-amber-600" />
+              </div>
+            </div>
+
+            <div className="p-4 rounded-3xl bg-indigo-50/70 border border-indigo-200/80 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Eventos & Reuniões</span>
+                <p className="text-xl font-black text-slate-900">
+                  {unconfirmedGestorEvents.length} <span className="text-xs font-semibold text-slate-500">pendente(s)</span>
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {unconfirmedGestorEvents.length > 0 ? 'Confirme sua presença' : 'Tudo confirmado!'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600/10 flex items-center justify-center">
+                <Users className="w-5 h-5 text-indigo-600" />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* FILTER BAR */}
       <div className="bg-white p-4 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
@@ -340,7 +432,8 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
             >
               <option value="todos">Todos os Tipos</option>
               <option value="VISITA">Visita a Imóvel</option>
-              <option value="TREINAMENTO">Treinamento / Reunião</option>
+              <option value="REUNIAO">Reunião de Equipe</option>
+              <option value="TREINAMENTO">Treinamento</option>
               <option value="EVENTO">Datas Úteis / Eventos</option>
               <option value="FERIADO">Feriados e Folgas</option>
             </select>
@@ -476,6 +569,39 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                         "{event.notes}"
                       </p>
                     )}
+
+                    {/* ATTENDANCE CONFIRMATION FOR REUNIAO / EVENTO / TREINAMENTO */}
+                    {['EVENTO', 'REUNIAO', 'TREINAMENTO'].includes(event.type) && (() => {
+                      const confirmedList = event.confirmed_attendees || [];
+                      const isConfirmedByMe = confirmedList.includes(currentUser.id);
+                      const confirmedCount = confirmedList.length;
+
+                      return (
+                        <div className="pt-2 flex flex-wrap items-center gap-2">
+                          <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5 text-indigo-600" />
+                            <span>{confirmedCount} confirmação{confirmedCount !== 1 ? 'ões' : ''} de presença</span>
+                          </span>
+
+                          {isConfirmedByMe ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              Sua Presença Confirmada
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmPresence(event.id)}
+                              disabled={confirmingPresenceId === event.id}
+                              className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black shadow-xs transition cursor-pointer disabled:opacity-50"
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>{confirmingPresenceId === event.id ? 'Confirmando...' : 'Confirmar Presença'}</span>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -572,17 +698,18 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                 <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1">
                   Tipo *
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
-                    { type: 'VISITA', label: 'Visita' },
+                    { type: 'VISITA', label: 'Visita Imóvel' },
+                    { type: 'REUNIAO', label: 'Reunião Equipe' },
                     { type: 'TREINAMENTO', label: 'Treinamento' },
-                    { type: 'EVENTO', label: 'Evento / Reunião' }
+                    { type: 'EVENTO', label: 'Evento Geral' }
                   ].map(item => (
                     <button
                       key={item.type}
                       type="button"
                       onClick={() => setFormData(prev => ({ ...prev, type: item.type as ScheduleEventType }))}
-                      className={`py-2 px-2.5 rounded-xl text-xs font-extrabold transition cursor-pointer text-center ${
+                      className={`py-2 px-2 rounded-xl text-[11px] font-extrabold transition cursor-pointer text-center ${
                         formData.type === item.type
                           ? 'bg-[#F10F4D] text-white shadow-xs'
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -591,6 +718,21 @@ export const SchedulePage: React.FC<SchedulePageProps> = ({
                       {item.label}
                     </button>
                   ))}
+                </div>
+
+                {/* Web Push Notification Explanation */}
+                <div className="mt-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+                  {formData.type === 'VISITA' ? (
+                    <p className="flex items-start gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                      <span><strong>Alerta Pessoal:</strong> Lembretes automáticos via Web Push serão enviados no seu celular/desktop 1 dia antes e no dia desta visita.</span>
+                    </p>
+                  ) : (
+                    <p className="flex items-start gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                      <span><strong>Alerta Coletivo:</strong> Notificará <strong>todos os corretores e gestores</strong> com Web Push ativo, com lembrete diário até confirmarem presença.</span>
+                    </p>
+                  )}
                 </div>
               </div>
 

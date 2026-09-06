@@ -42,7 +42,10 @@ import {
   savePushSubscription,
   removePushSubscription,
   sendPushToUser,
-  checkAndDispatchOverduePropertyAlerts
+  sendPushToAllUsers,
+  checkAndDispatchOverduePropertyAlerts,
+  checkAndDispatchScheduleAlerts,
+  checkAndDispatchAllDailyAlerts
 } from './src/server/webPushService.js';
 
 import { GoogleGenAI } from '@google/genai';
@@ -1858,6 +1861,7 @@ app.post('/api/schedule', requireAuth, async (req, res) => {
 
   const startA = eventData.start_time || '09:00';
   const endA = eventData.end_time || '10:30';
+  const isGestorEvent = ['EVENTO', 'REUNIAO', 'TREINAMENTO'].includes(eventData.type);
 
   const newEvent: ScheduleEvent = {
     id: `event_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -1868,6 +1872,9 @@ app.post('/api/schedule', requireAuth, async (req, res) => {
     end_time: endA,
     user_id: eventData.user_id || reqUser.id,
     user_name: eventData.user_name || reqUser.name,
+    created_by_role: reqUser.role,
+    created_by_user_id: reqUser.id,
+    created_by_user_name: reqUser.name,
     property_id: eventData.property_id,
     property_code: eventData.property_code,
     client_name: eventData.client_name,
@@ -1875,6 +1882,13 @@ app.post('/api/schedule', requireAuth, async (req, res) => {
     location: eventData.location,
     notes: eventData.notes,
     exclusive_visit: eventData.exclusive_visit ?? true,
+    // Creator automatically confirms presence for team events
+    confirmed_attendees: isGestorEvent ? [reqUser.id] : [],
+    confirmed_attendees_details: isGestorEvent ? [{
+      user_id: reqUser.id,
+      user_name: reqUser.name,
+      confirmed_at: new Date().toISOString()
+    }] : [],
     created_at: new Date().toISOString()
   };
 
@@ -1884,7 +1898,76 @@ app.post('/api/schedule', requireAuth, async (req, res) => {
 
   addAuditLog(reqUser.id, reqUser.name, 'Agendamento', `Agendou ${newEvent.type}: "${newEvent.title}" para ${newEvent.date} às ${newEvent.start_time}`, req);
 
+  // Trigger immediate Web Push alerts
+  try {
+    const formatBrDateStr = (dateStr: string) => {
+      const parts = dateStr.split('-');
+      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
+    };
+
+    if (isGestorEvent) {
+      // Dispatches alert to ALL registered users (captadores and gestores)
+      const typeLabel = newEvent.type === 'REUNIAO' ? 'Reunião' : newEvent.type === 'TREINAMENTO' ? 'Treinamento' : 'Evento';
+      sendPushToAllUsers(firestoreDb, {
+        title: `📢 Novo(a) ${typeLabel}: ${newEvent.title}`,
+        body: `Marcado para ${formatBrDateStr(newEvent.date)} às ${newEvent.start_time}${newEvent.location ? ` | ${newEvent.location}` : ''}. Confirme sua presença no app!`,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: `new-event-${newEvent.id}`,
+        data: {
+          url: `/?view=schedule&event=${newEvent.id}`,
+          type: 'NEW_EVENT',
+          eventId: newEvent.id
+        }
+      }, reqUser.id).catch(e => console.warn('[WebPush] Error notifying team event:', e));
+    } else if (newEvent.type === 'VISITA' && newEvent.user_id) {
+      // Alerts ONLY the specific captador responsible for this visit
+      sendPushToUser(firestoreDb, newEvent.user_id, {
+        title: `📅 Visita Agendada: ${newEvent.title}`,
+        body: `Marcada para ${formatBrDateStr(newEvent.date)} às ${newEvent.start_time}${newEvent.client_name ? ` com ${newEvent.client_name}` : ''}. Lembretes automáticos serão enviados na véspera e no dia!`,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: `visit-scheduled-${newEvent.id}`,
+        data: {
+          url: `/?view=schedule&event=${newEvent.id}`,
+          type: 'VISIT_SCHEDULED',
+          eventId: newEvent.id
+        }
+      }).catch(e => console.warn('[WebPush] Error notifying captador visit:', e));
+    }
+  } catch (pushErr) {
+    console.warn('[WebPush] Post-schedule notification warning:', pushErr);
+  }
+
   res.status(201).json({ event: newEvent });
+});
+
+app.post('/api/schedule/:id/confirm-presence', requireAuth, async (req, res) => {
+  const reqUser = (req as any).user as User;
+  const { id } = req.params;
+  const existing = scheduleEvents.find(e => e.id === id);
+  if (!existing) return res.status(404).json({ error: 'Evento não encontrado.' });
+
+  const currentConfirmed = existing.confirmed_attendees || [];
+  if (!currentConfirmed.includes(reqUser.id)) {
+    existing.confirmed_attendees = [...currentConfirmed, reqUser.id];
+    existing.confirmed_attendees_details = [
+      ...(existing.confirmed_attendees_details || []),
+      {
+        user_id: reqUser.id,
+        user_name: reqUser.name,
+        confirmed_at: new Date().toISOString()
+      }
+    ];
+    existing.updated_at = new Date().toISOString();
+
+    await safeFirestoreDocSet('schedule', existing.id, existing, false);
+    saveLocalDatabase();
+
+    addAuditLog(reqUser.id, reqUser.name, 'Confirmação de Presença', `Confirmou presença em ${existing.type}: "${existing.title}"`, req);
+  }
+
+  res.json({ success: true, event: existing });
 });
 
 app.delete('/api/schedule/:id', requireAuth, async (req, res) => {
@@ -2085,12 +2168,12 @@ initializeWebPush(firestoreDb).catch(err => {
   console.warn('[WebPush] Startup init warning:', err);
 });
 
-// Periodic background check for overdue properties (every 6 hours)
+// Periodic background check for overdue properties and schedule alerts (every 3 hours)
 setInterval(() => {
-  checkAndDispatchOverduePropertyAlerts(firestoreDb).catch(err => {
-    console.warn('[WebPush] Background overdue check error:', err);
+  checkAndDispatchAllDailyAlerts(firestoreDb).catch(err => {
+    console.warn('[WebPush] Background automated alerts check error:', err);
   });
-}, 6 * 60 * 60 * 1000);
+}, 3 * 60 * 60 * 1000);
 
 /**
  * GET /api/notifications/vapid-public-key
@@ -2225,6 +2308,62 @@ app.post('/api/notifications/check-overdue', async (req, res) => {
     });
   } catch (err: any) {
     res.status(500).json({ error: 'Erro ao verificar imóveis vencidos: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/notifications/check-schedule
+ * Scans schedule events:
+ * 1) Daily reminders for all gestor events/reunions/trainings to users without confirmed presence
+ * 2) Visit reminders (today & tomorrow) strictly to assigned captadores
+ */
+app.post('/api/notifications/check-schedule', async (req, res) => {
+  try {
+    const result = await checkAndDispatchScheduleAlerts(firestoreDb);
+    const authUser = extractUserFromRequest(req);
+    if (authUser) {
+      addAuditLog(
+        authUser.id,
+        authUser.name,
+        'Verificação de Alertas da Agenda',
+        `Disparou lembretes de eventos e visitas. ${result.totalNotificationsDelivered} pushes enviados (${result.visitsTodayCount} visitas hoje, ${result.visitsTomorrowCount} visitas amanhã).`,
+        req
+      );
+    }
+    res.json({
+      success: true,
+      ...result,
+      message: `Alertas de agenda processados com sucesso! ${result.totalNotificationsDelivered} push(es) entregue(s).`
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao processar alertas da agenda: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/notifications/check-all
+ * Triggers all automated checks simultaneously (properties overdue + gestor events + visits)
+ */
+app.post('/api/notifications/check-all', async (req, res) => {
+  try {
+    const result = await checkAndDispatchAllDailyAlerts(firestoreDb);
+    const authUser = extractUserFromRequest(req);
+    if (authUser) {
+      addAuditLog(
+        authUser.id,
+        authUser.name,
+        'Verificação Geral de Alertas',
+        'Executou checagem geral de imóveis e agenda para disparos Web Push.',
+        req
+      );
+    }
+    res.json({
+      success: true,
+      ...result,
+      message: 'Checagem geral de alertas de imóveis e agenda concluída com sucesso!'
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao executar checagem geral de alertas: ' + err.message });
   }
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "Lopes Captação",
-  "description": "Sistema de gestão imobiliária, captação e geração de catálogos digitais em PDF.",
+  "description": "Sistema de gestão imobiliária, captação, agenda com alertas push automáticos e geração de catálogos digitais.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

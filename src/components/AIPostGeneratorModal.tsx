@@ -13,6 +13,7 @@ import {
   Smartphone,
   Sliders,
   Layers,
+  LayoutGrid,
   FileCheck
 } from 'lucide-react';
 import { Property, CompanySettings, User } from '../types';
@@ -111,8 +112,9 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
     const neighborhood = currentProperty.neighborhood || 'Manaus';
     const city = currentProperty.city || 'Manaus';
 
-    const propImgs = extractPropertyImages(currentProperty);
-    const secondary = propImgs.slice(1, 4);
+    const propImgs = currentProperty ? Array.from(new Set(extractPropertyImages(currentProperty))) : [];
+    const mainImg = propImgs[0] || '';
+    const secondary = propImgs.filter(img => img && img !== mainImg).slice(0, 3);
 
     const extractedSpecs = extractDefaultPropertySpecs(currentProperty);
 
@@ -144,6 +146,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
       specs: extractedSpecs,
       designTheme: 'ruby_premium',
       layoutStyle: 'single',
+      mosaicVariant: 'top_two_bottom',
       secondaryPhotos: secondary
     };
 
@@ -158,7 +161,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
     setCaption(autoCaption);
   }, [isOpen, currentProperty?.id, currentUser, users]);
 
-  const images = currentProperty ? extractPropertyImages(currentProperty) : [];
+  const images = currentProperty ? Array.from(new Set(extractPropertyImages(currentProperty))) : [];
   const defaultFallbackImage = 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80';
   const photoUrl = images[selectedPhotoIndex] || images[0] || defaultFallbackImage;
 
@@ -268,11 +271,12 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
     if (images.length > 0) {
       const selectedMain = images[newIdx] || images[0];
       const remaining = images.filter(img => img !== selectedMain);
+      const targetCount = postData.mosaicVariant === 'top_three_bottom' ? 3 : 2;
       setPostData(prev => {
         const currentSec = (prev.secondaryPhotos || []).filter(img => img !== selectedMain);
         return {
           ...prev,
-          secondaryPhotos: currentSec.length > 0 ? currentSec.slice(0, 3) : remaining.slice(0, 3)
+          secondaryPhotos: currentSec.length > 0 ? currentSec.slice(0, targetCount) : remaining.slice(0, targetCount)
         };
       });
     }
@@ -281,6 +285,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
   const toggleSecondaryPhoto = (imgUrl: string) => {
     const currentMain = images[selectedPhotoIndex] || photoUrl;
     if (imgUrl === currentMain) return;
+    const targetCount = postData.mosaicVariant === 'top_three_bottom' ? 3 : 2;
 
     setPostData(prev => {
       const currentSec = prev.secondaryPhotos || [];
@@ -290,7 +295,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
           secondaryPhotos: currentSec.filter(u => u !== imgUrl)
         };
       } else {
-        if (currentSec.length >= 3) {
+        if (currentSec.length >= targetCount) {
           return {
             ...prev,
             secondaryPhotos: [...currentSec.slice(1), imgUrl]
@@ -532,64 +537,189 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
               </div>
             </div>
 
-            {/* 1.2 Layout Style Selection (Single vs Gallery Catalog) */}
-            <div>
-              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
-                <span>Modelo de Foto do Post:</span>
-                <span className="text-[10px] text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                  {images.length > 1 ? `${images.length} fotos no imóvel` : '1 foto'}
-                </span>
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPostData({ ...postData, layoutStyle: 'single' })}
-                  className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 cursor-pointer ${
-                    (postData.layoutStyle || 'gallery') === 'single'
-                      ? 'bg-slate-900 border-[#F10F4D] text-white shadow-md ring-2 ring-[#F10F4D]/30'
-                      : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
-                  }`}
-                >
-                  <div className="p-1.5 rounded-lg bg-[#F10F4D]/10 text-[#F10F4D] shrink-0">
-                    <ImageIcon className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-[11px] leading-tight">1 Foto Destaque</div>
-                    <div className="text-[9px] opacity-70">Imagem principal expandida</div>
-                  </div>
-                </button>
+            {/* 1.2 Layout Style Selection (Single vs Photo Mosaic Collage) */}
+            <div className="space-y-2.5">
+              <div>
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5 flex items-center justify-between">
+                  <span>Disposição das Fotos:</span>
+                  <span className="text-[10px] text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                    {images.length > 1 ? `${images.length} fotos disponíveis` : '1 foto'}
+                  </span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPostData({ ...postData, layoutStyle: 'single' })}
+                    className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 cursor-pointer ${
+                      (postData.layoutStyle || 'single') === 'single'
+                        ? 'bg-slate-900 border-[#F10F4D] text-white shadow-md ring-2 ring-[#F10F4D]/30'
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className="p-1.5 rounded-lg bg-[#F10F4D]/10 text-[#F10F4D] shrink-0">
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-[11px] leading-tight truncate">Foto Destaque</div>
+                      <div className="text-[9px] opacity-70 truncate">1 foto única em destaque</div>
+                    </div>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPostData(prev => {
-                      const selectedMain = images[selectedPhotoIndex] || images[0];
-                      const remaining = images.filter(img => img !== selectedMain);
-                      const currentSec = (prev.secondaryPhotos && prev.secondaryPhotos.length > 0)
-                        ? prev.secondaryPhotos.filter(img => img !== selectedMain)
-                        : remaining.slice(0, 3);
-                      return {
-                        ...prev,
-                        layoutStyle: 'gallery',
-                        secondaryPhotos: currentSec.slice(0, 3)
-                      };
-                    });
-                  }}
-                  className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 cursor-pointer ${
-                    postData.layoutStyle === 'gallery'
-                      ? 'bg-slate-900 border-[#F10F4D] text-white shadow-md ring-2 ring-[#F10F4D]/30'
-                      : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
-                  }`}
-                >
-                  <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 shrink-0">
-                    <Layers className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-[11px] leading-tight">Catálogo (1 + 3 Fotos)</div>
-                    <div className="text-[9px] opacity-70">Principal + 3 miniaturas</div>
-                  </div>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPostData(prev => {
+                        const selectedMain = images[selectedPhotoIndex] || images[0];
+                        const remaining = images.filter(img => img !== selectedMain);
+                        const curVariant = prev.mosaicVariant || 'top_two_bottom';
+                        const targetCount = curVariant === 'top_three_bottom' ? 3 : 2;
+                        const currentSec = (prev.secondaryPhotos && prev.secondaryPhotos.length > 0)
+                          ? prev.secondaryPhotos.filter(img => img !== selectedMain)
+                          : remaining.slice(0, targetCount);
+                        return {
+                          ...prev,
+                          layoutStyle: 'mosaic',
+                          mosaicVariant: curVariant,
+                          secondaryPhotos: currentSec.slice(0, targetCount)
+                        };
+                      });
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition flex items-center gap-2 cursor-pointer ${
+                      postData.layoutStyle === 'mosaic' || postData.layoutStyle === 'gallery'
+                        ? 'bg-slate-900 border-[#F10F4D] text-white shadow-md ring-2 ring-[#F10F4D]/30'
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500 shrink-0">
+                      <LayoutGrid className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-[11px] leading-tight truncate">Mosaico</div>
+                      <div className="text-[9px] opacity-70 truncate">Colagem com fotos integradas</div>
+                    </div>
+                  </button>
+                </div>
               </div>
+
+              {/* Sub-selector: Formatos do Mosaico */}
+              {(postData.layoutStyle === 'mosaic' || postData.layoutStyle === 'gallery') && (
+                <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                      <LayoutGrid className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Layout da Colagem Mosaico:</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded border border-amber-300">
+                      {postData.mosaicVariant === 'top_three_bottom' ? '4 Fotos (1+3)' : '3 Fotos (1+2)'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {/* Variant 1: 1 Top + 2 Bottom */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPostData(prev => {
+                          const selectedMain = images[selectedPhotoIndex] || images[0];
+                          const remaining = images.filter(img => img !== selectedMain);
+                          const currentSec = (prev.secondaryPhotos || []).filter(img => img !== selectedMain);
+                          return {
+                            ...prev,
+                            mosaicVariant: 'top_two_bottom',
+                            secondaryPhotos: currentSec.length >= 2 ? currentSec.slice(0, 2) : remaining.slice(0, 2)
+                          };
+                        });
+                      }}
+                      className={`p-2 rounded-xl border text-left transition flex flex-col gap-1.5 cursor-pointer ${
+                        (postData.mosaicVariant || 'top_two_bottom') === 'top_two_bottom'
+                          ? 'bg-slate-900 border-[#F10F4D] text-white shadow-sm ring-2 ring-[#F10F4D]/30'
+                          : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <div className="w-full h-8 rounded bg-slate-200 p-0.5 flex flex-col gap-0.5">
+                        <div className="w-full h-4 bg-slate-400 rounded-xs" />
+                        <div className="w-full flex-1 flex gap-0.5">
+                          <div className="flex-1 h-full bg-slate-500 rounded-xs" />
+                          <div className="flex-1 h-full bg-slate-500 rounded-xs" />
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-[10px] leading-tight truncate">1 Topo + 2 Base</div>
+                        <div className="text-[8px] opacity-70 truncate">Principal em cima, 2 abaixo</div>
+                      </div>
+                    </button>
+
+                    {/* Variant 2: 1 Left + 2 Right */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPostData(prev => {
+                          const selectedMain = images[selectedPhotoIndex] || images[0];
+                          const remaining = images.filter(img => img !== selectedMain);
+                          const currentSec = (prev.secondaryPhotos || []).filter(img => img !== selectedMain);
+                          return {
+                            ...prev,
+                            mosaicVariant: 'left_two_right',
+                            secondaryPhotos: currentSec.length >= 2 ? currentSec.slice(0, 2) : remaining.slice(0, 2)
+                          };
+                        });
+                      }}
+                      className={`p-2 rounded-xl border text-left transition flex flex-col gap-1.5 cursor-pointer ${
+                        postData.mosaicVariant === 'left_two_right'
+                          ? 'bg-slate-900 border-[#F10F4D] text-white shadow-sm ring-2 ring-[#F10F4D]/30'
+                          : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <div className="w-full h-8 rounded bg-slate-200 p-0.5 flex gap-0.5">
+                        <div className="w-[58%] h-full bg-slate-400 rounded-xs" />
+                        <div className="flex-1 h-full flex flex-col gap-0.5">
+                          <div className="w-full flex-1 bg-slate-500 rounded-xs" />
+                          <div className="w-full flex-1 bg-slate-500 rounded-xs" />
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-[10px] leading-tight truncate">1 Lateral + 2 Lado</div>
+                        <div className="text-[8px] opacity-70 truncate">Principal esquerda, 2 direita</div>
+                      </div>
+                    </button>
+
+                    {/* Variant 3: 1 Top + 3 Bottom */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPostData(prev => {
+                          const selectedMain = images[selectedPhotoIndex] || images[0];
+                          const remaining = images.filter(img => img !== selectedMain);
+                          const currentSec = (prev.secondaryPhotos || []).filter(img => img !== selectedMain);
+                          return {
+                            ...prev,
+                            mosaicVariant: 'top_three_bottom',
+                            secondaryPhotos: currentSec.length >= 3 ? currentSec.slice(0, 3) : remaining.slice(0, 3)
+                          };
+                        });
+                      }}
+                      className={`p-2 rounded-xl border text-left transition flex flex-col gap-1.5 cursor-pointer ${
+                        postData.mosaicVariant === 'top_three_bottom'
+                          ? 'bg-slate-900 border-[#F10F4D] text-white shadow-sm ring-2 ring-[#F10F4D]/30'
+                          : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <div className="w-full h-8 rounded bg-slate-200 p-0.5 flex flex-col gap-0.5">
+                        <div className="w-full h-4 bg-slate-400 rounded-xs" />
+                        <div className="w-full flex-1 flex gap-0.5">
+                          <div className="flex-1 h-full bg-slate-500 rounded-xs" />
+                          <div className="flex-1 h-full bg-slate-500 rounded-xs" />
+                          <div className="flex-1 h-full bg-slate-500 rounded-xs" />
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-[10px] leading-tight truncate">1 Topo + 3 Base</div>
+                        <div className="text-[8px] opacity-70 truncate">Principal em cima, 3 abaixo</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 1.5. Design Theme Selection */}
@@ -687,62 +817,63 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
                   </div>
                 </div>
 
-                {/* Secondary Miniaturas Picker (Only when layoutStyle === 'gallery' and images > 1) */}
-                {postData.layoutStyle === 'gallery' && images.length > 1 && (
-                  <div className="pt-2 border-t border-slate-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-amber-500" />
-                        <span>2. Miniaturas do Catálogo (Selecione até 3):</span>
-                      </label>
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                        {(postData.secondaryPhotos || []).length} de 3 selecionadas
-                      </span>
-                    </div>
+                {/* Secondary Mosaico Photos Picker (When layoutStyle is mosaic and images > 1) */}
+                {(postData.layoutStyle === 'mosaic' || postData.layoutStyle === 'gallery') && images.length > 1 && (() => {
+                  const maxSec = postData.mosaicVariant === 'top_three_bottom' ? 3 : 2;
+                  const secCount = (postData.secondaryPhotos || []).length;
+                  return (
+                    <div className="pt-2 border-t border-slate-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <LayoutGrid className="w-3.5 h-3.5 text-amber-600" />
+                          <span>2. Fotos Secundárias do Mosaico (Selecione {maxSec}):</span>
+                        </label>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                          secCount === maxSec
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                            : 'text-amber-700 bg-amber-50 border-amber-200'
+                        }`}>
+                          {secCount} de {maxSec} selecionadas
+                        </span>
+                      </div>
 
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                      {images.map((imgUrl, idx) => {
-                        const isMain = selectedPhotoIndex === idx;
-                        const secPhotos = postData.secondaryPhotos || [];
-                        const secIndex = secPhotos.indexOf(imgUrl);
-                        const isSelectedSec = secIndex !== -1;
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                        {images
+                          .filter((_, idx) => idx !== selectedPhotoIndex)
+                          .map((imgUrl, relativeIdx) => {
+                            const secPhotos = postData.secondaryPhotos || [];
+                            const secIndex = secPhotos.indexOf(imgUrl);
+                            const isSelectedSec = secIndex !== -1;
 
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            disabled={isMain}
-                            onClick={() => toggleSecondaryPhoto(imgUrl)}
-                            className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition ${
-                              isMain
-                                ? 'opacity-30 cursor-not-allowed border-slate-200'
-                                : isSelectedSec
-                                ? 'border-amber-500 ring-2 ring-amber-500/30 scale-105 shadow-sm cursor-pointer'
-                                : 'border-slate-200 hover:border-slate-300 opacity-60 hover:opacity-100 cursor-pointer'
-                            }`}
-                          >
-                            <img
-                              src={imgUrl}
-                              alt={`Miniatura ${idx + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                            {isSelectedSec && (
-                              <div className="absolute inset-0 bg-amber-500/40 flex flex-col items-center justify-center">
-                                <span className="text-[11px] font-black text-white drop-shadow">#{secIndex + 1}</span>
-                                <span className="text-[7px] font-extrabold text-white uppercase tracking-tighter">Miniatura</span>
-                              </div>
-                            )}
-                            {isMain && (
-                              <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
-                                <span className="text-[7px] font-bold text-slate-300 uppercase">Principal</span>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
+                            return (
+                              <button
+                                key={imgUrl + relativeIdx}
+                                type="button"
+                                onClick={() => toggleSecondaryPhoto(imgUrl)}
+                                className={`relative shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition cursor-pointer ${
+                                  isSelectedSec
+                                    ? 'border-amber-500 ring-2 ring-amber-500/30 scale-105 shadow-sm'
+                                    : 'border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100'
+                                }`}
+                              >
+                                <img
+                                  src={imgUrl}
+                                  alt={`Foto secundária ${relativeIdx + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                {isSelectedSec && (
+                                  <div className="absolute inset-0 bg-amber-500/40 flex flex-col items-center justify-center">
+                                    <span className="text-[11px] font-black text-white drop-shadow">#{secIndex + 1}</span>
+                                    <span className="text-[7px] font-extrabold text-white uppercase tracking-tighter">Mosaico</span>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
