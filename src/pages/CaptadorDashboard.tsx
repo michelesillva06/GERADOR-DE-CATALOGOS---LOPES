@@ -32,6 +32,7 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
   onGenerateAiPost,
   onPropertyConfirmed
 }) => {
+  const isMaster = user.role === 'MASTER_ADMIN' || user.role === 'MASTER' || user.username === 'admin' || user.email?.toLowerCase() === 'admin@lopes.com.br';
   const isOwnedByCurrentUser = (p: Property) =>
     p.user_id === user.id ||
     p.user_id?.toLowerCase() === user.id?.toLowerCase() ||
@@ -141,10 +142,11 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
                 captador={user}
                 onView={onViewProperty}
                 onEdit={onEditProperty}
-                onDelete={onDeleteProperty}
+                onDelete={isMaster ? onDeleteProperty : undefined}
                 onGenerateSocialMedia={onGenerateSocialMedia}
                 onGenerateAiPost={onGenerateAiPost}
                 canEdit={true}
+                canDelete={isMaster}
                 hidePerMonth={true}
               />
             ))}

@@ -35,6 +35,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [uploadingCoverField, setUploadingCoverField] = useState<string | null>(null);
 
   // Sync settings when loaded from cloud/backend ONLY if user has NOT modified the form
@@ -879,44 +880,58 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <span>Zerar Sistema (Reset de Fábrica)</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Apaga todos os dados fictícios de teste (imóveis, diário, agenda, logs e usuários adicionais), deixando apenas o Administrador Master para início limpo.
+                  Apaga todos os dados de imóveis, diário, agenda, logs e corretores adicionais do Cloud Firestore, preservando apenas a conta do Administrador Master para início 100% limpo.
                 </p>
               </div>
               <button
                 type="button"
+                disabled={isResetting}
                 onClick={async () => {
                   const confirmed = window.confirm(
-                    '⚠️ ATENÇÃO: Tem certeza absoluta que deseja ZERAR O SISTEMA?\n\n- Todos os imóveis serão removidos.\n- Todos os agendamentos e registros serão apagados.\n- Todos os usuários secundários serão removidos.\n\nApenas a conta do Administrador Master continuará ativa.'
+                    '⚠️ ATENÇÃO: Tem certeza absoluta que deseja ZERAR O SISTEMA?\n\n- Todos os imóveis serão excluídos do Cloud Firestore.\n- Todos os agendamentos, diários e logs serão apagados.\n- Todos os usuários/corretores secundários serão removidos.\n\nApenas a conta do Administrador Master continuará ativa.'
                   );
                   if (!confirmed) return;
 
+                  setIsResetting(true);
                   try {
-                    const res = await fetch('/api/system/reset', { method: 'POST' });
+                    const token = localStorage.getItem('lopes_token') || localStorage.getItem('token');
+                    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+                    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                    const res = await fetch('/api/system/reset', { method: 'POST', headers });
+                    const data = await res.json().catch(() => ({}));
+
                     if (res.ok) {
                       localStorage.removeItem('lopes_users');
                       localStorage.removeItem('lopes_properties');
                       localStorage.removeItem('lopes_journal');
                       localStorage.removeItem('lopes_schedule');
                       localStorage.removeItem('lopes_logs');
-                      alert('Sistema zerado com sucesso! Todos os imóveis e usuários secundários foram removidos.');
+                      alert('✅ Sistema zerado com sucesso! O banco de dados Cloud Firestore e o sistema foram limpos para o padrão de fábrica.');
                       window.location.reload();
                     } else {
-                      alert('Não foi possível concluir o reset do sistema.');
+                      alert(`Não foi possível concluir o reset do sistema: ${data.error || 'Erro desconhecido'}`);
                     }
-                  } catch {
+                  } catch (err: any) {
                     localStorage.removeItem('lopes_users');
                     localStorage.removeItem('lopes_properties');
                     localStorage.removeItem('lopes_journal');
                     localStorage.removeItem('lopes_schedule');
                     localStorage.removeItem('lopes_logs');
-                    alert('Navegador e banco de dados limpos! Recarregando...');
+                    alert('Navegador e banco de dados limpos! Recarregando a aplicação...');
                     window.location.reload();
+                  } finally {
+                    setIsResetting(false);
                   }
                 }}
-                className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-[#F10F4D] border border-rose-200 font-bold text-xs rounded-xl transition cursor-pointer shrink-0 flex items-center space-x-1.5"
+                className={`px-4 py-2 font-bold text-xs rounded-xl transition cursor-pointer shrink-0 flex items-center space-x-1.5 ${
+                  isResetting
+                    ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                    : 'bg-rose-50 hover:bg-rose-100 text-[#F10F4D] border border-rose-200'
+                }`}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Zerar Banco de Dados Agora</span>
+                <Trash2 className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin' : ''}`} />
+                <span>{isResetting ? 'Zerando Sistema...' : 'Zerar Banco de Dados Agora'}</span>
               </button>
             </div>
           </div>

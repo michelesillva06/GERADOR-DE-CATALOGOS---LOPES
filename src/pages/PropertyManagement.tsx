@@ -51,7 +51,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
     localStorage.setItem('property_view_mode', mode);
   };
 
-  const isMaster = currentUser.role === 'MASTER_ADMIN';
+  const isMaster = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'MASTER' || currentUser.username === 'admin' || currentUser.email?.toLowerCase() === 'admin@lopes.com.br';
   const isGestor = currentUser.role === 'GESTOR' || currentUser.role === 'GESTORA';
   const isCaptador = currentUser.role === 'CAPTADOR';
   const isMasterOrGestor = isMaster || isGestor;
@@ -322,16 +322,18 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
             currentUser={currentUser}
             onView={onViewProperty}
             onEdit={onEditProperty}
-            onDelete={onDeleteProperty}
+            onDelete={isMaster ? onDeleteProperty : undefined}
             onShareWhatsApp={onShareWhatsApp}
             onGenerateAiPost={onGenerateAiPost}
             canEditAny={isMaster || isGestor}
+            canDeleteAny={isMaster}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProperties.map(prop => {
               const owner = users.find(u => u.id === prop.user_id);
               const canEdit = isMaster || isGestor || isOwnedByCurrentUser(prop);
+              const canDelete = isMaster;
               return (
                 <PropertyCard
                   key={prop.id}
@@ -339,10 +341,11 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
                   captador={owner}
                   onView={onViewProperty}
                   onEdit={onEditProperty}
-                  onDelete={onDeleteProperty}
+                  onDelete={isMaster ? onDeleteProperty : undefined}
                   onGenerateSocialMedia={onGenerateSocialMedia}
                   onGenerateAiPost={onGenerateAiPost}
                   canEdit={canEdit}
+                  canDelete={canDelete}
                   hidePerMonth={true}
                 />
               );

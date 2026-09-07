@@ -15,6 +15,7 @@ interface PropertyTableViewProps {
   onShareWhatsApp?: (property: Property) => void;
   onGenerateAiPost?: (property: Property) => void;
   canEditAny?: boolean;
+  canDeleteAny?: boolean;
 }
 
 export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
@@ -26,10 +27,12 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
   onDelete,
   onShareWhatsApp,
   onGenerateAiPost,
-  canEditAny = false
+  canEditAny = false,
+  canDeleteAny = false
 }) => {
-  const isMaster = currentUser?.role === 'MASTER_ADMIN' || currentUser?.role === 'MASTER';
+  const isMaster = currentUser?.role === 'MASTER_ADMIN' || currentUser?.role === 'MASTER' || currentUser?.username === 'admin';
   const isGestor = currentUser?.role === 'GESTOR' || currentUser?.role === 'GESTORA';
+  const canDelete = canDeleteAny || isMaster;
 
   const isOwnedByCurrentUser = (p: Property) =>
     currentUser &&
@@ -223,12 +226,15 @@ export const PropertyTableView: React.FC<PropertyTableViewProps> = ({
                         </button>
                       )}
 
-                      {/* Botão Excluir */}
-                      {canEdit && onDelete && (
+                      {/* Botão Excluir (Apenas Administrador) */}
+                      {canDelete && onDelete && (
                         <button
                           type="button"
                           id={`btn-table-delete-${property.id}`}
-                          onClick={() => onDelete(property)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(property);
+                          }}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                           title="Excluir Imóvel"
                         >

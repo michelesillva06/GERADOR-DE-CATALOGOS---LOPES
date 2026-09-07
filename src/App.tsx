@@ -475,6 +475,14 @@ function MainApp() {
   };
 
   const handleDeleteProperty = async (prop: Property) => {
+    if (!user) return;
+    const isUserAdmin = user.role === 'MASTER_ADMIN' || user.role === 'MASTER' || user.username === 'admin' || user.id === 'usr_admin' || user.email?.toLowerCase() === 'admin@lopes.com.br';
+    
+    if (!isUserAdmin) {
+      alert('Permissão negada. Apenas o Administrador pode excluir imóveis do sistema.');
+      return;
+    }
+
     if (!confirm(`Deseja realmente excluir o imóvel ${prop.code} (${prop.title})? Esta ação não pode ser desfeita.`)) return;
 
     if (viewingProperty && (viewingProperty.id === prop.id || viewingProperty.code === prop.code)) {
@@ -1022,7 +1030,7 @@ function MainApp() {
     return <Login />;
   }
 
-  const isMaster = user.role === 'MASTER_ADMIN';
+  const isMaster = user.role === 'MASTER_ADMIN' || user.role === 'MASTER' || user.username === 'admin' || user.id === 'usr_admin' || user.email?.toLowerCase() === 'admin@lopes.com.br';
   const isGestor = user.role === 'GESTOR' || user.role === 'GESTORA';
   const isMasterOrGestor = isMaster || isGestor;
   const captadorOwner = viewingProperty ? users.find(u => u.id === viewingProperty.user_id) || user : user;
@@ -1238,13 +1246,14 @@ function MainApp() {
           captador={captadorOwner}
           companySettings={companySettings}
           canEdit={isMaster || isGestor || viewingProperty.user_id === user.id || viewingProperty.user_id?.toLowerCase() === user.id?.toLowerCase() || viewingProperty.user_id?.toLowerCase() === user.username?.toLowerCase() || viewingProperty.user_id?.toLowerCase() === user.email?.toLowerCase()}
+          canDelete={isMaster}
           onEdit={(prop) => {
             setViewingProperty(null);
             handleEditProperty(prop);
           }}
-          onDelete={(prop) => {
+          onDelete={isMaster ? (prop) => {
             handleDeleteProperty(prop);
-          }}
+          } : undefined}
           onGenerateSocialMedia={handleGenerateSocialMedia}
           onGenerateAiPost={handleOpenAiPost}
           onClose={() => setViewingProperty(null)}

@@ -182,13 +182,24 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
     setSuccessReport(null);
 
     try {
+      const token = localStorage.getItem('lopes_token') || localStorage.getItem('token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/properties/fetch-feed-xml', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ url: feedUrl.trim() })
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(`Resposta inválida do servidor (Status ${res.status}): ${rawText.substring(0, 150)}`);
+      }
+
       if (!res.ok || !data.xml) {
         throw new Error(data.error || 'Não foi possível baixar o feed da URL informada.');
       }

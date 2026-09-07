@@ -35,6 +35,7 @@ interface PropertyModalProps {
   captador?: User | null;
   companySettings?: CompanySettings;
   canEdit?: boolean;
+  canDelete?: boolean;
   onEdit?: (property: Property) => void;
   onDelete?: (property: Property) => void;
   onGenerateSocialMedia?: (property: Property) => void;
@@ -47,6 +48,7 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
   captador,
   companySettings: initialSettings,
   canEdit = false,
+  canDelete = false,
   onEdit,
   onDelete,
   onGenerateSocialMedia,
@@ -423,14 +425,14 @@ export const PropertyModal: React.FC<PropertyModalProps> = ({
                 </button>
               )}
 
-              {canEdit && onDelete && (
+              {canDelete && onDelete && (
                 <button
                   type="button"
                   onClick={() => {
                     onDelete(property);
                   }}
                   className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center space-x-1.5 transition border border-rose-200 cursor-pointer"
-                  title="Excluir este imóvel"
+                  title="Excluir este imóvel (Apenas Administrador)"
                 >
                   <Trash2 className="w-4 h-4 text-rose-600" />
                   <span>Excluir</span>

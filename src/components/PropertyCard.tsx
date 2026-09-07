@@ -15,6 +15,7 @@ interface PropertyCardProps {
   onGenerateSocialMedia?: (property: Property) => void;
   onGenerateAiPost?: (property: Property) => void;
   canEdit?: boolean;
+  canDelete?: boolean;
   hidePerMonth?: boolean;
 }
 
@@ -28,6 +29,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
   onGenerateSocialMedia,
   onGenerateAiPost,
   canEdit = false,
+  canDelete = false,
   hidePerMonth = false
 }) => {
   const priceInfo = getPropertyPriceInfo(property);
@@ -205,7 +207,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               </button>
             )}
 
-            {canEdit && onDelete && (
+            {canDelete && onDelete && (
               <button
                 type="button"
                 onClick={(e) => {
