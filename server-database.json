@@ -1,21 +1,21 @@
 {
   "users": [
     {
-      "created_at": "2026-09-07T22:06:59.355Z",
-      "username": "admin",
       "name": "Administrador Master",
-      "url_slug": "admin",
-      "phone": "(92) 3659-1000",
-      "creci": "540-J/AM",
-      "id": "usr_admin",
-      "status": "active",
-      "photo_url": "",
-      "position": "Administrador do Sistema",
-      "instagram": "@lopesmanaus",
       "password": "$2b$10$YOMRUjFnZ5jwg04a9HiHquzWwz0anEwV5TKd4Vwh1mamwFFSLqBKG",
-      "whatsapp": "5592994642693",
+      "phone": "(92) 3659-1000",
+      "status": "active",
+      "instagram": "@lopesmanaus",
+      "username": "admin",
       "email": "admin@lopesmanaus.com.br",
-      "role": "MASTER_ADMIN"
+      "id": "usr_admin",
+      "url_slug": "admin",
+      "created_at": "2026-09-07T22:06:59.355Z",
+      "creci": "540-J/AM",
+      "photo_url": "",
+      "role": "MASTER_ADMIN",
+      "whatsapp": "5592994642693",
+      "position": "Administrador do Sistema"
     }
   ],
   "properties": [],
@@ -39,70 +39,70 @@
   },
   "auditLogs": [
     {
+      "description": "O sistema foi completamente zerado para o estado inicial de fábrica pelo Administrador.",
       "user_id": "usr_admin",
-      "action": "Reset de Fábrica",
-      "user_name": "Administrador Master",
       "created_at": "2026-09-07T22:06:59.512Z",
-      "ip_address": "127.0.0.1",
+      "user_name": "Administrador Master",
+      "action": "Reset de Fábrica",
       "id": "log_1788818819512_hsvp",
-      "description": "O sistema foi completamente zerado para o estado inicial de fábrica pelo Administrador."
+      "ip_address": "127.0.0.1"
     },
     {
-      "action": "Login",
       "id": "log_1788819062639_eszn",
       "user_name": "Administrador Master",
-      "created_at": "2026-09-07T22:11:02.639Z",
+      "action": "Login",
       "ip_address": "127.0.0.1",
+      "created_at": "2026-09-07T22:11:02.639Z",
       "description": "Efetuou login no sistema",
       "user_id": "usr_admin"
     },
     {
       "ip_address": "127.0.0.1",
       "created_at": "2026-09-07T22:13:32.005Z",
-      "action": "Capa do Catálogo",
       "description": "Atualizou a imagem de capa (cover_horizontal_url) no Cloud Firestore",
-      "user_id": "usr_admin",
-      "id": "log_1788819212005_vixh",
-      "user_name": "Administrador Master"
-    },
-    {
-      "id": "log_1788819226333_zrtw",
       "action": "Capa do Catálogo",
-      "description": "Atualizou a imagem de capa (cover_venda_url) no Cloud Firestore",
-      "created_at": "2026-09-07T22:13:46.333Z",
-      "ip_address": "127.0.0.1",
-      "user_id": "usr_admin",
-      "user_name": "Administrador Master"
+      "user_name": "Administrador Master",
+      "id": "log_1788819212005_vixh",
+      "user_id": "usr_admin"
     },
     {
-      "description": "Atualizou a imagem de capa (cover_locacao_url) no Cloud Firestore",
+      "description": "Atualizou a imagem de capa (cover_venda_url) no Cloud Firestore",
+      "action": "Capa do Catálogo",
+      "id": "log_1788819226333_zrtw",
       "ip_address": "127.0.0.1",
+      "user_id": "usr_admin",
+      "user_name": "Administrador Master",
+      "created_at": "2026-09-07T22:13:46.333Z"
+    },
+    {
       "created_at": "2026-09-07T22:13:53.625Z",
       "action": "Capa do Catálogo",
-      "user_id": "usr_admin",
+      "description": "Atualizou a imagem de capa (cover_locacao_url) no Cloud Firestore",
       "user_name": "Administrador Master",
-      "id": "log_1788819233625_n13z"
+      "ip_address": "127.0.0.1",
+      "id": "log_1788819233625_n13z",
+      "user_id": "usr_admin"
     },
     {
-      "user_name": "Administrador Master",
       "id": "log_1788819241879_uot9",
       "description": "Atualizou as informações e capas da imobiliária no Firestore",
-      "ip_address": "127.0.0.1",
-      "created_at": "2026-09-07T22:14:01.879Z",
-      "user_id": "usr_admin",
-      "action": "Configurações"
-    },
-    {
-      "action": "Atualização de Usuário",
-      "id": "log_1788819242224_qnu1",
-      "description": "Atualizou dados do usuário Administrador Master (admin) no Firestore",
-      "created_at": "2026-09-07T22:14:02.224Z",
+      "action": "Configurações",
       "ip_address": "127.0.0.1",
       "user_name": "Administrador Master",
-      "user_id": "usr_admin"
+      "user_id": "usr_admin",
+      "created_at": "2026-09-07T22:14:01.879Z"
+    },
+    {
+      "user_id": "usr_admin",
+      "ip_address": "127.0.0.1",
+      "id": "log_1788819242224_qnu1",
+      "created_at": "2026-09-07T22:14:02.224Z",
+      "description": "Atualizou dados do usuário Administrador Master (admin) no Firestore",
+      "user_name": "Administrador Master",
+      "action": "Atualização de Usuário"
     }
   ],
   "journalEntries": [],
   "scheduleEvents": [],
-  "updated_at": "2026-09-08T13:35:50.551Z"
+  "updated_at": "2026-09-08T18:45:27.423Z"
 }

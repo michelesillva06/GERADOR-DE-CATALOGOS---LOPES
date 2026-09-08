@@ -1707,7 +1707,7 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
  */
 const LOPESNET_FEED_URL = 'https://multimidia.lopes.com.br/portais/zap-lopesmanaus-v2.xml';
 
-app.post('/api/cron/sync-lopesnet-feed', async (req, res) => {
+app.all('/api/cron/sync-lopesnet-feed', async (req, res) => {
   const authHeader = req.headers['authorization'];
   if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Não autorizado.' });
