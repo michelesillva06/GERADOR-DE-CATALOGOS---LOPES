@@ -1,21 +1,21 @@
 {
   "users": [
     {
-      "id": "usr_admin",
-      "name": "Administrador Master",
-      "email": "admin@lopesmanaus.com.br",
+      "created_at": "2026-09-07T22:06:59.355Z",
       "username": "admin",
-      "phone": "(92) 3659-1000",
-      "whatsapp": "5592994642693",
-      "role": "MASTER_ADMIN",
-      "position": "Administrador do Sistema",
+      "name": "Administrador Master",
       "url_slug": "admin",
+      "phone": "(92) 3659-1000",
+      "creci": "540-J/AM",
+      "id": "usr_admin",
       "status": "active",
       "photo_url": "",
-      "creci": "540-J/AM",
+      "position": "Administrador do Sistema",
       "instagram": "@lopesmanaus",
       "password": "$2b$10$YOMRUjFnZ5jwg04a9HiHquzWwz0anEwV5TKd4Vwh1mamwFFSLqBKG",
-      "created_at": "2026-09-07T22:06:59.355Z"
+      "whatsapp": "5592994642693",
+      "email": "admin@lopesmanaus.com.br",
+      "role": "MASTER_ADMIN"
     }
   ],
   "properties": [],
@@ -32,23 +32,77 @@
     "state": "AM",
     "instagram": "@lopesmanaus",
     "creci_j": "540-J/AM",
-    "cover_horizontal_url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=85",
-    "cover_geral_url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=85",
-    "cover_venda_url": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=85",
-    "cover_locacao_url": "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1920&q=85"
+    "cover_horizontal_url": "https://res.cloudinary.com/gyixvdcv/image/upload/v1786908880/lopes-catalogos/cover_horizontal.jpg",
+    "cover_geral_url": "https://res.cloudinary.com/gyixvdcv/image/upload/v1786908880/lopes-catalogos/cover_horizontal.jpg",
+    "cover_venda_url": "https://res.cloudinary.com/gyixvdcv/image/upload/v1786908895/lopes-catalogos/cover_venda.jpg",
+    "cover_locacao_url": "https://res.cloudinary.com/gyixvdcv/image/upload/v1786908888/lopes-catalogos/cover_locacao.jpg"
   },
   "auditLogs": [
     {
+      "user_id": "usr_admin",
+      "action": "Reset de Fábrica",
+      "user_name": "Administrador Master",
+      "created_at": "2026-09-07T22:06:59.512Z",
+      "ip_address": "127.0.0.1",
       "id": "log_1788818819512_hsvp",
+      "description": "O sistema foi completamente zerado para o estado inicial de fábrica pelo Administrador."
+    },
+    {
+      "action": "Login",
+      "id": "log_1788819062639_eszn",
+      "user_name": "Administrador Master",
+      "created_at": "2026-09-07T22:11:02.639Z",
+      "ip_address": "127.0.0.1",
+      "description": "Efetuou login no sistema",
+      "user_id": "usr_admin"
+    },
+    {
+      "ip_address": "127.0.0.1",
+      "created_at": "2026-09-07T22:13:32.005Z",
+      "action": "Capa do Catálogo",
+      "description": "Atualizou a imagem de capa (cover_horizontal_url) no Cloud Firestore",
+      "user_id": "usr_admin",
+      "id": "log_1788819212005_vixh",
+      "user_name": "Administrador Master"
+    },
+    {
+      "id": "log_1788819226333_zrtw",
+      "action": "Capa do Catálogo",
+      "description": "Atualizou a imagem de capa (cover_venda_url) no Cloud Firestore",
+      "created_at": "2026-09-07T22:13:46.333Z",
+      "ip_address": "127.0.0.1",
+      "user_id": "usr_admin",
+      "user_name": "Administrador Master"
+    },
+    {
+      "description": "Atualizou a imagem de capa (cover_locacao_url) no Cloud Firestore",
+      "ip_address": "127.0.0.1",
+      "created_at": "2026-09-07T22:13:53.625Z",
+      "action": "Capa do Catálogo",
       "user_id": "usr_admin",
       "user_name": "Administrador Master",
-      "action": "Reset de Fábrica",
-      "description": "O sistema foi completamente zerado para o estado inicial de fábrica pelo Administrador.",
-      "created_at": "2026-09-07T22:06:59.512Z",
-      "ip_address": "127.0.0.1"
+      "id": "log_1788819233625_n13z"
+    },
+    {
+      "user_name": "Administrador Master",
+      "id": "log_1788819241879_uot9",
+      "description": "Atualizou as informações e capas da imobiliária no Firestore",
+      "ip_address": "127.0.0.1",
+      "created_at": "2026-09-07T22:14:01.879Z",
+      "user_id": "usr_admin",
+      "action": "Configurações"
+    },
+    {
+      "action": "Atualização de Usuário",
+      "id": "log_1788819242224_qnu1",
+      "description": "Atualizou dados do usuário Administrador Master (admin) no Firestore",
+      "created_at": "2026-09-07T22:14:02.224Z",
+      "ip_address": "127.0.0.1",
+      "user_name": "Administrador Master",
+      "user_id": "usr_admin"
     }
   ],
   "journalEntries": [],
   "scheduleEvents": [],
-  "updated_at": "2026-09-07T22:06:59.564Z"
+  "updated_at": "2026-09-08T13:35:50.551Z"
 }

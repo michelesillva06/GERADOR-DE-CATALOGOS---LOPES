@@ -350,11 +350,15 @@ export async function triggerBackendOverdueCheck(): Promise<{
       method: 'POST',
       headers
     });
-    const data = await res.json();
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      return { success: false, message: errData.error || `HTTP ${res.status}` };
+    }
+    const data = await res.json().catch(() => ({ success: false }));
     return data;
   } catch (err: any) {
-    console.error('Error triggering backend overdue check:', err);
-    return { success: false, message: err.message };
+    console.warn('Error triggering backend overdue check:', err?.message || err);
+    return { success: false, message: err?.message || 'Falha de conexão' };
   }
 }
 
@@ -601,11 +605,15 @@ export async function triggerBackendScheduleCheck(): Promise<{
       method: 'POST',
       headers
     });
-    const data = await res.json();
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      return { success: false, message: errData.error || `HTTP ${res.status}` };
+    }
+    const data = await res.json().catch(() => ({ success: false }));
     return data;
   } catch (err: any) {
-    console.error('Error triggering backend schedule check:', err);
-    return { success: false, message: err.message };
+    console.warn('Error triggering backend schedule check:', err?.message || err);
+    return { success: false, message: err?.message || 'Falha de conexão' };
   }
 }
 
@@ -627,10 +635,14 @@ export async function triggerBackendCheckAll(): Promise<{
       method: 'POST',
       headers
     });
-    const data = await res.json();
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      return { success: false, message: errData.error || `HTTP ${res.status}` };
+    }
+    const data = await res.json().catch(() => ({ success: false }));
     return data;
   } catch (err: any) {
-    console.error('Error triggering backend check all:', err);
-    return { success: false, message: err.message };
+    console.warn('Error triggering backend check all:', err?.message || err);
+    return { success: false, message: err?.message || 'Falha de conexão' };
   }
 }

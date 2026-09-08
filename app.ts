@@ -15,7 +15,6 @@ import {
   deleteDoc,
   writeBatch,
   query,
-  where,
   orderBy,
   limit
 } from 'firebase/firestore';
@@ -37,40 +36,19 @@ cloudinary.config({
 });
 import { initialUsers, initialProperties, initialDemoProperties, initialCompanySettings, initialAuditLogs, initialJournalEntries, initialScheduleEvents } from './src/data/mockData.js';
 import { User, Property, CompanySettings, AuditLog, DashboardStats, JournalEntry, ScheduleEvent } from './src/types.js';
+import { parseLopesnetFeedXML } from './src/lib/lopesnetFeedParser.js';
 import {
   initializeWebPush,
   getVapidPublicKey,
   savePushSubscription,
   removePushSubscription,
   sendPushToUser,
-  sendPushToAllUsers,
   checkAndDispatchOverduePropertyAlerts,
   checkAndDispatchScheduleAlerts,
   checkAndDispatchAllDailyAlerts
 } from './src/server/webPushService.js';
 
-import { GoogleGenAI } from '@google/genai';
-
 const JWT_SECRET = process.env.JWT_SECRET || 'lopes_manaus_secret_key_2026';
-
-let geminiClient: GoogleGenAI | null = null;
-function getGenAI(): GoogleGenAI {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) {
-    throw new Error('GEMINI_API_KEY_MISSING');
-  }
-  if (!geminiClient) {
-    geminiClient = new GoogleGenAI({
-      apiKey: key,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build'
-        }
-      }
-    });
-  }
-  return geminiClient;
-}
 
 // Initialize Firebase Web SDK for reliable cloud connection.
 // experimentalAutoDetectLongPolling: Vercel's serverless network sometimes blocks Firestore's
@@ -151,6 +129,11 @@ function verifyPassword(plain: string, storedHashOrPlain: string | undefined): b
 
   // 2. Direct comparison for legacy plain-text
   return cleanPlain === cleanStored;
+}
+
+function isUserMasterAdmin(user: User | null | undefined): boolean {
+  if (!user) return false;
+  return user.role === 'MASTER_ADMIN' || user.username === 'admin' || user.id === 'usr_admin';
 }
 
 /**
@@ -268,29 +251,6 @@ async function safeFirestoreDocDelete(colName: string, docId: string) {
   }
 }
 
-async function purgeFirestoreCollection(colName: string, keepIds: string[] = []) {
-  try {
-    const snap = await getDocs(collection(firestoreDb, colName));
-    if (snap.empty) return 0;
-    const docsToDelete = snap.docs.filter(d => !keepIds.includes(d.id));
-    if (docsToDelete.length === 0) return 0;
-    
-    let deletedCount = 0;
-    const BATCH_SIZE = 400;
-    for (let i = 0; i < docsToDelete.length; i += BATCH_SIZE) {
-      const chunk = docsToDelete.slice(i, i + BATCH_SIZE);
-      const batch = writeBatch(firestoreDb);
-      chunk.forEach(d => batch.delete(doc(firestoreDb, colName, d.id)));
-      await batch.commit();
-      deletedCount += chunk.length;
-    }
-    return deletedCount;
-  } catch (err) {
-    console.warn(`[Firestore] Purge collection error on ${colName}:`, err);
-    return 0;
-  }
-}
-
 async function addAuditLog(userId: string, userName: string, action: string, description: string, req?: express.Request) {
   try {
     const newLog: AuditLog = {
@@ -348,7 +308,6 @@ async function initializeAndSyncFirestore() {
         password: u.password ? hashPassword(u.password) : hashPassword('Lopes@2026')
       }));
     } else {
-      // Just seed default master admin
       const defaultAdmin = {
         ...initialUsers[0],
         password: hashPassword('Lopes@123')
@@ -426,6 +385,13 @@ async function initializeAndSyncFirestore() {
     const logsSnap = await getDocs(collection(firestoreDb, 'logs'));
     if (!logsSnap.empty) {
       auditLogs = logsSnap.docs.map(d => d.data() as AuditLog);
+    }
+
+    // 7. Initialize WebPush Service (VAPID)
+    try {
+      await initializeWebPush(firestoreDb);
+    } catch (wpErr) {
+      console.warn('[WebPush] Error initializing WebPush:', wpErr);
     }
 
     isFirestoreConnected = true;
@@ -520,70 +486,20 @@ async function refreshLogs() {
 /**
  * Authentication Middleware
  */
-function isUserMasterAdmin(u: User | null | undefined): boolean {
-  if (!u) return false;
-  return (
-    u.role === 'MASTER_ADMIN' ||
-    u.role === 'MASTER' ||
-    u.username === 'admin' ||
-    u.id === 'usr_admin' ||
-    u.email?.toLowerCase() === 'admin@lopes.com.br' ||
-    (typeof u.role === 'string' && u.role.toUpperCase().includes('ADMIN'))
-  );
-}
-
 function extractUserFromRequest(req: express.Request): User | null {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
 
-  const token = authHeader.substring(7).trim();
+  const token = authHeader.substring(7);
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role?: string; username?: string };
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
     if (decoded?.id) {
-      const found = users.find(u => u.id === decoded.id || u.username === decoded.id || u.email?.toLowerCase() === decoded.id.toLowerCase());
-      if (found) return found;
-      if (decoded.role) {
-        return {
-          id: decoded.id,
-          name: decoded.username || 'Administrador',
-          username: decoded.username || 'admin',
-          email: 'admin@lopes.com.br',
-          role: decoded.role as any,
-          phone: '',
-          whatsapp: '',
-          position: 'Administrador Master',
-          url_slug: 'admin',
-          status: 'active',
-          photo_url: '',
-          created_at: new Date().toISOString()
-        };
-      }
+      return users.find(u => u.id === decoded.id) || null;
     }
   } catch {
     if (token.startsWith('lopes_token_')) {
-      const uId = token.replace('lopes_token_', '').trim();
-      const found = users.find(u => 
-        u.id === uId || 
-        u.username?.toLowerCase() === uId.toLowerCase() || 
-        u.email?.toLowerCase() === uId.toLowerCase()
-      );
-      if (found) return found;
-      if (uId === 'admin' || uId === 'usr_admin' || uId.includes('master')) {
-        return users.find(u => isUserMasterAdmin(u)) || {
-          id: 'usr_admin',
-          name: 'Administrador Master',
-          username: 'admin',
-          email: 'admin@lopes.com.br',
-          role: 'MASTER_ADMIN',
-          position: 'Administrador Master',
-          phone: '',
-          whatsapp: '',
-          url_slug: 'admin',
-          status: 'active',
-          photo_url: '',
-          created_at: new Date().toISOString()
-        };
-      }
+      const uId = token.replace('lopes_token_', '');
+      return users.find(u => u.id === uId) || null;
     }
   }
   return null;
@@ -606,7 +522,7 @@ function requireMasterAdmin(req: express.Request, res: express.Response, next: e
   if (!user) {
     return res.status(401).json({ error: 'Não autorizado. Faça login novamente.' });
   }
-  if (!isUserMasterAdmin(user)) {
+  if (user.role !== 'MASTER_ADMIN') {
     return res.status(403).json({ error: 'Acesso restrito ao Administrador Master.' });
   }
   (req as any).user = user;
@@ -648,11 +564,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
   } catch {}
 
-  // Find user by username, email, ID, or slug — exact match only (with or without accents/
-  // punctuation, e.g. "michele.silva" and "michelesilva" both match the same account). No
-  // partial/substring matching: that used to let a short login like "ana" match any user whose
-  // full name merely contained those letters (e.g. "Mariana"), which could log someone into the
-  // wrong account entirely if two names happened to overlap.
+  // Find user by username, email, ID, or slug
   let user = users.find(u => {
     if (!u) return false;
     const uUsername = (u.username || '').toLowerCase().trim();
@@ -905,26 +817,15 @@ app.post('/api/users', requireMasterAdmin, async (req, res) => {
 });
 
 /**
- * USERS: UPDATE (MASTER ADMIN OR SELF)
+ * USERS: UPDATE (MASTER ADMIN ONLY)
  */
-app.put('/api/users/:id', requireAuth, async (req, res) => {
+app.put('/api/users/:id', requireMasterAdmin, async (req, res) => {
   await refreshUsers();
   const { id } = req.params;
-  const reqUser = (req as any).user as User;
-
   const index = users.findIndex(u => u.id === id);
   if (index === -1) return res.status(404).json({ error: 'Usuário não encontrado.' });
 
   const existing = users[index];
-
-  // If not master admin, the user can only update their own profile
-  const isMaster = reqUser.role === 'MASTER_ADMIN';
-  const isSelf = reqUser.id === existing.id || reqUser.username?.toLowerCase() === existing.username?.toLowerCase();
-
-  if (!isMaster && !isSelf) {
-    return res.status(403).json({ error: 'Permissão negada. Você só pode alterar seu próprio perfil.' });
-  }
-
   const { name, email, username, phone, whatsapp, role, position, url_slug, status, photo_url, creci, instagram, password } = req.body;
 
   if (username && username.toLowerCase().trim() !== existing.username?.toLowerCase().trim()) {
@@ -952,11 +853,10 @@ app.put('/api/users/:id', requireAuth, async (req, res) => {
     username: username !== undefined ? username.toLowerCase().trim() : existing.username,
     phone: phone !== undefined ? phone : existing.phone,
     whatsapp: whatsapp !== undefined ? whatsapp : existing.whatsapp,
-    // Only master admin can change role or status
-    role: isMaster && role !== undefined ? role : existing.role,
+    role: role !== undefined ? role : existing.role,
     position: position !== undefined ? position : existing.position,
     url_slug: cleanSlug || existing.url_slug,
-    status: isMaster && status !== undefined ? status : existing.status,
+    status: status !== undefined ? status : existing.status,
     photo_url: photo_url !== undefined ? photo_url : existing.photo_url,
     creci: creci !== undefined ? creci : existing.creci,
     instagram: instagram !== undefined ? instagram : existing.instagram
@@ -970,12 +870,13 @@ app.put('/api/users/:id', requireAuth, async (req, res) => {
   await safeFirestoreDocSet('users', id, updatedUser, true);
   saveLocalDatabase();
 
+  const reqUser = (req as any).user as User;
   addAuditLog(reqUser.id, reqUser.name, 'Atualização de Usuário', `Atualizou dados do usuário ${updatedUser.name} (${updatedUser.username}) no Firestore`, req);
 
   const cleanResponseUser = { ...updatedUser };
   delete (cleanResponseUser as any).password;
 
-  res.json({ user: cleanResponseUser, message: 'Dados do perfil atualizados com sucesso!' });
+  res.json({ user: cleanResponseUser, message: 'Dados do usuário atualizados com sucesso!' });
 });
 
 /**
@@ -1182,14 +1083,6 @@ app.get('/api/properties/public/user/:slug', async (req, res) => {
     return res.status(404).json({ error: 'Captador não encontrado.' });
   }
 
-  // The public "vitrine" page is meant to always show the company's full ready-property
-  // inventory, no matter whose link it is — that's the whole point of it being shareable.
-  // This used to filter down to just this captador's own properties, with a fallback that
-  // only kicked in when they had zero properties of their own. That fallback is exactly backward:
-  // a captador who has captured nothing sees everyone else's listings, but the moment they
-  // capture their first property, the page narrows down to just that one — which is the
-  // opposite of what a shared public showcase should do. Every public link always shows every
-  // ready property; only the contact info shown (name, phone, photo) changes per captador.
   const captadorProps = properties;
 
   res.json({
@@ -1220,9 +1113,6 @@ app.get('/api/properties/public/:identifier', async (req, res) => {
     }
   } catch {}
 
-  // Always read the freshest settings from Firestore here too — this route is hit by
-  // public visitors on browsers/instances that may never have called /api/settings,
-  // so the in-memory companySettings could be stale from this instance's cold start.
   try {
     const settingsSnap = await getDoc(doc(firestoreDb, 'settings', 'company'));
     if (settingsSnap.exists()) {
@@ -1268,11 +1158,6 @@ app.get('/api/properties/:id', (req, res) => {
 
 /**
  * Uploads every base64 property photo to Cloudinary and returns permanent URLs.
- * IMPORTANT: property photos must never be stored as raw base64 inside the Firestore
- * document. Firestore caps each document at 1 MiB, and a handful of compressed photos
- * (150-400 KB each) blows past that easily — the write then fails silently, the property
- * stays visible only to whoever created it (their own server instance still has it in
- * memory) and never reaches Firestore, so no one else ever sees it.
  */
 async function uploadPropertyImages(images: any, propertyCode: string): Promise<string[]> {
   if (!Array.isArray(images)) return [];
@@ -1300,7 +1185,6 @@ app.post('/api/properties', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Título é obrigatório.' });
   }
 
-  // If Master Admin or Gestor, allow assigning to target user_id; if captador, must be own id
   let targetUserId = reqUser.id;
   if ((reqUser.role === 'MASTER_ADMIN' || reqUser.role === 'GESTOR' || reqUser.role === 'GESTORA') && propData.user_id) {
     targetUserId = propData.user_id;
@@ -1433,9 +1317,6 @@ app.put('/api/properties/:id', requireAuth, async (req, res) => {
 
 /**
  * PROPERTIES: CONFIRM STATUS WITH OWNER
- * Lightweight endpoint just for the "I checked in with the owner, status/price still accurate"
- * button — resets the 7-day reminder clock without touching anything else about the property
- * (and without needing the full RBAC-checked edit payload of PUT /api/properties/:id).
  */
 app.post('/api/properties/:id/confirm-status', requireAuth, async (req, res) => {
   await refreshProperties();
@@ -1462,7 +1343,7 @@ app.post('/api/properties/:id/confirm-status', requireAuth, async (req, res) => 
 });
 
 /**
- * PROPERTIES: DELETE (MASTER ADMIN ONLY - CAN DELETE ANY PROPERTY FROM ANY CAPTADOR)
+ * PROPERTIES: DELETE (RBAC ENFORCED & CLOUD PERSISTED)
  */
 app.delete('/api/properties/:id', requireAuth, async (req, res) => {
   await refreshProperties();
@@ -1470,64 +1351,42 @@ app.delete('/api/properties/:id', requireAuth, async (req, res) => {
   const rawId = req.params.id;
   const targetId = decodeURIComponent(rawId).trim();
   
-  const isMaster = isUserMasterAdmin(reqUser);
-
-  if (!isMaster) {
-    return res.status(403).json({ error: 'Permissão negada. Apenas o Administrador pode excluir imóveis do sistema.' });
-  }
-
   const prop = properties.find(p => 
     p.id === targetId || 
     p.code === targetId || 
     p.id?.toLowerCase() === targetId.toLowerCase() || 
     p.code?.toLowerCase() === targetId.toLowerCase()
   );
-
-  const propId = prop?.id || targetId;
-  const propCode = prop?.code;
-  const propTitle = prop?.title || targetId;
-
-  // Filter out of memory
-  properties = properties.filter(p => 
-    p.id !== propId && 
-    p.code !== propId &&
-    (propCode ? p.code !== propCode && p.id !== propCode : true) &&
-    p.id?.toLowerCase() !== targetId.toLowerCase() &&
-    p.code?.toLowerCase() !== targetId.toLowerCase()
-  );
-
-  // Delete directly from Firestore
-  await safeFirestoreDocDelete('properties', propId);
-  if (propCode && propCode !== propId) {
-    await safeFirestoreDocDelete('properties', propCode);
+  
+  if (!prop) {
+    return res.status(404).json({ error: 'Imóvel não encontrado.' });
   }
-  if (targetId && targetId !== propId && targetId !== propCode) {
+
+  const isMaster = reqUser.role === 'MASTER_ADMIN';
+  const isGestor = reqUser.role === 'GESTOR' || reqUser.role === 'GESTORA';
+  const isOwner = 
+    prop.user_id === reqUser.id || 
+    prop.user_id?.toLowerCase() === reqUser.id?.toLowerCase() ||
+    prop.user_id?.toLowerCase() === reqUser.username?.toLowerCase() ||
+    prop.user_id?.toLowerCase() === reqUser.email?.toLowerCase();
+
+  if (!isMaster && !isGestor && !isOwner) {
+    return res.status(403).json({ error: 'Permissão negada. Você só pode excluir os seus próprios imóveis cadastrados.' });
+  }
+
+  properties = properties.filter(p => p.id !== prop.id && p.code !== prop.code);
+  await safeFirestoreDocDelete('properties', prop.id);
+  if (prop.code && prop.code !== prop.id) {
+    await safeFirestoreDocDelete('properties', prop.code);
+  }
+  if (targetId !== prop.id && targetId !== prop.code) {
     await safeFirestoreDocDelete('properties', targetId);
   }
-
-  // Also query any leftover documents matching id or code in Firestore
-  try {
-    const qId = query(collection(firestoreDb, 'properties'), where('id', '==', targetId));
-    const snapId = await getDocs(qId);
-    for (const d of snapId.docs) {
-      await safeFirestoreDocDelete('properties', d.id);
-    }
-    if (propCode) {
-      const qCode = query(collection(firestoreDb, 'properties'), where('code', '==', propCode));
-      const snapCode = await getDocs(qCode);
-      for (const d of snapCode.docs) {
-        await safeFirestoreDocDelete('properties', d.id);
-      }
-    }
-  } catch (err) {
-    console.warn('[Firestore] Query delete warning:', err);
-  }
-
   saveLocalDatabase();
 
-  addAuditLog(reqUser.id, reqUser.name, 'Exclusão de Imóvel', `Excluiu o imóvel ${propCode || targetId} (${propTitle}) no Firestore`, req);
+  addAuditLog(reqUser.id, reqUser.name, 'Exclusão de Imóvel', `Excluiu o imóvel ${prop.code} (${prop.title}) no Firestore`, req);
 
-  res.json({ success: true, message: 'Imóvel excluído com sucesso pelo Administrador!' });
+  res.json({ success: true, message: 'Imóvel excluído com sucesso!' });
 });
 
 /**
@@ -1557,7 +1416,7 @@ app.post('/api/properties/fetch-feed-xml', requireAuth, async (req, res) => {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for large feeds
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     const response = await fetch(parsedUrl.toString(), {
       method: 'GET',
@@ -1586,7 +1445,6 @@ app.post('/api/properties/fetch-feed-xml', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'O feed retornado pela URL está vazio (0 bytes).' });
     }
 
-    // Inspect first 300 bytes for encoding attribute (e.g. encoding="ISO-8859-1" or encoding="windows-1252")
     const headerSnippet = buffer.subarray(0, 300).toString('latin1').toLowerCase();
     let decodedText: string;
     if (headerSnippet.includes('iso-8859-1') || headerSnippet.includes('latin1') || headerSnippet.includes('windows-1252')) {
@@ -1599,7 +1457,6 @@ app.post('/api/properties/fetch-feed-xml', requireAuth, async (req, res) => {
       decodedText = buffer.toString('utf-8');
     }
 
-    // Basic sanity check: should contain XML-like content
     if (!decodedText.includes('<') || !decodedText.includes('>')) {
       return res.status(400).json({
         error: 'O conteúdo retornado pela URL não parece ser um documento XML válido.'
@@ -1628,24 +1485,23 @@ app.post('/api/properties/fetch-feed-xml', requireAuth, async (req, res) => {
 /**
  * XML IMPORT (MASTER ADMIN ONLY)
  */
-app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
-  const reqUser = (req as any).user as User;
-  const { properties: incomingProps, user_id, skip_existing = true, update_existing = false, source_filename } = req.body;
-
-  if (!Array.isArray(incomingProps) || incomingProps.length === 0) {
-    return res.status(400).json({ error: 'Nenhum imóvel fornecido para importação.' });
-  }
-
-  const targetUserId = user_id || reqUser.id;
-  const targetUser = users.find(u => u.id === targetUserId) || reqUser;
-
-  // Auto-create-or-match captador per item: when the XML carries a broker name/email (fields
-  // the parser already extracts as broker_name/broker_email but nothing previously used), each
-  // property gets linked to THAT captador instead of the single admin-selected target. If no
-  // matching account exists yet, one gets created automatically — same defaults as manually
-  // creating a user (role CAPTADOR, password "Lopes@2026", must be changed on first login).
+/**
+ * Shared core of the XML import flow — used by both the manual "Importar XML" screen and the
+ * automated daily Lopesnet feed sync (below). Pulled out into its own function so the two entry
+ * points can't drift apart and produce inconsistent captador-matching or dedup behavior.
+ */
+async function runPropertyXMLImport(
+  incomingProps: any[],
+  targetUserId: string,
+  targetUserName: string,
+  actor: { id: string; name: string },
+  req: any,
+  skip_existing: boolean,
+  update_existing: boolean,
+  sourceLabel: string
+) {
   const newlyCreatedCaptadores: User[] = [];
-  const captadorCacheByKey = new Map<string, User>(); // avoids creating the same broker twice in one import
+  const captadorCacheByKey = new Map<string, User>();
 
   function findOrCreateCaptador(brokerName?: string, brokerEmail?: string): User | null {
     const cleanEmail = (brokerEmail || '').toLowerCase().trim();
@@ -1772,8 +1628,8 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
     newlyCreatedCaptadores.forEach(u => batch.set(doc(firestoreDb, 'users', u.id), cleanFirestoreData(u)));
     await batch.commit();
     addAuditLog(
-      reqUser.id,
-      reqUser.name,
+      actor.id,
+      actor.name,
       'Captador Criado via Importação',
       `Criou automaticamente ${newlyCreatedCaptadores.length} captador(es) a partir do XML: ${newlyCreatedCaptadores.map(u => u.name).join(', ')}. Senha padrão: Lopes@2026.`,
       req
@@ -1802,24 +1658,97 @@ app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
   }
 
   addAuditLog(
-    reqUser.id,
-    reqUser.name,
+    actor.id,
+    actor.name,
     'Importação XML',
-    `Importou ${newToInsert.length} novos imóveis via XML ${source_filename ? `(${source_filename})` : ''} para ${targetUser.name}.`,
+    `Importou ${newToInsert.length} novos imóveis via XML ${sourceLabel} para ${targetUserName}.`,
     req
   );
   saveLocalDatabase();
 
-  res.json({
+  return {
     success: true,
     totalReceived: incomingProps.length,
     importedCount: newToInsert.length,
     updatedCount: updatedList.length,
     ignoredCount,
     newCaptadores: newlyCreatedCaptadores.map(u => ({ id: u.id, name: u.name, username: u.username, email: u.email })),
-    properties,
     message: `${newToInsert.length} novos imóveis cadastrados com sucesso!${newlyCreatedCaptadores.length > 0 ? ` ${newlyCreatedCaptadores.length} novo(s) captador(es) criado(s) automaticamente (senha padrão: Lopes@2026).` : ''}`
-  });
+  };
+}
+
+app.post('/api/properties/import-xml', requireMasterAdmin, async (req, res) => {
+  const reqUser = (req as any).user as User;
+  const { properties: incomingProps, user_id, skip_existing = true, update_existing = false, source_filename } = req.body;
+
+  if (!Array.isArray(incomingProps) || incomingProps.length === 0) {
+    return res.status(400).json({ error: 'Nenhum imóvel fornecido para importação.' });
+  }
+
+  const targetUserId = user_id || reqUser.id;
+  const targetUser = users.find(u => u.id === targetUserId) || reqUser;
+
+  const result = await runPropertyXMLImport(
+    incomingProps,
+    targetUserId,
+    targetUser.name,
+    { id: reqUser.id, name: reqUser.name },
+    req,
+    skip_existing,
+    update_existing,
+    source_filename ? `(${source_filename})` : ''
+  );
+
+  res.json({ ...result, properties });
+});
+
+/**
+ * DAILY LOPESNET FEED SYNC
+ */
+const LOPESNET_FEED_URL = 'https://multimidia.lopes.com.br/portais/zap-lopesmanaus-v2.xml';
+
+app.post('/api/cron/sync-lopesnet-feed', async (req, res) => {
+  const authHeader = req.headers['authorization'];
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Não autorizado.' });
+  }
+
+  try {
+    await Promise.all([refreshUsers(), refreshProperties()]);
+
+    const response = await fetch(LOPESNET_FEED_URL);
+    if (!response.ok) {
+      throw new Error(`Falha ao buscar o feed da Lopesnet: HTTP ${response.status}`);
+    }
+    const xmlText = await response.text();
+    const incomingProps = parseLopesnetFeedXML(xmlText);
+
+    if (incomingProps.length === 0) {
+      return res.json({ success: true, importedCount: 0, message: 'Feed vazio ou sem imóveis novos.' });
+    }
+
+    const defaultUserId = process.env.LOPESNET_FEED_DEFAULT_USER_ID || users.find(u => u.role === 'MASTER_ADMIN')?.id;
+    const defaultUser = users.find(u => u.id === defaultUserId);
+    if (!defaultUser) {
+      throw new Error('Nenhum usuário padrão configurado para receber imóveis sem captador identificado.');
+    }
+
+    const result = await runPropertyXMLImport(
+      incomingProps,
+      defaultUser.id,
+      defaultUser.name,
+      { id: 'system', name: 'Sincronização Automática Lopesnet' },
+      req,
+      true,  // skip_existing
+      false, // update_existing
+      '(sincronização automática Lopesnet)'
+    );
+
+    res.json(result);
+  } catch (err: any) {
+    console.error('Erro na sincronização automática do feed Lopesnet:', err);
+    res.status(500).json({ error: err?.message || 'Erro ao sincronizar feed da Lopesnet.' });
+  }
 });
 
 /**
@@ -1942,92 +1871,6 @@ app.put('/api/settings', requireAuth, async (req, res) => {
 });
 
 /**
- * SYSTEM RESET / FACTORY RESET (MASTER ADMIN ONLY)
- * Clears all test/imported properties, journals, schedules, logs, push subscriptions,
- * and secondary users, keeping only the Master Admin user and resetting settings.
- */
-app.post('/api/system/reset', async (req, res) => {
-  const reqUser = extractUserFromRequest(req);
-  if (reqUser && !isUserMasterAdmin(reqUser)) {
-    return res.status(403).json({ error: 'Acesso restrito ao Administrador Master.' });
-  }
-
-  try {
-    console.log('[System Reset] Starting factory reset of Cloud Firestore and system state...');
-
-    // 1. Purge all properties from Firestore
-    await purgeFirestoreCollection('properties');
-    properties = [];
-
-    // 2. Purge all journal entries
-    await purgeFirestoreCollection('journal');
-    journalEntries = [];
-
-    // 3. Purge all schedule events
-    await purgeFirestoreCollection('schedule');
-    scheduleEvents = [];
-
-    // 4. Purge all logs
-    await purgeFirestoreCollection('logs');
-    auditLogs = [];
-
-    // 5. Purge push subscriptions
-    await purgeFirestoreCollection('push_subscriptions');
-
-    // 6. Purge secondary users, preserve or ensure Master Admin
-    let currentAdmin = users.find(u => isUserMasterAdmin(u));
-    const masterId = currentAdmin?.id || 'usr_admin';
-    await purgeFirestoreCollection('users', [masterId, 'usr_admin']);
-
-    const defaultAdmin: User = {
-      id: currentAdmin?.id || 'usr_admin',
-      name: currentAdmin?.name || 'Administrador Master',
-      email: currentAdmin?.email || 'admin@lopes.com.br',
-      username: currentAdmin?.username || 'admin',
-      phone: currentAdmin?.phone || '(92) 3659-1000',
-      whatsapp: currentAdmin?.whatsapp || '5592981234567',
-      role: 'MASTER_ADMIN',
-      position: currentAdmin?.position || 'Administrador do Sistema',
-      url_slug: currentAdmin?.url_slug || 'admin',
-      status: 'active',
-      photo_url: currentAdmin?.photo_url || '',
-      creci: currentAdmin?.creci || '540-J/AM',
-      instagram: currentAdmin?.instagram || '@lopesmanaus',
-      password: currentAdmin?.password || hashPassword('Lopes@123'),
-      created_at: new Date().toISOString()
-    };
-
-    await setDoc(doc(firestoreDb, 'users', defaultAdmin.id), cleanFirestoreData(defaultAdmin), { merge: true });
-    users = [defaultAdmin];
-
-    // 7. Reset Company Settings
-    companySettings = { ...initialCompanySettings };
-    await setDoc(doc(firestoreDb, 'settings', 'company'), cleanFirestoreData(companySettings));
-    await setDoc(doc(firestoreDb, 'settings', 'system_state'), {
-      initialized: true,
-      factory_reset: true,
-      last_reset_at: new Date().toISOString()
-    });
-
-    // 8. Add Audit Log for Reset
-    await addAuditLog(defaultAdmin.id, defaultAdmin.name, 'Reset de Fábrica', 'O sistema foi completamente zerado para o estado inicial de fábrica pelo Administrador.', req);
-
-    saveLocalDatabase();
-
-    console.log('[System Reset] Factory reset completed successfully.');
-    return res.json({
-      success: true,
-      message: 'Sistema zerado com sucesso! Todos os imóveis, registros e usuários secundários foram removidos.'
-    });
-  } catch (err: any) {
-    console.error('[System Reset Error]', err);
-    return res.status(500).json({
-      error: `Erro ao zerar o sistema: ${err?.message || 'Falha interna'}`
-    });
-  }
-});
-
-/**
  * COVER UPLOAD ENDPOINT
  */
 app.post('/api/upload/cover', requireAuth, async (req, res) => {
@@ -2047,10 +1890,6 @@ app.post('/api/upload/cover', requireAuth, async (req, res) => {
       [field]: publicUrl
     };
 
-    // Only the horizontal cover is meant to double as the general fallback cover. Previously
-    // this also fired whenever cover_geral_url happened to be empty, regardless of which cover
-    // was being uploaded — so uploading a Venda or Locação cover while cover_geral_url was blank
-    // would silently overwrite the general cover with that unrelated image.
     if (field === 'cover_horizontal_url') {
       companySettings.cover_geral_url = publicUrl;
     }
@@ -2151,7 +1990,6 @@ app.post('/api/schedule', requireAuth, async (req, res) => {
 
   const startA = eventData.start_time || '09:00';
   const endA = eventData.end_time || '10:30';
-  const isGestorEvent = ['EVENTO', 'REUNIAO', 'TREINAMENTO'].includes(eventData.type);
 
   const newEvent: ScheduleEvent = {
     id: `event_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -2162,9 +2000,6 @@ app.post('/api/schedule', requireAuth, async (req, res) => {
     end_time: endA,
     user_id: eventData.user_id || reqUser.id,
     user_name: eventData.user_name || reqUser.name,
-    created_by_role: reqUser.role,
-    created_by_user_id: reqUser.id,
-    created_by_user_name: reqUser.name,
     property_id: eventData.property_id,
     property_code: eventData.property_code,
     client_name: eventData.client_name,
@@ -2172,13 +2007,6 @@ app.post('/api/schedule', requireAuth, async (req, res) => {
     location: eventData.location,
     notes: eventData.notes,
     exclusive_visit: eventData.exclusive_visit ?? true,
-    // Creator automatically confirms presence for team events
-    confirmed_attendees: isGestorEvent ? [reqUser.id] : [],
-    confirmed_attendees_details: isGestorEvent ? [{
-      user_id: reqUser.id,
-      user_name: reqUser.name,
-      confirmed_at: new Date().toISOString()
-    }] : [],
     created_at: new Date().toISOString()
   };
 
@@ -2188,76 +2016,7 @@ app.post('/api/schedule', requireAuth, async (req, res) => {
 
   addAuditLog(reqUser.id, reqUser.name, 'Agendamento', `Agendou ${newEvent.type}: "${newEvent.title}" para ${newEvent.date} às ${newEvent.start_time}`, req);
 
-  // Trigger immediate Web Push alerts
-  try {
-    const formatBrDateStr = (dateStr: string) => {
-      const parts = dateStr.split('-');
-      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
-    };
-
-    if (isGestorEvent) {
-      // Dispatches alert to ALL registered users (captadores and gestores)
-      const typeLabel = newEvent.type === 'REUNIAO' ? 'Reunião' : newEvent.type === 'TREINAMENTO' ? 'Treinamento' : 'Evento';
-      sendPushToAllUsers(firestoreDb, {
-        title: `📢 Novo(a) ${typeLabel}: ${newEvent.title}`,
-        body: `Marcado para ${formatBrDateStr(newEvent.date)} às ${newEvent.start_time}${newEvent.location ? ` | ${newEvent.location}` : ''}. Confirme sua presença no app!`,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        tag: `new-event-${newEvent.id}`,
-        data: {
-          url: `/?view=schedule&event=${newEvent.id}`,
-          type: 'NEW_EVENT',
-          eventId: newEvent.id
-        }
-      }, reqUser.id).catch(e => console.warn('[WebPush] Error notifying team event:', e));
-    } else if (newEvent.type === 'VISITA' && newEvent.user_id) {
-      // Alerts ONLY the specific captador responsible for this visit
-      sendPushToUser(firestoreDb, newEvent.user_id, {
-        title: `📅 Visita Agendada: ${newEvent.title}`,
-        body: `Marcada para ${formatBrDateStr(newEvent.date)} às ${newEvent.start_time}${newEvent.client_name ? ` com ${newEvent.client_name}` : ''}. Lembretes automáticos serão enviados na véspera e no dia!`,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        tag: `visit-scheduled-${newEvent.id}`,
-        data: {
-          url: `/?view=schedule&event=${newEvent.id}`,
-          type: 'VISIT_SCHEDULED',
-          eventId: newEvent.id
-        }
-      }).catch(e => console.warn('[WebPush] Error notifying captador visit:', e));
-    }
-  } catch (pushErr) {
-    console.warn('[WebPush] Post-schedule notification warning:', pushErr);
-  }
-
   res.status(201).json({ event: newEvent });
-});
-
-app.post('/api/schedule/:id/confirm-presence', requireAuth, async (req, res) => {
-  const reqUser = (req as any).user as User;
-  const { id } = req.params;
-  const existing = scheduleEvents.find(e => e.id === id);
-  if (!existing) return res.status(404).json({ error: 'Evento não encontrado.' });
-
-  const currentConfirmed = existing.confirmed_attendees || [];
-  if (!currentConfirmed.includes(reqUser.id)) {
-    existing.confirmed_attendees = [...currentConfirmed, reqUser.id];
-    existing.confirmed_attendees_details = [
-      ...(existing.confirmed_attendees_details || []),
-      {
-        user_id: reqUser.id,
-        user_name: reqUser.name,
-        confirmed_at: new Date().toISOString()
-      }
-    ];
-    existing.updated_at = new Date().toISOString();
-
-    await safeFirestoreDocSet('schedule', existing.id, existing, false);
-    saveLocalDatabase();
-
-    addAuditLog(reqUser.id, reqUser.name, 'Confirmação de Presença', `Confirmou presença em ${existing.type}: "${existing.title}"`, req);
-  }
-
-  res.json({ success: true, event: existing });
 });
 
 app.delete('/api/schedule/:id', requireAuth, async (req, res) => {
@@ -2275,411 +2034,120 @@ app.delete('/api/schedule/:id', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
-/**
- * AI SOCIAL MEDIA POST GENERATOR (GEMINI 2.5 FLASH)
- * Generates headline line 1, line 2, highlight number, location tag, status, price, specs, and caption.
- */
-app.post('/api/social-media/generate-ai-post', async (req, res) => {
-  try {
-    const { property, style = 'luxury', customInstructions = '' } = req.body || {};
-    if (!property) {
-      return res.status(400).json({ error: 'Dados do imóvel não informados.' });
-    }
+app.post('/api/schedule/:id/confirm-presence', requireAuth, async (req, res) => {
+  await refreshSchedule();
+  const reqUser = (req as any).user as User;
+  const { id } = req.params;
+  const { user_id } = req.body;
+  const targetUserId = user_id || reqUser.id;
 
-    const purpose = property.purpose || 'Venda';
-    const isRent = purpose === 'Locação' || purpose === 'Venda e Locação';
-    const priceVal = isRent ? (property.rent_price || property.price || 0) : (property.price || 0);
-    const priceStr = priceVal > 0 
-      ? `R$ ${priceVal.toLocaleString('pt-BR')}${isRent ? '/mês' : ''}` 
-      : 'Consulte-nos';
-    
-    const neighborhood = property.neighborhood || 'Manaus';
-    const city = property.city || 'Manaus';
-    const category = property.category || 'Imóvel';
-    const bedrooms = property.bedrooms || 0;
-    const suites = property.suites || 0;
-    const bathrooms = property.bathrooms || 0;
-    const parking = property.parking_spaces || 0;
-    const area = property.total_area || property.built_area || 0;
-
-    // Default structured response
-    const defaultData = {
-      headlineLine1: `${category} com`,
-      headlineLine2: bedrooms > 0 ? `${bedrooms} Quartos${suites > 0 ? ` (${suites} Suítes)` : ''}` : 'Alto Padrão em Manaus',
-      highlightNumber: bedrooms > 0 ? `${bedrooms}` : '',
-      statusTag: isRent ? 'LOCAÇÃO' : 'VENDA',
-      subStatus: 'EXCLUSIVO',
-      priceFormatted: priceStr,
-      locationTag: `${neighborhood} | ${city}`,
-      specs: [
-        bedrooms > 0 ? { icon: 'bed', label: `${bedrooms} QUARTOS` } : null,
-        bathrooms > 0 ? { icon: 'bath', label: `${bathrooms} BANHEIROS` } : null,
-        parking > 0 ? { icon: 'car', label: `${parking} VAGAS` } : null,
-        area > 0 ? { icon: 'area', label: `${area} m²` } : null,
-      ].filter(Boolean),
-      hook: `Oportunidade Exclusiva Lopes Manaus em ${neighborhood}`,
-      instagramCaption: `✨ ${property.title || `${category} Exclusivo em ${neighborhood}`}\n\n📍 Localização: ${neighborhood}, ${city}\n💰 Valor: ${priceStr}\n\n🏡 Destaques:\n• ${bedrooms > 0 ? `${bedrooms} Quartos (${suites} Suítes)` : 'Excelente distribuição interna'}\n• ${bathrooms} Banheiros\n• ${parking} Vagas\n• ${area > 0 ? `${area}m²` : 'Amplo espaço'}\n\n📲 Agende agora sua visita com a Lopes Manaus!\n\n#LopesManaus #ImoveisManaus #${neighborhood.replace(/\s+/g, '')} #ImovelDeLuxo`
-    };
-
-    let ai: GoogleGenAI;
-    try {
-      ai = getGenAI();
-    } catch {
-      return res.json({ success: true, aiGenerated: false, data: defaultData });
-    }
-
-    const prompt = `Você é o Diretor de Arte e Marketing Imobiliário de Alto Padrão da Lopes Manaus.
-Crie os dados textuais profissionais para a ficha e arte gráfica do Instagram (Feed 1080x1350 / Story 1080x1920) e a legenda de alta conversão para este imóvel:
-- Título original: ${property.title}
-- Categoria: ${category}
-- Finalidade: ${purpose}
-- Bairro: ${neighborhood} | Cidade: ${city}
-- Preço: ${priceStr}
-- Quartos: ${bedrooms} | Suítes: ${suites} | Banheiros: ${bathrooms} | Vagas: ${parking} | Área: ${area}m²
-- Características/Diferenciais: ${Array.isArray(property.features) ? property.features.join(', ') : 'Alto Padrão'}
-- Estilo desejado: ${style} (luxury = luxo e sofisticação; opportunity = oportunidade imperdível; family = conforto familiar)
-${customInstructions ? `- Instruções adicionais do corretor: ${customInstructions}` : ''}
-
-Diretrizes para a Ficha Visual:
-1. Extraia de 4 a 6 características chave e ícones representativos (ex: 'bed', 'bath', 'car', 'area', 'piscina', 'churrasqueira', 'academia', 'varanda', 'vista', 'mobiliado', 'solar', 'elevador', 'portaria', 'quadra', 'salao'). Use textos objetivos e legíveis (ex: '3 SUÍTES', '2 VAGAS', '180 M²').
-2. Crie uma linha de título com forte apelo visual respeitando a identidade da Lopes Manaus.
-3. Sugira o tema visual: 'ruby_premium' (padrão oficial Lopes Manaus em vermelho rubi) ou 'gold_dark' (exclusivo para imóveis de altíssimo padrão/luxo).
-
-Retorne ESTRITAMENTE um objeto JSON válido no formato:
-{
-  "headlineLine1": "Linha 1 do título elegante (ex: 'Casa em Condomínio Fechado com' ou 'Apartamento de Alto Padrão com' ou 'Cobertura Duplex com')",
-  "headlineLine2": "Linha 2 do título com o principal diferencial (ex: '3 Suítes & Vista Rio Negro' ou '4 Suítes & Espaço Gourmet')",
-  "highlightNumber": "O número principal a destacar (ex: '3' ou '4' ou '')",
-  "statusTag": "${isRent ? 'LOCAÇÃO' : 'VENDA'}",
-  "subStatus": "EXCLUSIVO",
-  "priceFormatted": "${priceStr}",
-  "locationTag": "${neighborhood} | ${city}",
-  "designTheme": "ruby_premium",
-  "specs": [
-    { "icon": "bed", "label": "${bedrooms > 0 ? `${bedrooms} QUARTOS` : 'QUARTOS'}" },
-    { "icon": "bath", "label": "${bathrooms > 0 ? `${bathrooms} BANHEIROS` : 'BANHEIROS'}" },
-    { "icon": "car", "label": "${parking > 0 ? `${parking} VAGAS` : 'VAGAS'}" },
-    { "icon": "area", "label": "${area > 0 ? `${area} M²` : 'AMPLO ESPAÇO'}" }
-  ],
-  "hook": "Frase de impacto para anúncio de alto padrão",
-  "instagramCaption": "Legenda completa formatada para o Instagram com emojis, bullet points elegantes, CTA para o WhatsApp da Lopes Manaus e 5 a 8 hashtags (#LopesManaus, etc.)"
-}`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json'
-      }
-    });
-
-    const text = response.text || '';
-    let parsedData = defaultData;
-    try {
-      const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      parsedData = JSON.parse(cleanJson);
-    } catch (e) {
-      console.warn('[Gemini JSON parse failed, using fallback]:', e);
-    }
-
-    return res.json({
-      success: true,
-      aiGenerated: true,
-      data: {
-        ...defaultData,
-        ...parsedData,
-        // Guarantee safety on required fields
-        priceFormatted: parsedData.priceFormatted || priceStr,
-        locationTag: parsedData.locationTag || `${neighborhood} | ${city}`,
-        statusTag: parsedData.statusTag || (isRent ? 'LOCAÇÃO' : 'VENDA'),
-        subStatus: parsedData.subStatus || 'EXCLUSIVO'
-      }
-    });
-  } catch (err: any) {
-    console.error('Error generating AI post data:', err);
-    return res.status(500).json({ error: 'Erro ao gerar dados com IA: ' + err.message });
+  const eventIndex = scheduleEvents.findIndex(e => e.id === id);
+  if (eventIndex === -1) {
+    return res.status(404).json({ error: 'Compromisso não encontrado.' });
   }
+
+  const event = scheduleEvents[eventIndex];
+  const attendees = new Set(event.confirmed_attendees || []);
+  attendees.add(targetUserId);
+  event.confirmed_attendees = Array.from(attendees);
+  event.updated_at = new Date().toISOString();
+
+  scheduleEvents[eventIndex] = event;
+  await safeFirestoreDocSet('schedule', id, event, true);
+  saveLocalDatabase();
+
+  addAuditLog(reqUser.id, reqUser.name, 'Confirmação de Presença', `Confirmou presença no ${event.type}: "${event.title}"`, req);
+
+  res.json({ success: true, event });
 });
 
-/**
- * AI SOCIAL MEDIA CAPTION GENERATOR (GEMINI 2.5 FLASH)
- */
-app.post('/api/social-media/generate-caption', async (req, res) => {
-  try {
-    const { property } = req.body || {};
-    if (!property) {
-      return res.status(400).json({ error: 'Dados do imóvel não informados.' });
-    }
+// ==========================================
+// PUSH NOTIFICATIONS & AUTOMATED ALERTS API
+// ==========================================
 
-    let ai: GoogleGenAI;
-    try {
-      ai = getGenAI();
-    } catch {
-      return res.json({
-        caption: `✨ ${property.title || 'Oportunidade Exclusiva Lopes Manaus'}\n📍 ${property.neighborhood || 'Manaus'}, ${property.city || 'AM'}\n\nEntre em contato e agende sua visita!\n#LopesManaus #ImoveisManaus #ManausImoveis`
-      });
-    }
-
-    const prompt = `Crie uma legenda persuasiva e profissional para o Instagram da imobiliária Lopes Manaus promovendo este imóvel:
-Título: ${property.title}
-Finalidade: ${property.purpose || 'Venda'}
-Bairro/Cidade: ${property.neighborhood}, ${property.city} - ${property.state}
-Preço: R$ ${property.sale_price || property.rent_price || property.price || ''}
-Quartos: ${property.bedrooms || '-'} | Vagas: ${property.parking_spaces || '-'} | Área: ${property.total_area || property.built_area || '-'}m²
-
-Instruções:
-- Use emojis adequados para o mercado imobiliário de alto padrão.
-- Destaque os pontos fortes e localização.
-- Inclua chamada para ação clara direcionando para o WhatsApp do consultor.
-- Finalize com 5 a 8 hashtags relevantes (#LopesManaus, #ImoveisManaus, etc.).`;
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt
-    });
-
-    const caption = response.text || '';
-    return res.json({ success: true, caption });
-  } catch (err: any) {
-    return res.json({
-      caption: `✨ ${req.body?.property?.title || 'Oportunidade Exclusiva Lopes Manaus'}\n📍 ${req.body?.property?.neighborhood || 'Manaus'}\n\nEntre em contato para saber mais detalhes!\n#LopesManaus #ImoveisManaus`
-    });
-  }
+app.get('/api/notifications/vapid-public-key', (_req, res) => {
+  const key = getVapidPublicKey();
+  res.json({ publicKey: key });
 });
 
-/**
- * ============================================================================
- * WEB PUSH NOTIFICATIONS & VAPID SUBSCRIPTIONS (CLOUDINARY / FIRESTORE BACKEND)
- * ============================================================================
- */
-
-// Initialize Web Push after Firestore sync
-initializeWebPush(firestoreDb).catch(err => {
-  console.warn('[WebPush] Startup init warning:', err);
-});
-
-// Periodic background check for overdue properties and schedule alerts (every 3 hours)
-setInterval(() => {
-  checkAndDispatchAllDailyAlerts(firestoreDb).catch(err => {
-    console.warn('[WebPush] Background automated alerts check error:', err);
-  });
-}, 3 * 60 * 60 * 1000);
-
-/**
- * GET /api/notifications/vapid-public-key
- * Returns the VAPID public key for the browser to create push subscriptions
- */
-app.get('/api/notifications/vapid-public-key', async (req, res) => {
-  try {
-    let key = getVapidPublicKey();
-    if (!key) {
-      const init = await initializeWebPush(firestoreDb);
-      key = init.publicKey;
-    }
-    res.json({ publicKey: key });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao obter chave pública VAPID: ' + err.message });
-  }
-});
-
-/**
- * POST /api/notifications/subscribe
- * Saves a browser Web Push subscription into Cloud Firestore
- */
 app.post('/api/notifications/subscribe', async (req, res) => {
   try {
-    const { subscription, user: clientUser } = req.body || {};
+    const { subscription, user } = req.body;
     if (!subscription || !subscription.endpoint || !subscription.keys) {
-      return res.status(400).json({ error: 'Dados de assinatura push inválidos ou incompletos.' });
+      return res.status(400).json({ error: 'Dados da inscrição push inválidos.' });
     }
-
-    const authUser = extractUserFromRequest(req);
-    const targetUser = authUser || clientUser || { id: 'usr_guest', name: 'Convidado' };
-    const userAgent = (req.headers['user-agent'] as string) || '';
-
-    const result = await savePushSubscription(firestoreDb, subscription, targetUser, userAgent);
-    addAuditLog(targetUser.id, targetUser.name, 'Push Notification', 'Registrou dispositivo para Web Push Notifications', req);
-
-    res.json({
-      success: true,
-      id: result.id,
-      message: 'Dispositivo registrado com sucesso para notificações push!'
-    });
+    const result = await savePushSubscription(
+      firestoreDb,
+      subscription,
+      user || { id: 'anon', name: 'Usuário' },
+      req.headers['user-agent'] as string
+    );
+    res.json(result);
   } catch (err: any) {
-    console.error('[WebPush] Error saving subscription:', err);
-    res.status(500).json({ error: 'Erro ao salvar assinatura push: ' + err.message });
+    res.status(500).json({ error: err?.message || 'Falha ao salvar inscrição' });
   }
 });
 
-/**
- * POST /api/notifications/unsubscribe
- * Removes a browser Web Push subscription from Cloud Firestore
- */
 app.post('/api/notifications/unsubscribe', async (req, res) => {
   try {
-    const { endpoint, userId } = req.body || {};
-    const authUser = extractUserFromRequest(req);
-    const targetUserId = authUser?.id || userId || '';
-
-    if (!endpoint) {
-      return res.status(400).json({ error: 'Endpoint de assinatura não fornecido.' });
-    }
-
-    await removePushSubscription(firestoreDb, endpoint, targetUserId);
-    res.json({ success: true, message: 'Dispositivo removido das notificações push com sucesso.' });
+    const { endpoint, userId } = req.body;
+    if (!endpoint) return res.status(400).json({ error: 'Endpoint não informado.' });
+    const result = await removePushSubscription(firestoreDb, endpoint, userId || '');
+    res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao remover assinatura push: ' + err.message });
+    res.status(500).json({ error: err?.message || 'Falha ao remover inscrição' });
   }
 });
 
-/**
- * POST /api/notifications/test
- * Dispatches a test Web Push notification to the current user's active device(s)
- */
 app.post('/api/notifications/test', async (req, res) => {
   try {
-    const authUser = extractUserFromRequest(req);
-    const targetUser = authUser || req.body?.user;
-    if (!targetUser?.id) {
-      return res.status(400).json({ error: 'Usuário não autenticado.' });
-    }
-
-    const result = await sendPushToUser(firestoreDb, targetUser.id, {
-      title: '🔔 Teste de Notificação Web Push',
-      body: `Olá ${targetUser.name || 'Corretor'}! Suas notificações push da Lopes Captação estão ativas e funcionando perfeitamente.`,
+    const { user } = req.body;
+    if (!user || !user.id) return res.status(400).json({ error: 'Usuário não informado.' });
+    const result = await sendPushToUser(firestoreDb, user.id, {
+      title: '🔔 Lopes Captação - Notificação Ativa!',
+      body: 'As notificações push estão funcionando perfeitamente no seu dispositivo.',
       icon: '/icon-192.png',
       badge: '/icon-192.png',
-      data: {
-        url: '/?view=reminder',
-        type: 'TEST_PUSH'
-      }
+      tag: 'lopes-test-notification',
+      data: { url: '/?view=reminder', type: 'TEST' }
     });
-
-    if (result.sent === 0 && result.total === 0) {
-      return res.json({
-        success: false,
-        message: 'Nenhum dispositivo registrado encontrado para este usuário. Ative as notificações no botão acima primeiro.'
-      });
-    }
-
     res.json({
-      success: true,
-      deliveredCount: result.sent,
-      totalDevices: result.total,
-      message: `Notificação push entregue para ${result.sent} de ${result.total} dispositivo(s)!`
+      success: result.sent > 0,
+      message: result.sent > 0 ? 'Notificação enviada com sucesso!' : 'Nenhum dispositivo registrado.',
+      details: result
     });
   } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao disparar notificação push de teste: ' + err.message });
+    res.status(500).json({ error: err?.message || 'Erro ao enviar notificação de teste.' });
   }
 });
 
-/**
- * POST /api/notifications/check-overdue
- * Triggers full scan of properties in Firestore and delivers Web Push notifications
- * to captadores with overdue properties (>30 days without update)
- */
-app.post('/api/notifications/check-overdue', async (req, res) => {
+app.post('/api/notifications/check-overdue', async (_req, res) => {
   try {
     const result = await checkAndDispatchOverduePropertyAlerts(firestoreDb);
-    const authUser = extractUserFromRequest(req);
-    if (authUser) {
-      addAuditLog(
-        authUser.id,
-        authUser.name,
-        'Alerta de Imóveis Vencidos',
-        `Disparou verificação de imóveis vencidos. Notificou ${result.usersNotified} corretores (${result.notificationsDelivered} pushes enviados).`,
-        req
-      );
-    }
-    res.json({
-      success: true,
-      ...result,
-      message: `Verificação concluída: ${result.overduePropertiesCount} imóveis vencidos encontrados. ${result.usersNotified} corretor(es) notificado(s) via Web Push.`
-    });
+    res.json({ success: true, ...result });
   } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao verificar imóveis vencidos: ' + err.message });
+    console.error('[WebPush] Check overdue error:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao verificar imóveis pendentes.' });
   }
 });
 
-/**
- * POST /api/notifications/check-schedule
- * Scans schedule events:
- * 1) Daily reminders for all gestor events/reunions/trainings to users without confirmed presence
- * 2) Visit reminders (today & tomorrow) strictly to assigned captadores
- */
-app.post('/api/notifications/check-schedule', async (req, res) => {
+app.post('/api/notifications/check-schedule', async (_req, res) => {
   try {
     const result = await checkAndDispatchScheduleAlerts(firestoreDb);
-    const authUser = extractUserFromRequest(req);
-    if (authUser) {
-      addAuditLog(
-        authUser.id,
-        authUser.name,
-        'Verificação de Alertas da Agenda',
-        `Disparou lembretes de eventos e visitas. ${result.totalNotificationsDelivered} pushes enviados (${result.visitsTodayCount} visitas hoje, ${result.visitsTomorrowCount} visitas amanhã).`,
-        req
-      );
-    }
-    res.json({
-      success: true,
-      ...result,
-      message: `Alertas de agenda processados com sucesso! ${result.totalNotificationsDelivered} push(es) entregue(s).`
-    });
+    res.json({ success: true, ...result });
   } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao processar alertas da agenda: ' + err.message });
+    console.error('[WebPush] Check schedule error:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao verificar alertas de agenda.' });
   }
 });
 
-/**
- * POST /api/notifications/check-all
- * Triggers all automated checks simultaneously (properties overdue + gestor events + visits)
- */
-app.post('/api/notifications/check-all', async (req, res) => {
+app.post('/api/notifications/check-all', async (_req, res) => {
   try {
     const result = await checkAndDispatchAllDailyAlerts(firestoreDb);
-    const authUser = extractUserFromRequest(req);
-    if (authUser) {
-      addAuditLog(
-        authUser.id,
-        authUser.name,
-        'Verificação Geral de Alertas',
-        'Executou checagem geral de imóveis e agenda para disparos Web Push.',
-        req
-      );
-    }
-    res.json({
-      success: true,
-      ...result,
-      message: 'Checagem geral de alertas de imóveis e agenda concluída com sucesso!'
-    });
+    res.json({ success: true, ...result });
   } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao executar checagem geral de alertas: ' + err.message });
-  }
-});
-
-/**
- * GET /api/notifications/status
- * Returns current status of push subscriptions and overdue property counts
- */
-app.get('/api/notifications/status', async (req, res) => {
-  try {
-    const subsSnap = await getDocs(collection(firestoreDb, 'push_subscriptions'));
-    const totalSubs = subsSnap.size;
-
-    const authUser = extractUserFromRequest(req);
-    let userSubsCount = 0;
-    if (authUser) {
-      userSubsCount = subsSnap.docs.filter(d => d.data()?.user_id === authUser.id).length;
-    }
-
-    res.json({
-      webPushActive: true,
-      totalSubscriptions: totalSubs,
-      userSubscriptions: userSubsCount,
-      hasVapidPublicKey: !!getVapidPublicKey()
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Erro ao consultar status do Web Push: ' + err.message });
+    console.error('[WebPush] Check all error:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Erro ao verificar todos os alertas.' });
   }
 });
 
