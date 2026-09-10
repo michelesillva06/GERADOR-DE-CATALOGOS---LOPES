@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Property, CompanySettings } from '../types';
 import {
   generateAndDownloadSocialMedia,
-  generatePostImage
+  generatePostImage,
+  downloadCanvas
 } from '../lib/socialMediaGenerator';
 import { X, Loader2, Instagram, Image, Smartphone, Download } from 'lucide-react';
 
@@ -20,11 +21,7 @@ export const SocialMediaTemplateModal: React.FC<SocialMediaTemplateModalProps> =
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
   const handleDownloadCanvas = (canvas: HTMLCanvasElement, filename: string) => {
-    const url = canvas.toDataURL('image/png', 0.95);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
+    downloadCanvas(canvas, filename);
   };
 
   const handleGenerateAll = async () => {

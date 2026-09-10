@@ -2,13 +2,14 @@ import jsPDF from 'jspdf';
 import { Property, User, CompanySettings } from '../types';
 import { buildWhatsAppUrl, formatPhoneDisplay, getEffectiveWhatsApp } from './whatsapp';
 import { getPropertyPriceInfo } from './priceUtils';
+import { loadImageSafely } from './imageLoader';
 
 // Helper to convert image URL or Data URL to Base64 JPEG DataURL safely for jsPDF
 async function urlToBase64(url: string): Promise<string> {
   if (!url) return '';
   if (url.startsWith('data:')) return url;
 
-  const img = await loadImageElement(url);
+  const img = await loadImageSafely(url);
   if (img) {
     try {
       const canvas = document.createElement('canvas');
@@ -125,7 +126,7 @@ export async function renderAdminCoverImage(
   customCoverImage?: string
 ): Promise<string> {
   const coverUrl = resolveAdminCoverUrl(type, companySettings, customCoverImage);
-  const img = await loadImageElement(coverUrl);
+  const img = await loadImageSafely(coverUrl);
 
   const canvas = document.createElement('canvas');
   canvas.width = 2970;
@@ -155,7 +156,12 @@ export async function renderAdminCoverImage(
     ctx.drawImage(img, offsetX, offsetY, renderW, renderH);
   }
 
-  return canvas.toDataURL('image/jpeg', 0.95);
+  try {
+    return canvas.toDataURL('image/jpeg', 0.95);
+  } catch (err) {
+    console.warn('Cover toDataURL fallback:', err);
+    return '';
+  }
 }
 
 // Deprecated alias for backwards compatibility if needed
@@ -214,46 +220,7 @@ export function extractPropertyImages(prop: Property): string[] {
 }
 
 export async function loadImageElement(url: string): Promise<HTMLImageElement | null> {
-  if (!url) return Promise.resolve(null);
-
-  const loadImgFromSrc = (src: string, useCrossOrigin = true): Promise<HTMLImageElement | null> => {
-    return new Promise((resolve) => {
-      const img = new Image();
-      if (useCrossOrigin && !src.startsWith('data:')) {
-        img.crossOrigin = 'Anonymous';
-      }
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      img.src = src;
-    });
-  };
-
-  // 1. Try standard crossOrigin loading
-  let loadedImg = await loadImgFromSrc(url, true);
-  if (loadedImg) return loadedImg;
-
-  // 2. If CORS failed, try fetching as a blob and converting to Data URL
-  try {
-    const response = await fetch(url);
-    if (response.ok) {
-      const blob = await response.blob();
-      const dataUrl = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string) || '');
-        reader.onerror = () => resolve('');
-        reader.readAsDataURL(blob);
-      });
-      if (dataUrl) {
-        loadedImg = await loadImgFromSrc(dataUrl, false);
-        if (loadedImg) return loadedImg;
-      }
-    }
-  } catch {
-    // Ignore fetch error
-  }
-
-  // 3. Fallback: try loading without crossOrigin
-  return await loadImgFromSrc(url, false);
+  return loadImageSafely(url);
 }
 
 export function drawRoundedImage(
@@ -753,7 +720,12 @@ export async function renderHorizontalPropertyCanvas(
   ctx.fillText(pageNumStr, 2810, footerY + 110);
   ctx.textAlign = 'left';
 
-  return canvas.toDataURL('image/jpeg', 0.95);
+  try {
+    return canvas.toDataURL('image/jpeg', 0.95);
+  } catch (err) {
+    console.warn('Property page toDataURL fallback:', err);
+    return '';
+  }
 }
 
 export async function generateCatalogPDF(options: {

@@ -1,6 +1,9 @@
 import { Property, CompanySettings } from '../types';
 import { PostTemplateId } from '../components/postTemplates';
 import { extractPropertyImages } from './pdfGenerator';
+import { loadImageSafely } from './imageLoader';
+
+export { loadImageSafely };
 
 export type PostDesignTheme = 'ruby_premium' | 'gold_dark';
 export type PostLayoutStyle = 'single' | 'mosaic' | 'gallery';
@@ -96,24 +99,6 @@ export interface CanvasPostOptions {
   width: number;
   height: number;
   aiData?: CanvasPostData;
-}
-
-/**
- * Safe image loader with crossOrigin fallback handling
- */
-export async function loadImageSafely(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      const fallbackImg = new Image();
-      fallbackImg.onload = () => resolve(fallbackImg);
-      fallbackImg.onerror = (err) => reject(err);
-      fallbackImg.src = src;
-    };
-    img.src = src;
-  });
 }
 
 /**

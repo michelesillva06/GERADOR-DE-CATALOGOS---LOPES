@@ -11,6 +11,7 @@ interface UserManagementProps {
   onResetPassword?: (id: string, newPassword: string) => Promise<void>;
   onToggleBlock: (id: string) => Promise<void>;
   onDeleteUser: (id: string) => Promise<void>;
+  onPurgeTestUsers?: () => Promise<void>;
 }
 
 export const UserManagement: React.FC<UserManagementProps> = ({
@@ -21,12 +22,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   onUpdateUser,
   onResetPassword,
   onToggleBlock,
-  onDeleteUser
+  onDeleteUser,
+  onPurgeTestUsers
 }) => {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('todos');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [isPurging, setIsPurging] = useState(false);
 
   // Quick Password Reset Modal
   const [resetModalUser, setResetModalUser] = useState<User | null>(null);
@@ -305,13 +308,51 @@ export const UserManagement: React.FC<UserManagementProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-rose-900/30 transition transform active:scale-95 cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Cadastrar Usuário Captador</span>
-        </button>
+        <div className="flex items-center flex-wrap gap-2">
+          {isMasterUser && users.length > 1 && (
+            <button
+              type="button"
+              disabled={isPurging}
+              onClick={async () => {
+                const confirmed = window.confirm(
+                  'Deseja remover todos os usuários secundários/de teste do banco de dados na nuvem e manter apenas o Administrador Master?\n\n(Todos os imóveis associados a eles serão preservados e transferidos para o Administrador Master).'
+                );
+                if (!confirmed) return;
+                setIsPurging(true);
+                try {
+                  if (onPurgeTestUsers) {
+                    await onPurgeTestUsers();
+                  } else {
+                    const token = localStorage.getItem('lopes_token');
+                    await fetch('/api/users/purge-test-users', {
+                      method: 'POST',
+                      headers: token ? { Authorization: `Bearer ${token}` } : {}
+                    });
+                  }
+                  await onRefreshUsers();
+                  setSuccessToast('Usuários de teste removidos com sucesso! Apenas o Administrador Master está ativo.');
+                } catch (err: any) {
+                  alert(`Erro ao limpar usuários: ${err.message || err}`);
+                } finally {
+                  setIsPurging(false);
+                }
+              }}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 text-rose-700 hover:text-rose-800 border border-slate-200 hover:border-rose-200 font-bold text-xs flex items-center space-x-1.5 transition cursor-pointer"
+              title="Excluir usuários secundários e manter apenas 1 Administrador Master"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+              <span>{isPurging ? 'Limpando...' : 'Zerar Usuários (Manter só Admin)'}</span>
+            </button>
+          )}
+
+          <button
+            onClick={openCreateModal}
+            className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-rose-900/30 transition transform active:scale-95 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Cadastrar Usuário Captador</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Toolbar */}

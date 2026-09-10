@@ -72,7 +72,7 @@ export const UnifiedDailyAlertsModal: React.FC<UnifiedDailyAlertsModalProps> = (
     return !confirmed.includes(user.id);
   });
 
-  // 3. Overdue Properties (only for captadores)
+  // 3. Overdue Properties
   const isAdminOrGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
   const isOwnedByCurrentUser = (p: Property) =>
     p.user_id === user.id ||
@@ -80,7 +80,9 @@ export const UnifiedDailyAlertsModal: React.FC<UnifiedDailyAlertsModalProps> = (
     p.user_id?.toLowerCase() === user.username?.toLowerCase() ||
     p.user_id?.toLowerCase() === user.email?.toLowerCase();
 
-  const userProperties = isAdminOrGestor ? [] : properties.filter(isOwnedByCurrentUser);
+  const userProperties = properties.filter(isOwnedByCurrentUser).length > 0 
+    ? properties.filter(isOwnedByCurrentUser) 
+    : (isAdminOrGestor ? properties : []);
   const overdueProperties = userProperties.filter(needsStatusCheck);
 
   // Active tab selection

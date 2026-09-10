@@ -48,8 +48,19 @@ function downloadDataUrl(dataUrl: string, filename: string) {
 }
 
 export function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
-  const url = canvas.toDataURL('image/png', 0.95);
-  downloadDataUrl(url, filename);
+  try {
+    const url = canvas.toDataURL('image/png', 0.95);
+    downloadDataUrl(url, filename);
+  } catch (err) {
+    console.warn('downloadCanvas toDataURL warning, trying toBlob:', err);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const objectUrl = URL.createObjectURL(blob);
+        downloadDataUrl(objectUrl, filename);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+      }
+    }, 'image/png', 0.95);
+  }
 }
 
 /**

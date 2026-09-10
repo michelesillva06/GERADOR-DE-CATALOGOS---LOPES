@@ -84,12 +84,10 @@ function MainApp() {
   const [pdfPrefilteredProps, setPdfPrefilteredProps] = useState<Property[] | undefined>(undefined);
   const [showUpdateReminder, setShowUpdateReminder] = useState(false);
 
-  // Reminders only for regular captadores (never for Master Admin or Gestores)
-  // and strictly for the properties registered/owned by the current user.
+  // Overdue property alerts
   const updateReminderProperties = useMemo(() => {
     if (!user) return [];
     const isAdminOrGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
-    if (isAdminOrGestor) return [];
 
     const isOwnedByCurrentUser = (p: Property) =>
       p.user_id === user.id ||
@@ -97,7 +95,11 @@ function MainApp() {
       p.user_id?.toLowerCase() === user.username?.toLowerCase() ||
       p.user_id?.toLowerCase() === user.email?.toLowerCase();
 
-    return properties.filter(isOwnedByCurrentUser);
+    const userOwned = properties.filter(isOwnedByCurrentUser);
+    if (userOwned.length > 0) return userOwned;
+    // If admin is testing and has no individually assigned properties, show all properties to test notifications
+    if (isAdminOrGestor) return properties;
+    return [];
   }, [properties, user]);
 
   const overdueCount = useMemo(
@@ -113,10 +115,6 @@ function MainApp() {
   // Combined active alerts count
   const totalAlertsCount = useMemo(() => {
     if (!user) return 0;
-    const isGestor = user.role === 'MASTER_ADMIN' || user.role === 'GESTOR' || user.role === 'GESTORA';
-    if (isGestor) {
-      return scheduleAlerts.unconfirmedGestorEvents.length;
-    }
     return overdueCount + scheduleAlerts.totalAlertsCount;
   }, [user, overdueCount, scheduleAlerts]);
 
@@ -736,15 +734,18 @@ function MainApp() {
 
   const handleDeleteUser = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este usuário? Todos os imóveis captados por ele serão mantidos no sistema e transferidos para a administração master.')) return;
-    if (isBackendHealthy) {
-      try {
-        await fetch(`/api/users/${id}`, {
-          method: 'DELETE',
-          headers: getAuthHeaders(false)
-        });
-      } catch (e) {
-        console.warn('Backend API unavailable, deleting user locally:', e);
+    
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(false)
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.warn('Backend user delete response:', data);
       }
+    } catch (e) {
+      console.warn('Error deleting user on backend:', e);
     }
 
     const currentUsers = getStoredUsers();
@@ -761,6 +762,35 @@ function MainApp() {
     saveStoredUsers(allUsers);
     setUsers(allUsers);
     setStats(calculateStats(updatedProps, allUsers));
+  };
+
+  const handlePurgeTestUsers = async () => {
+    try {
+      const res = await fetch('/api/users/purge-test-users', {
+        method: 'POST',
+        headers: getAuthHeaders(false)
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Falha ao remover usuários secundários.');
+      }
+    } catch (e: any) {
+      console.warn('Purge users backend warning:', e);
+    }
+
+    const currentUsers = getStoredUsers();
+    const masterAdmin = currentUsers.find(u => u.role === 'MASTER_ADMIN' || u.id === 'usr_admin') || currentUsers[0];
+    const masterId = masterAdmin ? masterAdmin.id : 'usr_admin';
+
+    const currentProps = getStoredProperties();
+    const updatedProps = currentProps.map(p => p.user_id !== masterId ? { ...p, user_id: masterId } : p);
+    saveStoredProperties(updatedProps);
+    setProperties(updatedProps);
+
+    const remainingUsers = [masterAdmin];
+    saveStoredUsers(remainingUsers);
+    setUsers(remainingUsers);
+    setStats(calculateStats(updatedProps, remainingUsers));
   };
 
   const handleSaveSettings = async (newSettings: Partial<CompanySettings>) => {
@@ -1187,6 +1217,7 @@ function MainApp() {
               onResetPassword={handleResetUserPassword}
               onToggleBlock={handleToggleBlockUser}
               onDeleteUser={handleDeleteUser}
+              onPurgeTestUsers={handlePurgeTestUsers}
             />
           )}
 

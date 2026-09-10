@@ -545,6 +545,39 @@ app.get('/api/health', (req, res) => {
 });
 
 /**
+ * Image Proxy to prevent cross-origin canvas tainting for remote image export
+ */
+app.get('/api/proxy-image', async (req, res) => {
+  const imageUrl = req.query.url as string;
+  if (!imageUrl) {
+    return res.status(400).send('URL is required');
+  }
+  try {
+    const parsed = new URL(imageUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).send('Invalid protocol');
+    }
+    const response = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+      }
+    });
+    if (!response.ok) {
+      return res.status(response.status).send('Failed to fetch image');
+    }
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buffer);
+  } catch (err: any) {
+    return res.status(500).send(err?.message || 'Proxy error');
+  }
+});
+
+/**
  * AUTHENTICATION: LOGIN
  */
 app.post('/api/auth/login', async (req, res) => {
@@ -929,37 +962,87 @@ app.patch('/api/users/:id/block', requireMasterAdmin, async (req, res) => {
  * USERS: DELETE (MASTER ADMIN ONLY)
  */
 app.delete('/api/users/:id', requireMasterAdmin, async (req, res) => {
-  await Promise.all([refreshUsers(), refreshProperties()]);
-  const { id } = req.params;
-  const user = users.find(u => u.id === id);
-  if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
-
-  const masterAdmin = users.find(u => u.role === 'MASTER_ADMIN') || users[0];
-  const masterId = masterAdmin ? masterAdmin.id : 'usr_admin';
-
-  let reassignedCount = 0;
-  const batch = writeBatch(firestoreDb);
-
-  properties = properties.map(p => {
-    if (p.user_id === id) {
-      reassignedCount++;
-      const updatedP = { ...p, user_id: masterId };
-      batch.set(doc(firestoreDb, 'properties', p.id), cleanFirestoreData(updatedP), { merge: true });
-      return updatedP;
+  try {
+    await Promise.all([refreshUsers(), refreshProperties()]);
+    const { id } = req.params;
+    const user = users.find(u => u.id === id);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
+    if (user.role === 'MASTER_ADMIN' && users.filter(u => u.role === 'MASTER_ADMIN').length <= 1) {
+      return res.status(400).json({ error: 'Não é permitido excluir o único Administrador Master do sistema.' });
     }
-    return p;
-  });
 
-  batch.delete(doc(firestoreDb, 'users', id));
-  await batch.commit();
+    const masterAdmin = users.find(u => u.role === 'MASTER_ADMIN' && u.id !== id) || users[0];
+    const masterId = masterAdmin ? masterAdmin.id : 'usr_admin';
 
-  users = users.filter(u => u.id !== id);
-  saveLocalDatabase();
+    let reassignedCount = 0;
 
-  const reqUser = (req as any).user as User;
-  addAuditLog(reqUser.id, reqUser.name, 'Exclusão de Usuário', `Excluiu o usuário ${user.name} do Firestore e reatribuiu ${reassignedCount} imóveis.`, req);
+    for (let p of properties) {
+      if (p.user_id === id) {
+        reassignedCount++;
+        p.user_id = masterId;
+        p.user_name = masterAdmin ? masterAdmin.name : 'Administrador Master';
+        await safeFirestoreDocUpdate('properties', p.id, { user_id: masterId, user_name: p.user_name });
+      }
+    }
 
-  res.json({ success: true, reassignedCount });
+    await safeFirestoreDocDelete('users', id);
+    try {
+      await deleteDoc(doc(firestoreDb, 'users', id));
+    } catch {}
+
+    users = users.filter(u => u.id !== id);
+    saveLocalDatabase();
+
+    const reqUser = (req as any).user as User;
+    addAuditLog(reqUser.id, reqUser.name, 'Exclusão de Usuário', `Excluiu o usuário ${user.name} do sistema e reatribuiu ${reassignedCount} imóveis.`, req);
+
+    res.json({ success: true, reassignedCount, remainingUsers: users });
+  } catch (err: any) {
+    console.error('Error deleting user:', err);
+    res.status(500).json({ error: `Erro ao excluir usuário: ${err.message || err}` });
+  }
+});
+
+/**
+ * USERS: PURGE TEST USERS (MASTER ADMIN ONLY)
+ * Cleans all secondary/test users from Firestore and memory, leaving only the active Master Admin.
+ */
+app.post('/api/users/purge-test-users', requireMasterAdmin, async (req, res) => {
+  try {
+    await Promise.all([refreshUsers(), refreshProperties()]);
+    const masterAdmin = users.find(u => u.role === 'MASTER_ADMIN' || u.id === 'usr_admin') || users[0];
+    const masterId = masterAdmin ? masterAdmin.id : 'usr_admin';
+
+    const usersToDelete = users.filter(u => u.id !== masterId);
+    let removedCount = 0;
+
+    for (const u of usersToDelete) {
+      await safeFirestoreDocDelete('users', u.id);
+      try {
+        await deleteDoc(doc(firestoreDb, 'users', u.id));
+      } catch {}
+      removedCount++;
+    }
+
+    for (let p of properties) {
+      if (p.user_id !== masterId) {
+        p.user_id = masterId;
+        p.user_name = masterAdmin ? masterAdmin.name : 'Administrador Master';
+        await safeFirestoreDocUpdate('properties', p.id, { user_id: masterId, user_name: p.user_name });
+      }
+    }
+
+    users = [masterAdmin];
+    saveLocalDatabase();
+
+    const reqUser = (req as any).user as User;
+    addAuditLog(reqUser.id, reqUser.name, 'Limpeza de Usuários de Teste', `Removeu ${removedCount} usuários secundários, mantendo apenas o Administrador Master.`, req);
+
+    res.json({ success: true, removedCount, users: [masterAdmin] });
+  } catch (err: any) {
+    console.error('Error purging test users:', err);
+    res.status(500).json({ error: `Erro ao limpar usuários: ${err.message || err}` });
+  }
 });
 
 /**

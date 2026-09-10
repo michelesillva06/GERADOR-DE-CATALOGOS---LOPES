@@ -25,7 +25,7 @@ import {
   POST_TEMPLATES_CONFIG
 } from './postTemplates';
 import { CanvasPostLivePreview } from './CanvasPostLivePreview';
-import { generatePostImage, generateAndDownloadSocialMedia } from '../lib/socialMediaGenerator';
+import { generatePostImage, generateAndDownloadSocialMedia, downloadCanvas } from '../lib/socialMediaGenerator';
 import { CanvasPostData, extractDefaultPropertySpecs } from '../lib/canvasPostEngine';
 
 interface AIPostGeneratorModalProps {
@@ -228,13 +228,7 @@ export const AIPostGeneratorModal: React.FC<AIPostGeneratorModalProps> = ({
       if (!canvas) {
         canvas = await generatePostImage(currentProperty, companySettings, selectedTemplate, photoUrl, postData);
       }
-      const url = canvas.toDataURL('image/png', 0.95);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${code}_${selectedTemplate}_lopes_manaus.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      downloadCanvas(canvas, `${code}_${selectedTemplate}_lopes_manaus.png`);
     } catch (err) {
       console.error('Erro ao baixar arte:', err);
       alert('Não foi possível gerar o arquivo de imagem.');
