@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Property, User, CompanySettings } from '../types';
-import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2, Upload, Image as ImageIcon, User as UserIcon, ShieldCheck, Trash2 } from 'lucide-react';
+import { X, FileSpreadsheet, CheckSquare, Square, Download, Filter, Building2, Upload, Image as ImageIcon, User as UserIcon, ShieldCheck, Trash2, MapPin } from 'lucide-react';
 import { generateCatalogPDF } from '../lib/pdfGenerator';
-import { PROPERTY_CATEGORIES } from '../lib/constants';
+import { PROPERTY_CATEGORIES, MANAUS_NEIGHBORHOODS } from '../lib/constants';
 import { compressImage } from '../utils/imageCompressor';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
 
@@ -43,6 +43,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   );
   const [purposeFilter, setPurposeFilter] = useState('todos');
   const [categoryFilter, setCategoryFilter] = useState('todos');
+  const [neighborhoodFilter, setNeighborhoodFilter] = useState('todos');
   const [selectedPropIds, setSelectedPropIds] = useState<string[]>([]);
   const [customCoverImage, setCustomCoverImage] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -69,6 +70,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
         setCatalogTitle(`Catálogo Digital - ${selectedCaptador.name}`);
       }
       setCustomCoverImage('');
+      setNeighborhoodFilter('todos');
     }
   }, [isOpen, initialScope, selectedCaptadorId]);
 
@@ -81,10 +83,33 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   );
   const scopeProperties = scope === 'meus' ? myProperties : properties;
 
-  // Filtered properties based on purpose & category
+  // Extract available neighborhoods with count of properties
+  const availableNeighborhoods = useMemo(() => {
+    const counts = new Map<string, number>();
+    scopeProperties.forEach(p => {
+      if (p.neighborhood && p.neighborhood.trim()) {
+        const n = p.neighborhood.trim();
+        counts.set(n, (counts.get(n) || 0) + 1);
+      }
+    });
+
+    const activeList = Array.from(counts.keys()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    const allList = Array.from(new Set([...activeList, ...MANAUS_NEIGHBORHOODS])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    return { counts, activeList, allList };
+  }, [scopeProperties]);
+
+  // Filtered properties based on purpose, category & neighborhood
   const displayProperties = scopeProperties.filter(p => {
     if (purposeFilter !== 'todos' && !p.purpose.includes(purposeFilter)) return false;
     if (categoryFilter !== 'todos' && p.category !== categoryFilter) return false;
+    if (neighborhoodFilter !== 'todos') {
+      const pNeigh = (p.neighborhood || '').trim().toLowerCase();
+      const fNeigh = neighborhoodFilter.trim().toLowerCase();
+      if (pNeigh !== fNeigh && !pNeigh.includes(fNeigh) && !fNeigh.includes(pNeigh)) {
+        return false;
+      }
+    }
     return true;
   });
 
@@ -94,7 +119,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
       const matchIds = displayProperties.map(p => p.id);
       setSelectedPropIds(matchIds);
     }
-  }, [isOpen, scope, purposeFilter, categoryFilter]);
+  }, [isOpen, scope, purposeFilter, categoryFilter, neighborhoodFilter]);
 
   const toggleSelectAll = () => {
     const displayIds = displayProperties.map(p => p.id);
@@ -202,7 +227,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 relative">
+      <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-slate-200 p-6 relative">
         
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
@@ -272,13 +297,29 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
             </div>
           </div>
 
-          {/* Filters: Purpose & Category */}
-          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
-            <div className="flex items-center space-x-1 text-xs font-bold text-slate-700 uppercase mb-1">
-              <Filter className="w-3.5 h-3.5 text-[#F10F4D]" />
-              <span>2. Filtrar Por Finalidade e Categoria</span>
+          {/* Filters: Purpose, Category & Neighborhood */}
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1 text-xs font-bold text-slate-700 uppercase">
+                <Filter className="w-3.5 h-3.5 text-[#F10F4D]" />
+                <span>2. Filtrar Por Finalidade, Categoria e Bairro</span>
+              </div>
+              {(purposeFilter !== 'todos' || categoryFilter !== 'todos' || neighborhoodFilter !== 'todos') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPurposeFilter('todos');
+                    setCategoryFilter('todos');
+                    setNeighborhoodFilter('todos');
+                  }}
+                  className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                >
+                  Limpar Filtros
+                </button>
+              )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Finalidade</label>
                 <div className="grid grid-cols-3 gap-1 bg-white p-1 rounded-xl border border-slate-200">
@@ -310,6 +351,45 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
                   {PROPERTY_CATEGORIES.map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center space-x-1">
+                  <MapPin className="w-3 h-3 text-[#F10F4D]" />
+                  <span>Bairro</span>
+                </label>
+                <select
+                  value={neighborhoodFilter}
+                  onChange={(e) => setNeighborhoodFilter(e.target.value)}
+                  className={`w-full px-3 py-2 bg-white border rounded-xl text-xs font-semibold ${
+                    neighborhoodFilter !== 'todos'
+                      ? 'border-[#F10F4D] text-[#F10F4D] ring-1 ring-[#F10F4D]/30 font-bold'
+                      : 'border-slate-200 text-slate-800'
+                  }`}
+                >
+                  <option value="todos">Todos os Bairros ({scopeProperties.length})</option>
+                  {availableNeighborhoods.activeList.length > 0 && (
+                    <optgroup label="Bairros com Imóveis Cadastrados">
+                      {availableNeighborhoods.activeList.map(n => {
+                        const count = availableNeighborhoods.counts.get(n) || 0;
+                        return (
+                          <option key={`active-${n}`} value={n}>
+                            {n} ({count} {count === 1 ? 'imóvel' : 'imóveis'})
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  )}
+                  <optgroup label="Outros Bairros de Manaus">
+                    {availableNeighborhoods.allList
+                      .filter(n => !availableNeighborhoods.activeList.includes(n))
+                      .map(n => (
+                        <option key={`other-${n}`} value={n}>
+                          {n} (0 imóveis)
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
               </div>
             </div>
