@@ -1588,57 +1588,9 @@ async function runPropertyXMLImport(
   update_existing: boolean,
   sourceLabel: string
 ) {
+  // Criação automática de captadores via XML foi desativada — todo imóvel importado é associado
+  // apenas ao usuário escolhido na tela (ou ao Admin Master, na sincronização automática).
   const newlyCreatedCaptadores: User[] = [];
-  const captadorCacheByKey = new Map<string, User>();
-
-  function findOrCreateCaptador(brokerName?: string, brokerEmail?: string): User | null {
-    const cleanEmail = (brokerEmail || '').toLowerCase().trim();
-    const cleanName = (brokerName || '').trim();
-    if (!cleanEmail && !cleanName) return null;
-
-    const cacheKey = cleanEmail || cleanName.toLowerCase();
-    if (captadorCacheByKey.has(cacheKey)) return captadorCacheByKey.get(cacheKey)!;
-
-    const normalizedName = cleanName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
-    let match = users.find(u =>
-      (cleanEmail && u.email?.toLowerCase().trim() === cleanEmail) ||
-      (normalizedName && u.name?.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '') === normalizedName)
-    );
-
-    if (!match && cleanName) {
-      const baseUsername = normalizedName || `captador${Date.now()}`;
-      let uniqueUsername = baseUsername;
-      let suffix = 1;
-      while (users.some(u => u.username.toLowerCase() === uniqueUsername) || newlyCreatedCaptadores.some(u => u.username.toLowerCase() === uniqueUsername)) {
-        uniqueUsername = `${baseUsername}${suffix++}`;
-      }
-      const generatedEmail = cleanEmail || `${uniqueUsername}@lopescaptacao.local`;
-
-      match = {
-        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        name: cleanName,
-        email: generatedEmail,
-        username: uniqueUsername,
-        phone: '',
-        whatsapp: '',
-        role: 'CAPTADOR',
-        position: 'Corretor de Imóveis',
-        url_slug: uniqueUsername,
-        status: 'active',
-        photo_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-        creci: '',
-        instagram: '',
-        password: hashPassword('Lopes@2026'),
-        created_at: new Date().toISOString()
-      } as User & { password: string };
-
-      newlyCreatedCaptadores.push(match);
-      users.push(match);
-    }
-
-    if (match) captadorCacheByKey.set(cacheKey, match);
-    return match || null;
-  }
 
   const existingCodeMap = new Map<string, Property>();
   properties.forEach(p => {
@@ -1654,8 +1606,7 @@ async function runPropertyXMLImport(
   incomingProps.forEach((item: any, idx: number) => {
     const cleanCode = (item.code || `IMP-${Date.now()}-${idx}`).trim();
     const existing = existingCodeMap.get(cleanCode.toLowerCase());
-    const matchedCaptador = findOrCreateCaptador(item.broker_name, item.broker_email);
-    const propUserId = matchedCaptador ? matchedCaptador.id : targetUserId;
+    const propUserId = targetUserId;
 
     if (existing) {
       if (skip_existing && !update_existing) {
@@ -1710,19 +1661,6 @@ async function runPropertyXMLImport(
     newToInsert.push(newProp);
     existingCodeMap.set(cleanCode.toLowerCase(), newProp);
   });
-
-  if (newlyCreatedCaptadores.length > 0) {
-    const batch = writeBatch(firestoreDb);
-    newlyCreatedCaptadores.forEach(u => batch.set(doc(firestoreDb, 'users', u.id), cleanFirestoreData(u)));
-    await batch.commit();
-    addAuditLog(
-      actor.id,
-      actor.name,
-      'Captador Criado via Importação',
-      `Criou automaticamente ${newlyCreatedCaptadores.length} captador(es) a partir do XML: ${newlyCreatedCaptadores.map(u => u.name).join(', ')}. Senha padrão: Lopes@2026.`,
-      req
-    );
-  }
 
   if (newToInsert.length > 0) {
     const BATCH_SIZE = 400;
