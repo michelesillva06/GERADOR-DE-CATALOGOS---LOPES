@@ -115,16 +115,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
   return (
     <aside className="w-64 bg-white border-r border-slate-200/80 shrink-0 hidden md:block min-h-[calc(100vh-4rem)]">
       <div className="p-4 space-y-6">
-        
-        {/* Quick Action Button: New Property */}
-        <button
-          onClick={onOpenNewPropertyModal}
-          className="w-full bg-[#F10F4D] hover:bg-rose-600 text-white font-bold py-2.5 px-4 rounded-xl shadow-md shadow-rose-500/20 flex items-center justify-center space-x-2 transition transform active:scale-95 cursor-pointer"
-        >
-          <PlusCircle className="w-5 h-5" />
-          <span>Cadastrar Imóvel</span>
-        </button>
-
         {/* Public Page Share Banner */}
         <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 text-xs text-slate-700">
           <p className="font-bold text-slate-900 mb-1 flex items-center space-x-1.5">
