@@ -40,6 +40,9 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   const [purposeFilter, setPurposeFilter] = useState('todos');
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [neighborhoodFilter, setNeighborhoodFilter] = useState('todos');
+  const [bedroomFilter, setBedroomFilter] = useState('todos');
+  const [priceMinFilter, setPriceMinFilter] = useState('');
+  const [priceMaxFilter, setPriceMaxFilter] = useState('');
   const [selectedPropIds, setSelectedPropIds] = useState<string[]>([]);
   const [customCoverImage, setCustomCoverImage] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -83,7 +86,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
     return { counts, activeList, allList };
   }, [scopeProperties]);
 
-  // Filtered properties based on purpose, category & neighborhood
+  // Filtered properties based on purpose, category, neighborhood, bedrooms & price range
   const displayProperties = scopeProperties.filter(p => {
     if (purposeFilter !== 'todos' && !p.purpose.includes(purposeFilter)) return false;
     if (categoryFilter !== 'todos' && p.category !== categoryFilter) return false;
@@ -94,6 +97,13 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
         return false;
       }
     }
+    if (bedroomFilter !== 'todos') {
+      const minBeds = parseInt(bedroomFilter, 10);
+      if ((p.bedrooms || 0) < minBeds) return false;
+    }
+    const effectivePrice = p.price || p.rent_price || 0;
+    if (priceMinFilter && effectivePrice < Number(priceMinFilter)) return false;
+    if (priceMaxFilter && effectivePrice > Number(priceMaxFilter)) return false;
     return true;
   });
 
@@ -103,7 +113,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
       const matchIds = displayProperties.map(p => p.id);
       setSelectedPropIds(matchIds);
     }
-  }, [isOpen, purposeFilter, categoryFilter, neighborhoodFilter]);
+  }, [isOpen, purposeFilter, categoryFilter, neighborhoodFilter, bedroomFilter, priceMinFilter, priceMaxFilter]);
 
   const toggleSelectAll = () => {
     const displayIds = displayProperties.map(p => p.id);
@@ -238,15 +248,18 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1 text-xs font-bold text-slate-700 uppercase">
                 <Filter className="w-3.5 h-3.5 text-[#F10F4D]" />
-                <span>1. Filtrar Por Finalidade, Categoria e Bairro</span>
+                <span>1. Filtrar Por Finalidade, Categoria, Bairro, Quartos e Faixa de Preço</span>
               </div>
-              {(purposeFilter !== 'todos' || categoryFilter !== 'todos' || neighborhoodFilter !== 'todos') && (
+              {(purposeFilter !== 'todos' || categoryFilter !== 'todos' || neighborhoodFilter !== 'todos' || bedroomFilter !== 'todos' || priceMinFilter || priceMaxFilter) && (
                 <button
                   type="button"
                   onClick={() => {
                     setPurposeFilter('todos');
                     setCategoryFilter('todos');
                     setNeighborhoodFilter('todos');
+                    setBedroomFilter('todos');
+                    setPriceMinFilter('');
+                    setPriceMaxFilter('');
                   }}
                   className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
                 >
@@ -327,6 +340,44 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
                       ))}
                   </optgroup>
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Quartos (mínimo)</label>
+                <select
+                  value={bedroomFilter}
+                  onChange={(e) => setBedroomFilter(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                >
+                  <option value="todos">Qualquer quantidade</option>
+                  <option value="1">1+ quarto</option>
+                  <option value="2">2+ quartos</option>
+                  <option value="3">3+ quartos</option>
+                  <option value="4">4+ quartos</option>
+                  <option value="5">5+ quartos</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Faixa de Preço (R$)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    placeholder="Mínimo"
+                    value={priceMinFilter}
+                    onChange={(e) => setPriceMinFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Máximo"
+                    value={priceMaxFilter}
+                    onChange={(e) => setPriceMaxFilter(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+                  />
+                </div>
               </div>
             </div>
           </div>
