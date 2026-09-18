@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { ParsedXMLProperty, normalizeCategory } from './xmlPropertyParser';
+import { ParsedXMLProperty, normalizeCategory } from './xmlPropertyParser.js';
 
 /**
  * Parser for the real Lopesnet "ListingDataFeed" XML export (the same feed the official
