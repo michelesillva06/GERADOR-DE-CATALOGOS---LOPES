@@ -32,15 +32,11 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   const isManagerOrAdmin = currentCaptador.role === 'MASTER_ADMIN' || currentCaptador.role === 'GESTORA' || currentCaptador.role === 'MASTER' || currentCaptador.role === 'GESTOR';
   const isAdmin = currentCaptador.role === 'MASTER_ADMIN' || currentCaptador.role === 'MASTER';
 
-  // Scope: 'meus' (Apenas meus imóveis captados) vs 'todos' (Todos imóveis do sistema / Catálogo Geral)
-  const [scope, setScope] = useState<'meus' | 'todos'>(initialScope);
   const [selectedCaptadorId, setSelectedCaptadorId] = useState(currentCaptador.id);
 
   const selectedCaptador = (captadores.find(c => c.id === selectedCaptadorId) || currentCaptador);
 
-  const [catalogTitle, setCatalogTitle] = useState(
-    scope === 'todos' ? 'Catálogo Geral de Imóveis - Lopes Manaus' : `Catálogo Digital - ${selectedCaptador.name}`
-  );
+  const [catalogTitle, setCatalogTitle] = useState('Catálogo Geral de Imóveis - Lopes Manaus');
   const [purposeFilter, setPurposeFilter] = useState('todos');
   const [categoryFilter, setCategoryFilter] = useState('todos');
   const [neighborhoodFilter, setNeighborhoodFilter] = useState('todos');
@@ -63,25 +59,13 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
   // Sync initial scope on open
   useEffect(() => {
     if (isOpen) {
-      setScope(initialScope);
-      if (initialScope === 'todos') {
-        setCatalogTitle('Catálogo Geral de Imóveis - Lopes Manaus');
-      } else {
-        setCatalogTitle(`Catálogo Digital - ${selectedCaptador.name}`);
-      }
+      setCatalogTitle('Catálogo Geral de Imóveis - Lopes Manaus');
       setCustomCoverImage('');
       setNeighborhoodFilter('todos');
     }
-  }, [isOpen, initialScope, selectedCaptadorId]);
+  }, [isOpen]);
 
-  // Handle scope base properties
-  const myProperties = properties.filter(p =>
-    p.user_id === currentCaptador.id ||
-    p.user_id?.toLowerCase() === currentCaptador.id?.toLowerCase() ||
-    p.user_id?.toLowerCase() === currentCaptador.username?.toLowerCase() ||
-    p.user_id?.toLowerCase() === currentCaptador.email?.toLowerCase()
-  );
-  const scopeProperties = scope === 'meus' ? myProperties : properties;
+  const scopeProperties = properties;
 
   // Extract available neighborhoods with count of properties
   const availableNeighborhoods = useMemo(() => {
@@ -119,7 +103,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
       const matchIds = displayProperties.map(p => p.id);
       setSelectedPropIds(matchIds);
     }
-  }, [isOpen, scope, purposeFilter, categoryFilter, neighborhoodFilter]);
+  }, [isOpen, purposeFilter, categoryFilter, neighborhoodFilter]);
 
   const toggleSelectAll = () => {
     const displayIds = displayProperties.map(p => p.id);
@@ -249,60 +233,12 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
 
         <div className="space-y-5">
 
-          {/* Scope Selection: Meus vs Todos */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide mb-2">
-              1. Origem / Escopo dos Imóveis
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setScope('meus')}
-                className={`p-3.5 rounded-2xl border text-left flex items-center space-x-3 transition cursor-pointer ${
-                  scope === 'meus'
-                    ? 'bg-rose-50/90 border-[#F10F4D] ring-2 ring-[#F10F4D]/20 shadow-sm'
-                    : 'bg-slate-50 border-slate-200 opacity-75 hover:opacity-100'
-                }`}
-              >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                  scope === 'meus' ? 'bg-[#F10F4D] text-white' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  <UserIcon className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-extrabold text-slate-900">Apenas Meus Imóveis</p>
-                  <p className="text-[11px] text-slate-500 font-medium">{myProperties.length} imóveis sob sua captação</p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setScope('todos')}
-                className={`p-3.5 rounded-2xl border text-left flex items-center space-x-3 transition cursor-pointer ${
-                  scope === 'todos'
-                    ? 'bg-rose-50/90 border-[#F10F4D] ring-2 ring-[#F10F4D]/20 shadow-sm'
-                    : 'bg-slate-50 border-slate-200 opacity-75 hover:opacity-100'
-                }`}
-              >
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                  scope === 'todos' ? 'bg-[#F10F4D] text-white' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-extrabold text-slate-900">Todos os Imóveis do Sistema</p>
-                  <p className="text-[11px] text-slate-500 font-medium">{properties.length} imóveis de todos captadores</p>
-                </div>
-              </button>
-            </div>
-          </div>
-
           {/* Filters: Purpose, Category & Neighborhood */}
           <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1 text-xs font-bold text-slate-700 uppercase">
                 <Filter className="w-3.5 h-3.5 text-[#F10F4D]" />
-                <span>2. Filtrar Por Finalidade, Categoria e Bairro</span>
+                <span>1. Filtrar Por Finalidade, Categoria e Bairro</span>
               </div>
               {(purposeFilter !== 'todos' || categoryFilter !== 'todos' || neighborhoodFilter !== 'todos') && (
                 <button
@@ -482,7 +418,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-bold text-slate-700 uppercase">
-                3. Imóveis para Incluir ({selectedPropIds.length} de {displayProperties.length})
+                2. Imóveis para Incluir ({selectedPropIds.length} de {displayProperties.length})
               </label>
               {displayProperties.length > 0 && (
                 <button
@@ -519,7 +455,7 @@ export const PDFCatalogModal: React.FC<PDFCatalogModalProps> = ({
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-900 truncate">{p.title}</p>
                           <p className="text-[10px] text-slate-500 font-medium truncate">
-                            {p.neighborhood} • {p.category} ({p.purpose}) {scope === 'todos' && captadorObj ? `• Captador: ${captadorObj.name}` : ''}
+                            {p.neighborhood} • {p.category} ({p.purpose}) {captadorObj ? `• Captador: ${captadorObj.name}` : ''}
                           </p>
                         </div>
                       </div>
