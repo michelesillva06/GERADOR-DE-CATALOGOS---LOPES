@@ -260,14 +260,6 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <span className="text-[10px]">Agenda</span>
           </button>
 
-          {/* Plus FAB Button */}
-          <button
-            onClick={onOpenNewPropertyModal}
-            className="flex flex-col items-center justify-center -mt-5 bg-[#F10F4D] text-white p-3 rounded-2xl shadow-lg shadow-rose-500/40 transform active:scale-95 transition cursor-pointer"
-            title="Cadastrar Novo Imóvel"
-          >
-            <PlusCircle className="w-6 h-6" />
-          </button>
 
           {/* Imóveis */}
           <button
