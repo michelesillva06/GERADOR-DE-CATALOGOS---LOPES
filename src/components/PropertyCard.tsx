@@ -1,6 +1,6 @@
 import React from 'react';
 import { Property, User } from '../types';
-import { Bed, Bath, Car, Maximize, MapPin, Share2, Eye, Edit3, Trash2 } from 'lucide-react';
+import { Bed, Bath, Car, Maximize, MapPin, Share2, FileText, ExternalLink, Hash } from 'lucide-react';
 import { getPropertyMainImage, handleImageError } from '../lib/imageUtils';
 import { getPropertyPriceInfo } from '../lib/priceUtils';
 import { PropertyStatusBadge, PropertyPurposeBadge, PropertyCategoryBadge } from './PropertyBadges';
@@ -21,15 +21,9 @@ interface PropertyCardProps {
 
 export const PropertyCard: React.FC<PropertyCardProps> = ({
   property,
-  captador,
   onView,
-  onEdit,
-  onDelete,
   onShareWhatsApp,
-  onGenerateSocialMedia,
   onGenerateAiPost,
-  canEdit = false,
-  canDelete = false,
   hidePerMonth = false
 }) => {
   const priceInfo = getPropertyPriceInfo(property);
@@ -40,6 +34,8 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
     ? priceInfo.rentFormatted.replace(/\s*\/\s*mês/gi, '').replace(/\/mês/gi, '').trim()
     : priceInfo.rentFormatted;
 
+  const publicSiteUrl = property.official_site_url || `https://manaus.lopes.com.br/imovel/${property.code}`;
+
   const handleOpenAiPostModal = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onGenerateAiPost) {
@@ -49,7 +45,7 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group">
-      
+
       {/* Property Image Container */}
       <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden cursor-pointer" onClick={() => onView(property)}>
         <img
@@ -63,8 +59,12 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
         {/* Overlay Dark Gradient */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent opacity-80" />
 
-        {/* Top Badges */}
-        <div className="absolute top-3 right-3 pointer-events-none">
+        {/* Top Badges: Status + Code */}
+        <div className="absolute top-3 right-3 left-3 flex items-center justify-between pointer-events-none">
+          <span className="bg-slate-900/80 text-white text-[10px] font-mono font-bold px-2 py-1 rounded-lg backdrop-blur border border-slate-700 flex items-center gap-1">
+            <Hash className="w-3 h-3 text-[#F10F4D]" />
+            {property.code}
+          </span>
           <PropertyStatusBadge status={property.status} variant="solid" size="sm" />
         </div>
 
@@ -74,19 +74,12 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
             <PropertyPurposeBadge purpose={property.purpose} variant="solid" size="xs" />
             <PropertyCategoryBadge category={property.category} variant="dark-glass" size="xs" />
           </div>
-
-          {property.views !== undefined && property.views > 0 && (
-            <span className="bg-slate-900/80 text-slate-300 text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur border border-slate-700 flex items-center space-x-1">
-              <Eye className="w-3 h-3 text-rose-400" />
-              <span>{property.views} visualizações</span>
-            </span>
-          )}
         </div>
       </div>
 
       {/* Property Details Body */}
       <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-        
+
         {/* Title & Neighborhood */}
         <div>
           <div className="flex items-center text-slate-500 text-xs font-medium space-x-1 mb-1">
@@ -137,94 +130,72 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
           </div>
         </div>
 
-        {/* Price & Action Row */}
-        <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
-          <div className="min-w-0 shrink">
-            <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
-              {priceInfo.isBoth ? 'Venda / Aluguel' : (priceInfo.isRent ? 'Aluguel' : 'Valor')}
+        {/* Price Row */}
+        <div className="pt-2.5 border-t border-slate-100">
+          <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400 truncate">
+            {priceInfo.isBoth ? 'Venda / Aluguel' : (priceInfo.isRent ? 'Aluguel' : 'Valor')}
+          </p>
+          <p className="text-sm sm:text-base font-extrabold text-[#F10F4D] truncate">
+            {displayPrimaryPrice}
+          </p>
+          {priceInfo.isBoth && priceInfo.rentPrice > 0 && priceInfo.salePrice > 0 && (
+            <p className="text-[10px] font-bold text-slate-600 truncate">
+              Locação: {displayRentPrice}
             </p>
-            <p className="text-sm sm:text-base font-extrabold text-[#F10F4D] truncate">
-              {displayPrimaryPrice}
-            </p>
-            {priceInfo.isBoth && priceInfo.rentPrice > 0 && priceInfo.salePrice > 0 && (
-              <p className="text-[10px] font-bold text-slate-600 truncate">
-                Locação: {displayRentPrice}
-              </p>
-            )}
-          </div>
+          )}
+        </div>
 
-          {/* Quick Action Buttons */}
-          <div className="flex items-center space-x-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-            {(onGenerateAiPost || onGenerateSocialMedia) && (
-              <button
-                type="button"
-                id={`btn-gerar-post-ia-card-${property.id || property.code || 'item'}`}
-                onClick={handleOpenAiPostModal}
-                className="px-3 py-1.5 h-8 rounded-xl bg-[#F10F4D] hover:bg-[#d40d43] text-white text-xs font-bold whitespace-nowrap shadow-xs hover:shadow transition transform active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
-                title="Gerar Post para Redes Sociais"
-              >
-                <span>Gerar Post</span>
-              </button>
-            )}
+        {/* Action Buttons Row: Ficha Completa / Site / Compartilhar */}
+        <div className="flex items-center gap-1.5 pt-1" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={() => onView(property)}
+            className="flex-1 min-w-0 px-2.5 py-2 rounded-xl bg-[#F10F4D] hover:bg-[#d40d43] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs hover:shadow transition transform active:scale-95 cursor-pointer"
+            title="Ver Ficha Completa do Imóvel"
+          >
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Ficha Completa</span>
+          </button>
 
+          <a
+            href={publicSiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer flex items-center justify-center shrink-0"
+            title="Ver no Site Oficial da Lopes"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+
+          {onShareWhatsApp && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onView(property);
+                onShareWhatsApp(property);
               }}
-              className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer flex items-center justify-center shrink-0"
-              title="Ver Detalhes do Imóvel"
+              className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition cursor-pointer flex items-center justify-center shrink-0"
+              title="Enviar por WhatsApp"
             >
-              <Eye className="w-4 h-4" />
+              <Share2 className="w-4 h-4" />
             </button>
+          )}
 
-            {onShareWhatsApp && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onShareWhatsApp(property);
-                }}
-                className="w-8 h-8 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition cursor-pointer flex items-center justify-center shrink-0"
-                title="Enviar por WhatsApp"
-              >
-                <Share2 className="w-4 h-4" />
-              </button>
-            )}
-
-            {canEdit && onEdit && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(property);
-                }}
-                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 transition cursor-pointer"
-                title="Editar Imóvel"
-              >
-                <Edit3 className="w-4 h-4" />
-              </button>
-            )}
-
-            {canDelete && onDelete && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(property);
-                }}
-                className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition cursor-pointer"
-                title="Excluir Imóvel"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+          {onGenerateAiPost && (
+            <button
+              type="button"
+              id={`btn-gerar-post-ia-card-${property.id || property.code || 'item'}`}
+              onClick={handleOpenAiPostModal}
+              className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-white transition cursor-pointer flex items-center justify-center shrink-0"
+              title="Gerar Post para Redes Sociais"
+            >
+              <span className="text-[9px] font-black">IA</span>
+            </button>
+          )}
         </div>
 
       </div>
     </div>
   );
 };
-
