@@ -3,15 +3,12 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
   Building2,
-  PlusCircle,
   FileText,
   Menu,
   X,
   Users,
   Settings,
-  BookOpen,
   Calendar,
-  CalendarCheck,
   History,
   Copy,
   Check,
@@ -30,8 +27,7 @@ interface MobileBottomNavProps {
 
 export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeView,
-  setActiveView,
-  onOpenNewPropertyModal
+  setActiveView
 }) => {
   const { user } = useAuth();
   const [showDrawer, setShowDrawer] = useState(false);
@@ -55,20 +51,30 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     window.open(waUrl, '_blank');
   };
 
-  const menuItems = [
-    { id: 'journal', label: 'Diário de Captação', icon: CalendarCheck, show: true, highlight: true },
-    { id: 'schedule', label: 'Agenda & Visitas', icon: Calendar, show: true, highlight: true },
-    { id: 'contracts', label: 'Gerar Contratos', icon: FileSignature, show: true },
-    { id: 'properties', label: 'Lista de Imóveis', icon: Building2, show: true },
+  const captadorDrawerItems = [
+    { id: 'properties', label: 'Todos os Imóveis', icon: Building2, show: true },
     { id: 'pdf-catalog', label: 'Gerar Catálogo PDF', icon: FileText, show: true },
-    { id: 'general-catalog', label: 'Vitrine Geral', icon: BookOpen, show: true },
-    { id: 'dashboard', label: 'Dashboard & Métricas', icon: LayoutDashboard, show: true },
-    { id: 'reports', label: 'Relatório Semanal', icon: BarChart3, show: isMasterOrGestor },
+    { id: 'schedule', label: 'Agenda de Visitas', icon: Calendar, show: true },
+    { id: 'contracts', label: 'Gerar Contratos', icon: FileSignature, show: true },
+    { id: 'reports', label: 'Relatórios', icon: BarChart3, show: true },
+    { id: 'dashboard', label: 'Visão de Consulta', icon: LayoutDashboard, show: true },
+    { id: 'settings', label: 'Configurações', icon: Settings, show: true }
+  ];
+
+  const adminDrawerItems = [
+    { id: 'dashboard', label: 'Dashboard do Gestor', icon: LayoutDashboard, show: true },
+    { id: 'properties', label: 'Todos os Imóveis', icon: Building2, show: true },
     { id: 'xml-import', label: 'Importar XML', icon: FileCode, show: isMaster },
+    { id: 'pdf-catalog', label: 'Gerar Catálogo PDF', icon: FileText, show: true },
+    { id: 'schedule', label: 'Agenda de Visitas', icon: Calendar, show: true },
+    { id: 'contracts', label: 'Gerar Contratos', icon: FileSignature, show: true },
+    { id: 'reports', label: 'Relatórios', icon: BarChart3, show: true },
     { id: 'users', label: 'Usuários & Perfis', icon: Users, show: isMaster },
     { id: 'logs', label: 'Histórico & Logs', icon: History, show: isMaster },
-    { id: 'settings', label: 'Configurações & Perfil', icon: Settings, show: true }
+    { id: 'settings', label: 'Configurações', icon: Settings, show: true }
   ];
+
+  const menuItems = isMasterOrGestor ? adminDrawerItems : captadorDrawerItems;
 
   return (
     <>
@@ -84,7 +90,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#F10F4D]"></span>
-                <h3 className="text-sm font-black text-slate-900 uppercase">Menu & Atalhos Prioritários</h3>
+                <h3 className="text-sm font-black text-slate-900 uppercase">Menu Principal</h3>
               </div>
               <button
                 onClick={() => setShowDrawer(false)}
@@ -94,31 +100,31 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
               </button>
             </div>
 
-            {/* PRIORITY SHORTCUTS: DIÁRIO DE CAPTAÇÃO & AGENDA */}
+            {/* PRIORITY SHORTCUTS: IMOVEIS & AGENDA */}
             <div className="grid grid-cols-2 gap-2.5">
               <button
                 onClick={() => {
-                  setActiveView('journal');
+                  setActiveView('properties');
                   setShowDrawer(false);
                 }}
                 className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between shadow-xs ${
-                  activeView === 'journal'
+                  activeView === 'properties'
                     ? 'bg-[#F10F4D] text-white border-[#F10F4D] shadow-rose-500/20'
                     : 'bg-rose-50/70 border-rose-200 text-slate-900 hover:bg-rose-100/80'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeView === 'journal' ? 'bg-white/20 text-white' : 'bg-[#F10F4D] text-white'}`}>
-                    <CalendarCheck className="w-4 h-4" />
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeView === 'properties' ? 'bg-white/20 text-white' : 'bg-[#F10F4D] text-white'}`}>
+                    <Building2 className="w-4 h-4" />
                   </div>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeView === 'journal' ? 'bg-white/30 text-white' : 'bg-[#F10F4D] text-white'}`}>
-                    Prioridade
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${activeView === 'properties' ? 'bg-white/30 text-white' : 'bg-[#F10F4D] text-white'}`}>
+                    Estoque
                   </span>
                 </div>
                 <div>
-                  <h4 className="text-xs font-black leading-tight">Diário de Captação</h4>
-                  <p className={`text-[10px] mt-0.5 ${activeView === 'journal' ? 'text-rose-100' : 'text-slate-500'}`}>
-                    Leads, visitas e metas
+                  <h4 className="text-xs font-black leading-tight">Todos os Imóveis</h4>
+                  <p className={`text-[10px] mt-0.5 ${activeView === 'properties' ? 'text-rose-100' : 'text-slate-500'}`}>
+                    Carteira Lopesnet
                   </p>
                 </div>
               </button>
@@ -143,9 +149,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
                   </span>
                 </div>
                 <div>
-                  <h4 className="text-xs font-black leading-tight">Agenda & Visitas</h4>
+                  <h4 className="text-xs font-black leading-tight">Agenda de Visitas</h4>
                   <p className={`text-[10px] mt-0.5 ${activeView === 'schedule' ? 'text-slate-300' : 'text-slate-500'}`}>
-                    Compromissos do dia
+                    Compromissos e visitas
                   </p>
                 </div>
               </button>
@@ -155,8 +161,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-black text-slate-800 flex items-center space-x-1.5">
-                  <BookOpen className="w-3.5 h-3.5 text-[#F10F4D]" />
-                  <span>Catálogo Digital</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-[#F10F4D]" />
+                  <span>Seu Link Público</span>
                 </span>
                 <a
                   href={`/catalogo/${user.url_slug || user.username}`}
@@ -238,33 +244,10 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-40 md:hidden px-3 py-2 shadow-lg">
         <div className="flex items-center justify-around max-w-md mx-auto">
           
-          {/* Diário de Captação - Prioridade Mobile */}
-          <button
-            onClick={() => setActiveView('journal')}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
-              activeView === 'journal' ? 'text-[#F10F4D] font-extrabold' : 'text-slate-500 hover:text-slate-800 font-semibold'
-            }`}
-          >
-            <CalendarCheck className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px]">Diário</span>
-          </button>
-
-          {/* Agenda & Visitas - Prioridade Mobile */}
-          <button
-            onClick={() => setActiveView('schedule')}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
-              activeView === 'schedule' ? 'text-[#F10F4D] font-extrabold' : 'text-slate-500 hover:text-slate-800 font-semibold'
-            }`}
-          >
-            <Calendar className="w-5 h-5 mb-0.5" />
-            <span className="text-[10px]">Agenda</span>
-          </button>
-
-
-          {/* Imóveis */}
+          {/* 1. Todos os Imóveis - Entrada principal */}
           <button
             onClick={() => setActiveView('properties')}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition ${
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition ${
               activeView === 'properties' ? 'text-[#F10F4D] font-extrabold' : 'text-slate-500 hover:text-slate-800 font-semibold'
             }`}
           >
@@ -272,10 +255,43 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <span className="text-[10px]">Imóveis</span>
           </button>
 
-          {/* Menu Drawer */}
+          {/* 2. Gerar Catálogo PDF */}
+          <button
+            onClick={() => setActiveView('pdf-catalog')}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition ${
+              activeView === 'pdf-catalog' ? 'text-[#F10F4D] font-extrabold' : 'text-slate-500 hover:text-slate-800 font-semibold'
+            }`}
+          >
+            <FileText className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px]">Catálogo</span>
+          </button>
+
+          {/* 3. Agenda de Visitas */}
+          <button
+            onClick={() => setActiveView('schedule')}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition ${
+              activeView === 'schedule' ? 'text-[#F10F4D] font-extrabold' : 'text-slate-500 hover:text-slate-800 font-semibold'
+            }`}
+          >
+            <Calendar className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px]">Agenda</span>
+          </button>
+
+          {/* 4. Gerar Contratos */}
+          <button
+            onClick={() => setActiveView('contracts')}
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition ${
+              activeView === 'contracts' ? 'text-[#F10F4D] font-extrabold' : 'text-slate-500 hover:text-slate-800 font-semibold'
+            }`}
+          >
+            <FileSignature className="w-5 h-5 mb-0.5" />
+            <span className="text-[10px]">Contratos</span>
+          </button>
+
+          {/* 5. Menu Drawer */}
           <button
             onClick={() => setShowDrawer(true)}
-            className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition cursor-pointer ${
+            className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition cursor-pointer ${
               showDrawer ? 'text-[#F10F4D] font-extrabold' : 'text-slate-500 hover:text-slate-800 font-semibold'
             }`}
           >

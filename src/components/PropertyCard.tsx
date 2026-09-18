@@ -12,8 +12,6 @@ interface PropertyCardProps {
   onEdit?: (property: Property) => void;
   onDelete?: (property: Property) => void;
   onShareWhatsApp?: (property: Property) => void;
-  onGenerateSocialMedia?: (property: Property) => void;
-  onGenerateAiPost?: (property: Property) => void;
   canEdit?: boolean;
   canDelete?: boolean;
   hidePerMonth?: boolean;
@@ -23,7 +21,6 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
   property,
   onView,
   onShareWhatsApp,
-  onGenerateAiPost,
   hidePerMonth = false
 }) => {
   const priceInfo = getPropertyPriceInfo(property);
@@ -35,13 +32,6 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
     : priceInfo.rentFormatted;
 
   const publicSiteUrl = property.official_site_url || `https://manaus.lopes.com.br/imovel/${property.code}`;
-
-  const handleOpenAiPostModal = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onGenerateAiPost) {
-      onGenerateAiPost(property);
-    }
-  };
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group">
@@ -179,18 +169,6 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({
               title="Enviar por WhatsApp"
             >
               <Share2 className="w-4 h-4" />
-            </button>
-          )}
-
-          {onGenerateAiPost && (
-            <button
-              type="button"
-              id={`btn-gerar-post-ia-card-${property.id || property.code || 'item'}`}
-              onClick={handleOpenAiPostModal}
-              className="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-white transition cursor-pointer flex items-center justify-center shrink-0"
-              title="Gerar Post para Redes Sociais"
-            >
-              <span className="text-[9px] font-black">IA</span>
             </button>
           )}
         </div>

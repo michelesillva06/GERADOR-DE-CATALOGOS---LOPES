@@ -2,32 +2,21 @@ import React, { useState, useMemo } from 'react';
 import { Property, User } from '../types';
 import { PropertyCard } from '../components/PropertyCard';
 import { PropertyTableView } from '../components/PropertyTableView';
-import { Search, FileSpreadsheet, Building2, FileCode, LayoutGrid, List, Bed, SlidersHorizontal, X } from 'lucide-react';
+import { Search, FileSpreadsheet, Building2, FileCode, LayoutGrid, List, X, DollarSign, Tag, MapPin } from 'lucide-react';
 import { PROPERTY_CATEGORIES } from '../lib/constants';
 
 interface PropertyManagementProps {
   properties: Property[];
   users: User[];
   currentUser: User;
-  onOpenNewPropertyModal: () => void;
+  onOpenNewPropertyModal?: () => void;
   onOpenPdfModal: () => void;
   onOpenXmlImport?: () => void;
   onViewProperty: (property: Property) => void;
-  onEditProperty: (property: Property) => void;
-  onDeleteProperty: (property: Property) => void;
+  onEditProperty?: (property: Property) => void;
+  onDeleteProperty?: (property: Property) => void;
   onShareWhatsApp: (property: Property) => void;
-  onGenerateSocialMedia?: (property: Property) => void;
-  onGenerateAiPost?: (property: Property) => void;
 }
-
-const PRICE_RANGES = [
-  { label: 'Qualquer valor', min: undefined as number | undefined, max: undefined as number | undefined },
-  { label: 'Até R$ 350 mil', min: undefined as number | undefined, max: 350000 },
-  { label: 'R$ 350 mil a R$ 600 mil', min: 350000, max: 600000 },
-  { label: 'R$ 600 mil a R$ 1 milhão', min: 600000, max: 1000000 },
-  { label: 'R$ 1M a R$ 2 milhões', min: 1000000, max: 2000000 },
-  { label: 'Alto Padrão (> R$ 2M)', min: 2000000, max: undefined as number | undefined }
-];
 
 export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   properties,
@@ -37,20 +26,14 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   onOpenXmlImport,
   onViewProperty,
   onDeleteProperty,
-  onShareWhatsApp,
-  onGenerateSocialMedia,
-  onGenerateAiPost
+  onShareWhatsApp
 }) => {
   const [search, setSearch] = useState('');
-  const [purposeFilter, setPurposeFilter] = useState<'todos' | 'Venda' | 'Locação'>('todos');
+  const [purposeFilter, setPurposeFilter] = useState<'todos' | 'Venda' | 'Locação' | 'Venda e Locação'>('todos');
   const [neighborhoodFilter, setNeighborhoodFilter] = useState('todos');
   const [categoryFilter, setCategoryFilter] = useState('todos');
-  const [bedroomFilter, setBedroomFilter] = useState('todos');
-  const [priceRangeIndex, setPriceRangeIndex] = useState(0);
   const [priceMinCustom, setPriceMinCustom] = useState('');
   const [priceMaxCustom, setPriceMaxCustom] = useState('');
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('todos');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
     const saved = localStorage.getItem('property_view_mode');
     return saved === 'table' ? 'table' : 'grid';
@@ -64,53 +47,78 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
   const isMaster = currentUser.role === 'MASTER_ADMIN' || currentUser.role === 'MASTER' || currentUser.username === 'admin' || currentUser.email?.toLowerCase() === 'admin@lopes.com.br';
 
   const totalCount = properties.length;
-  const vendaCount = properties.filter(p => p.purpose.includes('Venda')).length;
-  const locacaoCount = properties.filter(p => p.purpose.includes('Locação')).length;
+  const vendaCount = properties.filter(p => p.purpose === 'Venda' || p.purpose === 'Venda e Locação' || p.purpose?.includes('Venda')).length;
+  const locacaoCount = properties.filter(p => p.purpose === 'Locação' || p.purpose === 'Venda e Locação' || p.purpose?.includes('Locação')).length;
+  const vendaELocacaoCount = properties.filter(p => p.purpose === 'Venda e Locação').length;
 
   const neighborhoods = useMemo(
     () => Array.from(new Set(properties.map(p => p.neighborhood))).filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR')),
     [properties]
   );
 
-  const activeRange = PRICE_RANGES[priceRangeIndex];
-  const effectivePriceMin = priceMinCustom ? Number(priceMinCustom) : activeRange.min;
-  const effectivePriceMax = priceMaxCustom ? Number(priceMaxCustom) : activeRange.max;
+  // Helper to parse typed price into a clean number
+  const parsePriceInput = (val: string): number | undefined => {
+    if (!val) return undefined;
+    const clean = val.replace(/[^\d]/g, '');
+    if (!clean) return undefined;
+    const num = Number(clean);
+    return isNaN(num) ? undefined : num;
+  };
+
+  const effectiveMin = parsePriceInput(priceMinCustom);
+  const effectiveMax = parsePriceInput(priceMaxCustom);
 
   const filteredProperties = properties.filter(p => {
-    if (purposeFilter !== 'todos' && !p.purpose.includes(purposeFilter)) return false;
+    // 1. Tipo de Negócio
+    if (purposeFilter === 'Venda') {
+      if (!p.purpose?.includes('Venda')) return false;
+    } else if (purposeFilter === 'Locação') {
+      if (!p.purpose?.includes('Locação')) return false;
+    } else if (purposeFilter === 'Venda e Locação') {
+      if (p.purpose !== 'Venda e Locação') return false;
+    }
+
+    // 2. Bairro / Localização
     if (neighborhoodFilter !== 'todos' && p.neighborhood !== neighborhoodFilter) return false;
+
+    // 3. Categoria do Imóvel
     if (categoryFilter !== 'todos' && p.category !== categoryFilter) return false;
-    if (statusFilter !== 'todos' && p.status !== statusFilter) return false;
-    if (bedroomFilter !== 'todos' && (p.bedrooms || 0) < parseInt(bedroomFilter, 10)) return false;
 
+    // 4. Faixa de Preço Livre
     const effectivePrice = p.price || p.rent_price || 0;
-    if (effectivePriceMin && effectivePrice < effectivePriceMin) return false;
-    if (effectivePriceMax && effectivePrice > effectivePriceMax) return false;
+    if (effectiveMin !== undefined && effectivePrice < effectiveMin) return false;
+    if (effectiveMax !== undefined && effectivePrice > effectiveMax) return false;
 
+    // 5. Busca rápida por código REO, título, bairro ou endereço
     if (search.trim()) {
-      const q = search.toLowerCase();
+      const q = search.toLowerCase().trim();
       return (
-        p.code.toLowerCase().includes(q) ||
-        p.title.toLowerCase().includes(q) ||
-        p.neighborhood.toLowerCase().includes(q) ||
+        (p.code || '').toLowerCase().includes(q) ||
+        (p.title || '').toLowerCase().includes(q) ||
+        (p.neighborhood || '').toLowerCase().includes(q) ||
         (p.address || '').toLowerCase().includes(q) ||
-        p.description.toLowerCase().includes(q)
+        (p.description || '').toLowerCase().includes(q)
       );
     }
 
     return true;
   });
 
-  const hasActiveFilters = neighborhoodFilter !== 'todos' || categoryFilter !== 'todos' || statusFilter !== 'todos' || bedroomFilter !== 'todos' || priceRangeIndex !== 0 || !!priceMinCustom || !!priceMaxCustom;
+  const hasActiveFilters =
+    neighborhoodFilter !== 'todos' ||
+    categoryFilter !== 'todos' ||
+    purposeFilter !== 'todos' ||
+    !!priceMinCustom ||
+    !!priceMaxCustom ||
+    !!search.trim();
 
   const clearFilters = () => {
+    setPurposeFilter('todos');
     setNeighborhoodFilter('todos');
     setCategoryFilter('todos');
-    setStatusFilter('todos');
-    setBedroomFilter('todos');
-    setPriceRangeIndex(0);
     setPriceMinCustom('');
     setPriceMaxCustom('');
+    setSearch('');
   };
 
   return (
@@ -119,9 +127,9 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Carteira de Imóveis Lopes Manaus</h1>
-          <p className="text-xs text-slate-500">
-            Estoque oficial com dados em tempo real, direto do feed Lopesnet
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Carteira de Imóveis Lopes Manaus</h1>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Estoque oficial com dados em tempo real sincronizados do feed Lopesnet
           </p>
         </div>
 
@@ -129,8 +137,8 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
           {isMaster && onOpenXmlImport && (
             <button
               onClick={onOpenXmlImport}
-              className="px-3.5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center space-x-1.5 border border-slate-300/80 shadow-2xs transition"
-              title="Importar imóveis em lote via arquivo XML"
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center space-x-1.5 border border-slate-300/80 shadow-2xs transition cursor-pointer"
+              title="Sincronização e Importação de imóveis Lopesnet"
             >
               <FileCode className="w-4 h-4 text-[#F10F4D]" />
               <span>Importar XML</span>
@@ -139,188 +147,150 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
 
           <button
             onClick={onOpenPdfModal}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center space-x-2 shadow transition"
+            className="px-4 py-2 rounded-xl bg-[#F10F4D] hover:bg-[#d40d43] text-white font-bold text-xs flex items-center space-x-2 shadow-sm transition cursor-pointer"
           >
-            <FileSpreadsheet className="w-4 h-4 text-[#F10F4D]" />
+            <FileSpreadsheet className="w-4 h-4" />
             <span>Gerar Catálogo PDF</span>
           </button>
         </div>
       </div>
 
-      {/* Purpose Tabs with Counts */}
-      <div className="bg-slate-100 p-1.5 rounded-2xl flex items-center gap-2 max-w-xl overflow-x-auto">
+      {/* Modern Purpose Filter: Venda x Locação x Venda e Locação x Todos */}
+      <div className="bg-slate-100/90 p-1.5 rounded-2xl flex items-center gap-1.5 overflow-x-auto shadow-inner border border-slate-200/60">
         {[
           { key: 'todos' as const, label: 'Todos os Imóveis', count: totalCount },
           { key: 'Venda' as const, label: 'Comprar / Venda', count: vendaCount },
-          { key: 'Locação' as const, label: 'Alugar / Locação', count: locacaoCount }
-        ].map(tab => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setPurposeFilter(tab.key)}
-            className={`shrink-0 py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 ${
-              purposeFilter === tab.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <span>{tab.label}</span>
-            <span className={`px-2 py-0.5 text-[10px] rounded-full font-extrabold ${
-              purposeFilter === tab.key ? 'bg-rose-100 text-[#F10F4D]' : 'bg-slate-200 text-slate-700'
-            }`}>
-              {tab.count}
-            </span>
-          </button>
-        ))}
+          { key: 'Locação' as const, label: 'Alugar / Locação', count: locacaoCount },
+          { key: 'Venda e Locação' as const, label: 'Venda e Locação', count: vendaELocacaoCount }
+        ].map(tab => {
+          const isSelected = purposeFilter === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setPurposeFilter(tab.key)}
+              className={`shrink-0 py-2 px-3.5 rounded-xl text-xs font-bold transition flex items-center justify-center space-x-2 cursor-pointer ${
+                isSelected
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/80'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span className={`px-2 py-0.5 text-[10px] rounded-full font-extrabold ${
+                isSelected ? 'bg-rose-100 text-[#F10F4D]' : 'bg-slate-200/80 text-slate-700'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="bg-white rounded-3xl p-4 border border-slate-200/80 shadow-sm space-y-3">
+      {/* Filter Toolbar (Essential Filters Only) */}
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/80 shadow-sm space-y-4">
 
-        {/* Search bar */}
+        {/* Search Bar */}
         <div className="relative">
-          <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar por código (ex: REO843669), título, bairro, endereço..."
+            placeholder="Buscar por código (ex: REO843669), título, bairro, condomínio ou endereço..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-900 focus:outline-none focus:border-[#F10F4D]"
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#F10F4D] focus:bg-white transition"
           />
         </div>
 
-        {/* Bairro & Tipo */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {/* Essential Filter Fields: Bairro, Categoria e Faixa de Preço Livre */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          
+          {/* 1. Bairro / Localização */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Bairro / Localização</label>
+            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <MapPin className="w-3 h-3 text-[#F10F4D]" />
+              <span>Bairro / Localização</span>
+            </label>
             <select
               value={neighborhoodFilter}
               onChange={(e) => setNeighborhoodFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#F10F4D] focus:bg-white transition"
             >
-              <option value="todos">Todos os Bairros de Manaus</option>
+              <option value="todos">Todos os Bairros ({neighborhoods.length})</option>
               {neighborhoods.map(n => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
           </div>
 
+          {/* 2. Categoria do Imóvel */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo de Imóvel</label>
+            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Tag className="w-3 h-3 text-[#F10F4D]" />
+              <span>Tipo de Imóvel</span>
+            </label>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:outline-none focus:border-[#F10F4D] focus:bg-white transition"
             >
-              <option value="todos">Todos os Tipos de Imóvel</option>
+              <option value="todos">Todos os Tipos</option>
               {PROPERTY_CATEGORIES.map(c => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
+
+          {/* 3. Preço Mínimo Livre */}
+          <div>
+            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <DollarSign className="w-3 h-3 text-[#F10F4D]" />
+              <span>Valor Mínimo (R$)</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">R$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={priceMinCustom}
+                onChange={(e) => setPriceMinCustom(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#F10F4D] focus:bg-white transition"
+              />
+            </div>
+          </div>
+
+          {/* 4. Preço Máximo Livre */}
+          <div>
+            <label className="block text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <DollarSign className="w-3 h-3 text-[#F10F4D]" />
+              <span>Valor Máximo (R$)</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">R$</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Sem limite"
+                value={priceMaxCustom}
+                onChange={(e) => setPriceMaxCustom(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#F10F4D] focus:bg-white transition"
+              />
+            </div>
+          </div>
+
         </div>
 
-        {/* Quartos */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 flex items-center space-x-1">
-            <Bed className="w-3 h-3 text-[#F10F4D]" />
-            <span>Quartos (mínimo)</span>
-          </label>
-          <div className="flex flex-wrap gap-1.5">
-            {['todos', '1', '2', '3', '4'].map(b => (
-              <button
-                key={b}
-                type="button"
-                onClick={() => setBedroomFilter(b)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
-                  bedroomFilter === b
-                    ? 'bg-[#F10F4D] text-white border-[#F10F4D]'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                {b === 'todos' ? 'Todos' : `${b}+`}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setShowMoreFilters(v => !v)}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200 text-slate-600 hover:bg-slate-100 transition flex items-center space-x-1 ml-auto"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Mais Filtros</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Faixa de Preço */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Faixa de Preço (R$)</label>
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {PRICE_RANGES.map((range, idx) => (
-              <button
-                key={range.label}
-                type="button"
-                onClick={() => {
-                  setPriceRangeIndex(idx);
-                  setPriceMinCustom('');
-                  setPriceMaxCustom('');
-                }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
-                  priceRangeIndex === idx && !priceMinCustom && !priceMaxCustom
-                    ? 'bg-[#F10F4D] text-white border-[#F10F4D]'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              placeholder="R$ Mín."
-              value={priceMinCustom}
-              onChange={(e) => setPriceMinCustom(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-            />
-            <span className="text-xs text-slate-400">até</span>
-            <input
-              type="number"
-              placeholder="R$ Máx."
-              value={priceMaxCustom}
-              onChange={(e) => setPriceMaxCustom(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-            />
-          </div>
-        </div>
-
-        {/* More Filters (Status) */}
-        {showMoreFilters && (
-          <div className="pt-2 border-t border-slate-100">
-            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Status do Imóvel</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 sm:max-w-xs"
-            >
-              <option value="todos">Todos os Status</option>
-              <option value="Disponível">Disponível</option>
-              <option value="Reservado">Reservado</option>
-              <option value="Vendido">Vendido</option>
-              <option value="Alugado">Alugado</option>
-            </select>
-          </div>
-        )}
-
-        {/* Clear filters + View mode + count */}
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
+        {/* Toolbar Footer: Results Counter + View Switcher + Clear Filters */}
+        <div className="pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center space-x-3">
             <span className="text-xs text-slate-500 font-medium">
-              <strong className="text-slate-800 font-bold">{filteredProperties.length}</strong> {filteredProperties.length === 1 ? 'imóvel encontrado' : 'imóveis encontrados'}
+              <strong className="text-slate-900 font-bold">{filteredProperties.length}</strong> {filteredProperties.length === 1 ? 'imóvel disponível' : 'imóveis disponíveis'}
             </span>
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={clearFilters}
-                className="text-[11px] font-bold text-rose-600 hover:underline flex items-center space-x-1"
+                className="text-[11px] font-bold text-[#F10F4D] hover:underline flex items-center space-x-1 cursor-pointer"
               >
                 <X className="w-3 h-3" />
                 <span>Limpar Filtros</span>
@@ -368,7 +338,6 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
             onEdit={undefined}
             onDelete={isMaster ? onDeleteProperty : undefined}
             onShareWhatsApp={onShareWhatsApp}
-            onGenerateAiPost={onGenerateAiPost}
             canEditAny={false}
             canDeleteAny={isMaster}
           />
@@ -385,8 +354,6 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
                   onEdit={undefined}
                   onDelete={isMaster ? onDeleteProperty : undefined}
                   onShareWhatsApp={onShareWhatsApp}
-                  onGenerateSocialMedia={onGenerateSocialMedia}
-                  onGenerateAiPost={onGenerateAiPost}
                   canEdit={false}
                   canDelete={isMaster}
                   hidePerMonth={true}
@@ -407,9 +374,21 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
             <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
               {properties.length === 0
                 ? 'Os imóveis chegam automaticamente pela sincronização com o feed Lopesnet.'
-                : 'Tente ajustar ou limpar os filtros de busca para visualizar outros imóveis.'}
+                : 'Tente ajustar ou limpar os filtros de busca para visualizar outros imóveis da carteira.'}
             </p>
           </div>
+
+          {hasActiveFilters && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Limpar Todos os Filtros
+              </button>
+            </div>
+          )}
 
           {properties.length === 0 && isMaster && onOpenXmlImport && (
             <div className="pt-2 flex flex-wrap items-center justify-center gap-3">

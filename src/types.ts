@@ -93,6 +93,7 @@ export interface Property {
   transaction_notes?: string;
   created_at: string;
   updated_at: string;
+  synced_at?: string;
   // When the captador last confirmed with the owner that price/status/availability are still
   // accurate. Separate from updated_at (which changes on any edit) so that touching an unrelated
   // field doesn't silently reset the 7-day "time to check in with the owner" clock.

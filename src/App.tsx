@@ -1118,15 +1118,11 @@ function MainApp() {
                 user={user}
                 properties={properties}
                 companySettings={companySettings}
-                onOpenNewPropertyModal={handleOpenNewProperty}
+                scheduleEvents={scheduleEvents}
+                onNavigateView={setActiveView}
                 onOpenPdfModal={() => setIsPdfModalOpen(true)}
                 onViewProperty={handleViewPropertyDetails}
-                onEditProperty={handleEditProperty}
-                onDeleteProperty={handleDeleteProperty}
                 onShareWhatsApp={handleShareWhatsApp}
-                onGenerateSocialMedia={handleGenerateSocialMedia}
-                onGenerateAiPost={handleOpenAiPost}
-                onPropertyConfirmed={handlePropertyStatusConfirmed}
               />
             )
           )}
@@ -1175,8 +1171,6 @@ function MainApp() {
               onEditProperty={handleEditProperty}
               onDeleteProperty={handleDeleteProperty}
               onShareWhatsApp={handleShareWhatsApp}
-              onGenerateSocialMedia={handleGenerateSocialMedia}
-              onGenerateAiPost={handleOpenAiPost}
             />
           )}
 

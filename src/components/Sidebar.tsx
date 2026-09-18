@@ -33,32 +33,72 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
   const isGestor = user.role === 'GESTOR' || user.role === 'GESTORA';
   const isMasterOrGestor = isMaster || isGestor;
 
-  const menuItems = [
+  // Menu items for non-admin (Captador / Corretor)
+  // Solicitação explícita:
+  // 1. Todos os Imóveis (deve ser a tela de entrada/consulta principal do captador)
+  // 2. Gerar Catálogo PDF
+  // 3. Agenda de Visitas
+  // 4. Gerar Contratos
+  // 5. Relatórios
+  // Diário de captação e Gerador de post removidos.
+  const captadorMenuItems = [
+    {
+      id: 'properties',
+      label: 'Todos os Imóveis',
+      icon: Building2,
+      show: true
+    },
+    {
+      id: 'pdf-catalog',
+      label: 'Gerar Catálogo PDF',
+      icon: FileText,
+      show: true
+    },
+    {
+      id: 'schedule',
+      label: 'Agenda de Visitas',
+      icon: Calendar,
+      show: true
+    },
+    {
+      id: 'contracts',
+      label: 'Gerar Contratos',
+      icon: FileSignature,
+      show: true
+    },
+    {
+      id: 'reports',
+      label: 'Relatórios',
+      icon: BarChart3,
+      show: true
+    },
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: 'Visão de Consulta',
+      icon: LayoutDashboard,
+      show: true
+    },
+    {
+      id: 'settings',
+      label: 'Configurações',
+      icon: Settings,
+      show: true
+    }
+  ];
+
+  // Menu items for Master Admin & Gestores
+  const adminMenuItems = [
+    {
+      id: 'dashboard',
+      label: 'Dashboard do Gestor',
       icon: LayoutDashboard,
       show: true
     },
     {
       id: 'properties',
-      label: isMasterOrGestor ? 'Todos os Imóveis' : 'Meus Imóveis',
+      label: 'Todos os Imóveis',
       icon: Building2,
       show: true
-    },
-    {
-      id: 'journal',
-      label: 'Diário de Captação',
-      icon: CalendarCheck,
-      show: true,
-      badge: 'Diário'
-    },
-    {
-      id: 'reports',
-      label: 'Relatório Semanal',
-      icon: BarChart3,
-      show: isMasterOrGestor,
-      badge: 'Semanal'
     },
     {
       id: 'xml-import',
@@ -75,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
     },
     {
       id: 'schedule',
-      label: 'Agenda & Visitas',
+      label: 'Agenda de Visitas',
       icon: Calendar,
       show: true
     },
@@ -86,10 +126,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       show: true
     },
     {
+      id: 'reports',
+      label: 'Relatórios',
+      icon: BarChart3,
+      show: true
+    },
+    {
       id: 'users',
       label: 'Usuários & Perfis',
       icon: Users,
-      show: isMaster // ONLY Master Admin can manage users
+      show: isMaster
     },
     {
       id: 'logs',
@@ -104,6 +150,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       show: true
     }
   ];
+
+  const menuItems = isMasterOrGestor ? adminMenuItems : captadorMenuItems;
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200/80 shrink-0 hidden md:block min-h-[calc(100vh-4rem)]">
