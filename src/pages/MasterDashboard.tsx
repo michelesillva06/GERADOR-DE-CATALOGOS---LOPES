@@ -49,12 +49,7 @@ export const MasterDashboard: React.FC<MasterDashboardProps> = ({
               <span>Importar Imóveis (XML)</span>
             </button>
           )}
-          <button
-            onClick={onOpenNewPropertyModal}
-            className="px-4 py-2.5 bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5 cursor-pointer"
-          >
-            <span>+ Cadastrar Imóvel</span>
-          </button>
+
         </div>
       </div>
 

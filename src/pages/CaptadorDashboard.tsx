@@ -76,14 +76,6 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
             <FileSpreadsheet className="w-4 h-4 text-[#F10F4D]" />
             <span>Gerar Catálogo PDF</span>
           </button>
-          
-          <button
-            onClick={onOpenNewPropertyModal}
-            className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-md shadow-rose-500/20 transition cursor-pointer"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Novo Imóvel</span>
-          </button>
         </div>
       </div>
 
@@ -124,13 +116,6 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-black text-slate-900">Seus Imóveis no Sistema ({myProperties.length})</h2>
-          <button
-            onClick={onOpenNewPropertyModal}
-            className="text-xs font-bold text-[#F10F4D] hover:underline flex items-center space-x-1"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Adicionar Novo</span>
-          </button>
         </div>
 
         {myProperties.length > 0 ? (
@@ -141,11 +126,11 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
                 property={property}
                 captador={user}
                 onView={onViewProperty}
-                onEdit={onEditProperty}
+                onEdit={undefined}
                 onDelete={isMaster ? onDeleteProperty : undefined}
                 onGenerateSocialMedia={onGenerateSocialMedia}
                 onGenerateAiPost={onGenerateAiPost}
-                canEdit={true}
+                canEdit={false}
                 canDelete={isMaster}
                 hidePerMonth={true}
               />
@@ -158,12 +143,6 @@ export const CaptadorDashboard: React.FC<CaptadorDashboardProps> = ({
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               Comece cadastrando seu primeiro imóvel para gerar catálogos PDF e criar sua vitrine pública.
             </p>
-            <button
-              onClick={onOpenNewPropertyModal}
-              className="px-5 py-2.5 bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow transition"
-            >
-              Cadastrar Primeiro Imóvel
-            </button>
           </div>
         )}
       </div>
