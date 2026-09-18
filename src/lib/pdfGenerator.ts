@@ -591,12 +591,7 @@ export async function renderHorizontalPropertyCanvas(
     }
   });
 
-  // Prefer the official Lopes site page for this specific property when the captador has pasted
-  // one. When it's missing, point to the Lopes Manaus homepage instead of our own internal
-  // catalog page.
-  const propertyPublicUrl = prop.official_site_url && prop.official_site_url.trim()
-    ? prop.official_site_url.trim()
-    : 'https://manaus.lopes.com.br/';
+  const propertyPublicUrl = `https://manaus.lopes.com.br/imovel/${prop.code}`;
 
   // =========================================================================
   // LOWER GALLERY & CTA DETAILS BOX ROW
@@ -791,9 +786,7 @@ export async function generateCatalogPDF(options: {
     doc.addImage(horizontalCanvasDataUrl, 'JPEG', 0, 0, 297, 210);
 
     // Active interactive PDF link overlay for WhatsApp
-    const propertyPublicUrl = prop.official_site_url && prop.official_site_url.trim()
-      ? prop.official_site_url.trim()
-      : 'https://manaus.lopes.com.br/';
+    const propertyPublicUrl = `https://manaus.lopes.com.br/imovel/${prop.code}`;
     const waMsg = `Olá ${captador.name}! Vi o imóvel "${prop.title}" (Cód: ${prop.code}) no seu catálogo Lopes e gostaria de mais informações.`;
     const whatsappDirectUrl = buildWhatsAppUrl(effectivePhone, waMsg);
 
