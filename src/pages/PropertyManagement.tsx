@@ -129,15 +129,7 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
             <span>Gerar Catálogo PDF</span>
           </button>
 
-          {!isGestor && (
-            <button
-              onClick={onOpenNewPropertyModal}
-              className="px-4 py-2.5 rounded-xl bg-[#F10F4D] hover:bg-rose-600 text-white font-bold text-xs flex items-center space-x-2 shadow-lg shadow-rose-900/30 transition transform active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Cadastrar Imóvel</span>
-            </button>
-          )}
+
         </div>
       </div>
 
@@ -321,11 +313,11 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
             users={users}
             currentUser={currentUser}
             onView={onViewProperty}
-            onEdit={onEditProperty}
+            onEdit={undefined}
             onDelete={isMaster ? onDeleteProperty : undefined}
             onShareWhatsApp={onShareWhatsApp}
             onGenerateAiPost={onGenerateAiPost}
-            canEditAny={isMaster || isGestor}
+            canEditAny={false}
             canDeleteAny={isMaster}
           />
         ) : (
@@ -340,11 +332,11 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
                   property={prop}
                   captador={owner}
                   onView={onViewProperty}
-                  onEdit={onEditProperty}
+                  onEdit={undefined}
                   onDelete={isMaster ? onDeleteProperty : undefined}
                   onGenerateSocialMedia={onGenerateSocialMedia}
                   onGenerateAiPost={onGenerateAiPost}
-                  canEdit={canEdit}
+                  canEdit={false}
                   canDelete={canDelete}
                   hidePerMonth={true}
                 />
@@ -370,15 +362,6 @@ export const PropertyManagement: React.FC<PropertyManagementProps> = ({
 
           {baseProperties.length === 0 && (
             <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={onOpenNewPropertyModal}
-                className="px-4 py-2.5 bg-[#F10F4D] hover:bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center space-x-2 transition shadow-sm cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Cadastrar Imóvel</span>
-              </button>
-
               {isMaster && onOpenXmlImport && (
                 <button
                   type="button"
