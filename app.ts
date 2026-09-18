@@ -1827,8 +1827,8 @@ app.all('/api/cron/sync-lopesnet-feed', async (req, res) => {
       defaultUser.name,
       { id: 'system', name: 'Sincronização Automática Lopesnet' },
       req,
-      true,  // skip_existing
-      false, // update_existing
+      true, // skip_existing
+      true, // update_existing
       '(sincronização automática Lopesnet)'
     );
 
@@ -1836,6 +1836,83 @@ app.all('/api/cron/sync-lopesnet-feed', async (req, res) => {
   } catch (err: any) {
     console.error('Erro na sincronização automática do feed Lopesnet:', err);
     res.status(500).json({ error: err?.message || 'Erro ao sincronizar feed da Lopesnet.' });
+  }
+});
+
+/**
+ * MANUAL RESYNC (MASTER ADMIN ONLY)
+ * Faz a mesma coisa que a sincronização automática diária, mas sob demanda, direto do painel.
+ */
+app.post('/api/properties/sync-now', requireMasterAdmin, async (req, res) => {
+  const reqUser = (req as any).user as User;
+  try {
+    const response = await fetch(LOPESNET_FEED_URL);
+    if (!response.ok) {
+      throw new Error(`Falha ao buscar o feed da Lopesnet: HTTP ${response.status}`);
+    }
+    const xmlText = await response.text();
+    const incomingProps = parseLopesnetFeedXML(xmlText);
+
+    if (incomingProps.length === 0) {
+      return res.json({ success: true, importedCount: 0, updatedCount: 0, message: 'Feed vazio ou sem imóveis.' });
+    }
+
+    const result = await runPropertyXMLImport(
+      incomingProps,
+      reqUser.id,
+      reqUser.name,
+      { id: reqUser.id, name: reqUser.name },
+      req,
+      true, // skip_existing
+      true, // update_existing
+      '(sincronização manual)'
+    );
+
+    res.json({ ...result, properties });
+  } catch (err: any) {
+    console.error('Erro na sincronização manual do feed Lopesnet:', err);
+    res.status(500).json({ error: err?.message || 'Erro ao sincronizar feed da Lopesnet.' });
+  }
+});
+
+/**
+ * PURGE ALL PROPERTIES (MASTER ADMIN ONLY)
+ * Apaga todos os imóveis do sistema — usado uma única vez para limpar dados antigos/manuais
+ * antes de repovoar tudo direto do feed oficial da Lopesnet.
+ */
+app.post('/api/properties/purge-all', requireMasterAdmin, async (req, res) => {
+  const reqUser = (req as any).user as User;
+  const { confirm } = req.body;
+
+  if (confirm !== 'APAGAR TUDO') {
+    return res.status(400).json({ error: 'Confirmação inválida. Envie { confirm: "APAGAR TUDO" } para prosseguir.' });
+  }
+
+  try {
+    const toDelete = [...properties];
+
+    for (const p of toDelete) {
+      await safeFirestoreDocDelete('properties', p.id);
+      if (p.code && p.code !== p.id) {
+        await safeFirestoreDocDelete('properties', p.code);
+      }
+    }
+
+    properties = [];
+    saveLocalDatabase();
+
+    addAuditLog(
+      reqUser.id,
+      reqUser.name,
+      'Purge Total de Imóveis',
+      `Apagou todos os ${toDelete.length} imóveis do sistema para repovoar do zero via XML.`,
+      req
+    );
+
+    res.json({ success: true, deletedCount: toDelete.length, message: `${toDelete.length} imóveis apagados com sucesso.` });
+  } catch (err: any) {
+    console.error('Erro ao apagar todos os imóveis:', err);
+    res.status(500).json({ error: err?.message || 'Erro ao apagar imóveis.' });
   }
 });
 
