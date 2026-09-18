@@ -10,7 +10,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
-import { User, Property, ScheduleEvent } from '../types';
+import { User, Property, ScheduleEvent } from '../types.js';
 
 let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || '';
 let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || '';

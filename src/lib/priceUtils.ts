@@ -1,4 +1,4 @@
-import { Property } from '../types';
+import { Property } from '../types.js';
 
 /**
  * Safely converts any numerical or string input into a valid integer/float number.

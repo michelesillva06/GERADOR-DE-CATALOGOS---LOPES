@@ -1,5 +1,5 @@
-import { Property } from '../types';
-import { parseNumericPrice } from './priceUtils';
+import { Property } from '../types.js';
+import { parseNumericPrice } from './priceUtils.js';
 
 export interface ParsedXMLProperty {
   id?: string;
