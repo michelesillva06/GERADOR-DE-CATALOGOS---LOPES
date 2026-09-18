@@ -30,7 +30,9 @@ import {
   Layers,
   ChevronRight,
   FileText,
-  ShieldAlert
+  ShieldAlert,
+  Trash2,
+  Zap
 } from 'lucide-react';
 
 interface XMLImportPageProps {
@@ -71,11 +73,11 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [comparison, setComparison] = useState<XMLImportComparison | null>(null);
-  
+
   // Table filters inside preview
   const [previewFilter, setPreviewFilter] = useState<'all' | 'new' | 'existing'>('all');
   const [previewSearch, setPreviewSearch] = useState('');
-  
+
   // Success state
   const [successReport, setSuccessReport] = useState<{
     importedCount: number;
@@ -83,6 +85,18 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
     totalCount: number;
     assignedUserName: string;
   } | null>(null);
+
+  // Manual "Sincronizar Agora" state (feed oficial da Lopesnet, sob demanda)
+  const [isSyncingNow, setIsSyncingNow] = useState(false);
+  const [syncNowResult, setSyncNowResult] = useState<{ importedCount: number; updatedCount: number; message: string } | null>(null);
+  const [syncNowError, setSyncNowError] = useState<string | null>(null);
+
+  // "Apagar Imóveis Antigos" (purge) state
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
+  const [purgeConfirmText, setPurgeConfirmText] = useState('');
+  const [isPurging, setIsPurging] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<{ deletedCount: number; message: string } | null>(null);
+  const [purgeError, setPurgeError] = useState<string | null>(null);
 
   // Import history (stored in localStorage)
   const [history, setHistory] = useState<ImportBatchHistory[]>(() => {
@@ -109,6 +123,80 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
       </div>
     );
   }
+
+  const authHeaders = (): Record<string, string> => {
+    const token = localStorage.getItem('lopes_token') || localStorage.getItem('token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+  };
+
+  // Sincroniza agora, sob demanda, direto do feed oficial da Lopesnet (mesma lógica do cron diário)
+  const handleSyncNow = async () => {
+    setIsSyncingNow(true);
+    setSyncNowError(null);
+    setSyncNowResult(null);
+
+    try {
+      const res = await fetch('/api/properties/sync-now', {
+        method: 'POST',
+        headers: authHeaders()
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao sincronizar com o feed da Lopesnet.');
+      }
+
+      setSyncNowResult({
+        importedCount: data.importedCount ?? 0,
+        updatedCount: data.updatedCount ?? 0,
+        message: data.message || 'Sincronização concluída com sucesso!'
+      });
+
+      if (data.properties) {
+        onPropertiesImported(data.properties, data.message || 'Sincronização concluída com sucesso!');
+      }
+    } catch (err: any) {
+      setSyncNowError(err.message || 'Erro ao sincronizar com o feed da Lopesnet.');
+    } finally {
+      setIsSyncingNow(false);
+    }
+  };
+
+  // Apaga todos os imóveis do sistema (usado uma única vez para limpar dados antigos/manuais)
+  const handlePurgeAll = async () => {
+    if (purgeConfirmText.trim() !== 'APAGAR TUDO') return;
+
+    setIsPurging(true);
+    setPurgeError(null);
+    setPurgeResult(null);
+
+    try {
+      const res = await fetch('/api/properties/purge-all', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ confirm: 'APAGAR TUDO' })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Erro ao apagar os imóveis.');
+      }
+
+      setPurgeResult({
+        deletedCount: data.deletedCount ?? 0,
+        message: data.message || 'Imóveis apagados com sucesso.'
+      });
+      setShowPurgeConfirm(false);
+      setPurgeConfirmText('');
+      onPropertiesImported([], data.message || 'Imóveis apagados com sucesso.');
+    } catch (err: any) {
+      setPurgeError(err.message || 'Erro ao apagar os imóveis.');
+    } finally {
+      setIsPurging(false);
+    }
+  };
 
   // File Upload Handler
   const handleFileUpload = (file: File) => {
@@ -182,13 +270,9 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
     setSuccessReport(null);
 
     try {
-      const token = localStorage.getItem('lopes_token') || localStorage.getItem('token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       const res = await fetch('/api/properties/fetch-feed-xml', {
         method: 'POST',
-        headers,
+        headers: authHeaders(),
         body: JSON.stringify({ url: feedUrl.trim() })
       });
 
@@ -243,13 +327,9 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
     const assignedUser = users.find(u => u.id === selectedCaptadorId) || currentUser;
 
     try {
-      const token = localStorage.getItem('lopes_token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
       const res = await fetch('/api/properties/import-xml', {
         method: 'POST',
-        headers,
+        headers: authHeaders(),
         body: JSON.stringify({
           properties: comparison.all,
           user_id: selectedCaptadorId,
@@ -332,11 +412,11 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
-      
+
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#F10F4D]/10 rounded-full blur-3xl pointer-events-none" />
-        
+
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center space-x-2 px-3 py-1 bg-white/10 rounded-full text-xs font-bold text-rose-300 backdrop-blur-xs">
@@ -347,12 +427,30 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
               Importador Automático de Imóveis XML
             </h1>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Importe lotes completos de imóveis de outros sistemas e portais (VivaReal, ZAP, Imovelweb, Kenlo, Winker). 
-              Envie todo o arquivo: o sistema <strong className="text-emerald-400 font-bold">cadastra os novos automaticamente</strong> e <strong className="text-amber-300 font-bold">ignora os já cadastrados</strong>.
+              O sistema já sincroniza automaticamente todos os dias com o feed oficial da Lopesnet — novos imóveis são
+              cadastrados e os já existentes têm seus dados <strong className="text-emerald-400 font-bold">atualizados automaticamente</strong>.
+              Use as opções abaixo para importar de outra fonte, sincronizar agora mesmo ou limpar dados antigos.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleSyncNow}
+              disabled={isSyncingNow}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-900/30 transition flex items-center space-x-1.5 cursor-pointer"
+              title="Busca o feed oficial da Lopesnet agora e atualiza os imóveis já cadastrados"
+            >
+              {isSyncingNow ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              <span>{isSyncingNow ? 'Sincronizando...' : 'Sincronizar Agora'}</span>
+            </button>
+            <button
+              onClick={() => setShowPurgeConfirm(true)}
+              className="px-4 py-2 bg-rose-950/60 hover:bg-rose-900 text-rose-200 font-bold text-xs rounded-xl transition flex items-center space-x-1.5 border border-rose-800 cursor-pointer"
+              title="Apaga todos os imóveis do sistema para repovoar do zero via feed oficial"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Apagar Imóveis Antigos</span>
+            </button>
             <button
               onClick={handleLoadSample}
               className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition flex items-center space-x-1.5 border border-white/15 cursor-pointer"
@@ -370,6 +468,103 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Sync Now Result / Error */}
+      {syncNowResult && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 flex items-start justify-between gap-3 animate-fade-in">
+          <div className="flex items-start space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">{syncNowResult.message}</p>
+              <p className="text-emerald-700 mt-0.5">
+                +{syncNowResult.importedCount} novos imóveis • {syncNowResult.updatedCount} imóveis atualizados com dados frescos do feed
+              </p>
+            </div>
+          </div>
+          <button onClick={() => setSyncNowResult(null)} className="text-emerald-700 hover:bg-emerald-100 rounded-lg p-1"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+      {syncNowError && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 flex items-start justify-between gap-3 animate-fade-in">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="w-4 h-4 text-[#F10F4D] shrink-0 mt-0.5" />
+            <p className="font-bold">{syncNowError}</p>
+          </div>
+          <button onClick={() => setSyncNowError(null)} className="text-rose-700 hover:bg-rose-100 rounded-lg p-1"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {/* Purge Result / Error */}
+      {purgeResult && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-900 flex items-start justify-between gap-3 animate-fade-in">
+          <div className="flex items-start space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <p className="font-bold">{purgeResult.message}</p>
+          </div>
+          <button onClick={() => setPurgeResult(null)} className="text-emerald-700 hover:bg-emerald-100 rounded-lg p-1"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+      {purgeError && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 text-xs text-rose-900 flex items-start justify-between gap-3 animate-fade-in">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="w-4 h-4 text-[#F10F4D] shrink-0 mt-0.5" />
+            <p className="font-bold">{purgeError}</p>
+          </div>
+          <button onClick={() => setPurgeError(null)} className="text-rose-700 hover:bg-rose-100 rounded-lg p-1"><X className="w-4 h-4" /></button>
+        </div>
+      )}
+
+      {/* Purge Confirmation Panel */}
+      {showPurgeConfirm && (
+        <div className="bg-rose-50 border-2 border-rose-300 rounded-3xl p-6 space-y-4 animate-fade-in">
+          <div className="flex items-start space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-rose-950">Atenção: isso vai apagar TODOS os imóveis do sistema</h3>
+              <p className="text-xs text-rose-800 mt-1 leading-relaxed">
+                Essa ação remove permanentemente todos os {properties.length} imóveis cadastrados hoje (incluindo os antigos/manuais
+                com dados incorretos). Depois de apagar, use o botão <strong>"Sincronizar Agora"</strong> para repovoar o sistema
+                direto do feed oficial da Lopesnet, já com os dados corretos. Essa ação não pode ser desfeita.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-rose-900">
+              Para confirmar, digite exatamente: <span className="font-mono bg-rose-100 px-1.5 py-0.5 rounded">APAGAR TUDO</span>
+            </label>
+            <input
+              type="text"
+              value={purgeConfirmText}
+              onChange={(e) => setPurgeConfirmText(e.target.value)}
+              placeholder="APAGAR TUDO"
+              className="w-full sm:w-80 px-4 py-2.5 bg-white border border-rose-300 rounded-xl text-sm font-mono font-bold text-rose-900 focus:ring-2 focus:ring-rose-500/30"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handlePurgeAll}
+              disabled={purgeConfirmText.trim() !== 'APAGAR TUDO' || isPurging}
+              className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-xs rounded-xl shadow-lg transition flex items-center space-x-2 cursor-pointer"
+            >
+              {isPurging ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              <span>{isPurging ? 'Apagando...' : 'Confirmar e Apagar Tudo'}</span>
+            </button>
+            <button
+              onClick={() => {
+                setShowPurgeConfirm(false);
+                setPurgeConfirmText('');
+              }}
+              className="px-5 py-2.5 bg-white hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl border border-rose-300 transition cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Success Notification Box */}
       {successReport && (
@@ -455,7 +650,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
       {/* STEP 1: Input / File Upload Area (if comparison not yet active) */}
       {!comparison && !successReport && (
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-6">
-          
+
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
               <h2 className="text-lg font-black text-slate-900">1. Selecione a Origem do Arquivo XML</h2>
@@ -515,7 +710,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                   accept=".xml,text/xml,application/xml"
                   className="hidden"
                 />
-                
+
                 <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center mx-auto text-[#F10F4D] group-hover:scale-110 transition">
                   <UploadCloud className="w-8 h-8" />
                 </div>
@@ -610,10 +805,10 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
       {/* STEP 2: Preview & Deduplication Summary (Active when comparison is ready) */}
       {comparison && (
         <div className="space-y-6 animate-fade-in">
-          
+
           {/* Deduplication & Count Summary Header */}
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-6">
-            
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-5">
               <div>
                 <div className="flex items-center space-x-2">
@@ -637,7 +832,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
 
             {/* 3 Metric Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              
+
               {/* Total Card */}
               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200/80">
                 <p className="text-xs font-bold text-slate-500 uppercase">Total no Arquivo XML</p>
@@ -680,7 +875,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
 
             {/* Import Configuration Controls */}
             <div className="p-5 bg-slate-50/80 rounded-2xl border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
-              
+
               {/* Captador Assignment Selection */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center space-x-1.5">
@@ -708,7 +903,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
                   Comportamento de Duplicações:
                 </label>
-                
+
                 <label className="flex items-start space-x-2.5 p-2 bg-white rounded-xl border border-slate-200 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -791,7 +986,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
 
           {/* Detailed Preview Table */}
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
-            
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="text-base font-black text-slate-900">Prévia dos Imóveis no Arquivo</h3>
@@ -861,7 +1056,7 @@ export const XMLImportPage: React.FC<XMLImportPageProps> = ({
                     const isNew = comparison.newProperties.some(np => np.code.toLowerCase().trim() === item.code.toLowerCase().trim());
                     return (
                       <tr key={index} className={isNew ? 'hover:bg-emerald-50/30' : 'bg-slate-50/40 hover:bg-amber-50/30 opacity-75'}>
-                        
+
                         {/* Status Badge */}
                         <td className="p-3.5 whitespace-nowrap">
                           {isNew ? (
