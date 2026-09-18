@@ -836,7 +836,12 @@ app.post('/api/users', requireMasterAdmin, async (req, res) => {
     created_at: new Date().toISOString()
   };
 
-  await safeFirestoreDocSet('users', newUser.id, newUser, false);
+  const firestoreWriteOk = await safeFirestoreDocSet('users', newUser.id, newUser, false);
+  if (!firestoreWriteOk) {
+    return res.status(502).json({
+      error: 'Não foi possível salvar o usuário no banco de dados na nuvem (Firestore). Tente novamente em alguns instantes.'
+    });
+  }
   users.push(newUser);
   saveLocalDatabase();
 
