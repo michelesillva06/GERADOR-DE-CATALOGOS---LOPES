@@ -11,7 +11,6 @@ import {
   Share2,
   History,
   ExternalLink,
-  BookOpen,
   Calendar,
   FileCode,
   CalendarCheck,
@@ -67,12 +66,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeView, setActiveView, onO
       icon: FileCode,
       show: isMaster,
       badge: 'XML'
-    },
-    {
-      id: 'general-catalog',
-      label: 'Catálogo Geral (Vitrine)',
-      icon: BookOpen,
-      show: true
     },
     {
       id: 'pdf-catalog',
